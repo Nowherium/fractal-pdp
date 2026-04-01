@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Fractal - Planificateur de Faction (V9 - Historique & Overrides)</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; background-color: #121212; color: #e0e0e0; padding: 20px; max-width: 1400px; margin: auto; }
+        h1, h2, h3 { color: #00bcd4; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .panel { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444; }
+        .lune-panel { background: #1a1a1a; border-left: 5px solid #00bcd4; box-shadow: 2px 2px 10px rgba(0,0,0,0.5); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #111; font-size: 0.9em; }
+        th, td { border: 1px solid #333; padding: 6px; text-align: center; vertical-align: middle; }
+        th { background-color: #0a0a0a; color: #00bcd4; }
+        input[type="number"], input[type="text"] { width: 55px; padding: 4px; background: #222; color: white; border: 1px solid #555; text-align: center; }
+        input[type="text"].nom-input { width: 120px; }
+        .input-global { width: 80px; }
+        .input-xp { width: 45px; height: 18px; font-size: 0.85em; background: #1a2e1a; border: 1px solid #4caf50; color: #69f0ae; }
+        .xp-container { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        select { background: #222; color: white; border: 1px solid #555; padding: 4px; }
+        .danger { color: #ff5252; font-weight: bold; }
+        .warning { color: #ffd54f; font-weight: bold; }
+        .safe { color: #69f0ae; font-weight: bold;}
+        .dead { background-color: #2a0000; color: #555; text-decoration: line-through; }
+        .highlight { background-color: #2a2a2a; }
+        .mat-color { color: #ffb74d; }
+        button { background-color: #00bcd4; color: #121212; border: none; padding: 8px 12px; cursor: pointer; font-weight: bold; border-radius: 3px; margin-top: 5px; }
+        button:hover { background-color: #008ba3; }
+        .btn-add { background-color: #4caf50; color: white; }
+        .btn-add:hover { background-color: #45a049; }
+        .btn-del { background-color: #f44336; color: white; padding: 4px 8px; font-size: 0.8em; }
+        .btn-gear { background-color: #555; color: white; padding: 4px 8px; font-size: 0.9em; border-radius: 5px; }
+        .btn-gear:hover { background-color: #777; }
+        .stats-box { display: flex; gap: 15px; background: #0a0a0a; padding: 10px; border-radius: 5px; margin-bottom: 10px; justify-content: space-around; border: 1px solid #333;}
+        .stat-item { text-align: center; }
+        .stat-val { font-size: 1.2em; font-weight: bold; }
+        .info-text { font-size: 0.85em; color: #888; font-style: italic; margin-bottom: 10px; }
+        .craft-box { background-color: #2c2c2c; padding: 10px; border-radius: 4px; border-left: 3px solid #ffb74d; margin-top: 10px; display: inline-block; }
+        .save-bar { background: #0a0a0a; padding: 15px; border-radius: 5px; display: flex; gap: 15px; align-items: center; border: 1px solid #00bcd4; margin-bottom: 20px;}
+        input[type="file"] { display: none; }
+        .file-label { background-color: #ffb74d; color: #121212; padding: 8px 12px; cursor: pointer; font-weight: bold; border-radius: 3px; display: inline-block; }
+        .file-label:hover { background-color: #e6a545; }
+        .override-row { background-color: #1a2a3a; border-left: 3px solid #00bcd4; border-right: 3px solid #00bcd4;}
+        .override-box { display: flex; gap: 10px; justify-content: center; align-items: center; padding: 10px; flex-wrap: wrap;}
+        .override-item { background: #111; padding: 5px 10px; border-radius: 4px; border: 1px solid #444; }
+    </style>
+</head>
+<body>
+
+    <h1>Fractal - Planificateur de Faction (V9)</h1>
+
+    <div class="save-bar">
+        <strong style="color: #00bcd4;">💾 BASE DE DONNÉES :</strong>
+        <span id="save-status" style="color: #69f0ae; font-size: 0.9em; margin-right: auto;">(Auto-sauvegarde active)</span>
+        <button onclick="exporterDonnees()">📥 Exporter</button>
+        <label class="file-label">
+            📤 Importer
+            <input type="file" id="fileImport" accept=".json" onchange="importerDonnees(event)">
+        </label>
+        <button class="btn-del" onclick="resetDonnees()">⚠️ Tout effacer</button>
+    </div>
+
+    <div class="panel">
+        <h2>1. Réserve Centrale (MAINTENANT)</h2>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <label>Stock Eau : <input type="number" id="stockInitEau" step="1" onchange="updateStockInitial()"></label>
+            <label>Stock Nrt : <input type="number" id="stockInitNrt" step="1" onchange="updateStockInitial()"></label>
+            <label>Stock Med : <input type="number" id="stockInitMed" step="1" onchange="updateStockInitial()"></label>
+            <label class="mat-color">Stock Mat : <input type="number" id="stockInitMat" step="1" onchange="updateStockInitial()"></label>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>2. L'Effectif & Potentiel de base</h2>
+        <p class="info-text">Indiquez la capacité originelle. Les modifications au fil du temps se feront directement dans les blocs Lunes via le bouton ⚙️.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>PV Début</th>
+                    <th class="highlight">💧 Eau<br><span style="font-size:0.7em; color:#4caf50;">Base / +XP par Lune</span></th>
+                    <th class="highlight">🍗 Nrt<br><span style="font-size:0.7em; color:#4caf50;">Base / +XP par Lune</span></th>
+                    <th class="highlight">💊 Med<br><span style="font-size:0.7em; color:#4caf50;">Base / +XP par Lune</span></th>
+                    <th class="highlight mat-color">🧱 Mat<br><span style="font-size:0.7em; color:#4caf50;">Base / +XP par Lune</span></th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="tbodyBasePersos"></tbody>
+        </table>
+        <button class="btn-add" onclick="ajouterPerso()">+ Recruter un membre</button>
+    </div>
+
+    <h2>3. Ligne du Temps & Assignations</h2>
+    <div id="timeline"></div>
+    <button class="btn-add" onclick="ajouterLune()" style="font-size: 1.1em; padding: 10px 20px;">+ Ajouter la Lune suivante</button>
+
+    <script>
+        let persos = [];
+        let lunes = [];
+        let nextPersoId = 1;
+        let stocks = { eau: 82, nrt: 96, med: 15, mat: 20 };
+        
+        // État de l'interface (pour garder les menus ⚙️ ouverts)
+        let openOverrides = {};
+
+        // --- SAUVEGARDE ET IMPORT/EXPORT ---
+        function sauvegarderEnLocal() {
+            const data = { persos, lunes, nextPersoId, stocks };
+            localStorage.setItem('fractalEscaleSaveV9', JSON.stringify(data));
+            let status = document.getElementById('save-status');
+            status.innerText = "Sauvegardé à " + new Date().toLocaleTimeString();
+            setTimeout(() => { status.innerText = "(Auto-sauvegarde active)"; }, 2000);
+        }
+
+        function chargerDepuisLocal() {
+            let savedData = localStorage.getItem('fractalEscaleSaveV9') || localStorage.getItem('fractalEscaleSaveV8') || localStorage.getItem('fractalEscaleSave');
+            if (savedData) {
+                try {
+                    const parsed = JSON.parse(savedData);
+                    persos = parsed.persos || [];
+                    lunes = parsed.lunes || [];
+                    nextPersoId = parsed.nextPersoId || 1;
+                    stocks = parsed.stocks || { eau: 0, nrt: 0, med: 0, mat: 0 };
+                    
+                    persos.forEach(p => {
+                        if(p.incEau === undefined) p.incEau = 0.05;
+                        if(p.incNrt === undefined) p.incNrt = 0.05;
+                        if(p.incMed === undefined) p.incMed = 0.01;
+                        if(p.incMat === undefined) p.incMat = 0.05;
+                    });
+                    
+                    lunes.forEach(l => {
+                        if(!l.overrides) l.overrides = {};
+                    });
+
+                    appliquerStocksInitiaux();
+                    return true;
+                } catch(e) { console.error("Erreur de chargement", e); }
+            }
+            return false;
+        }
+
+        function exporterDonnees() {
+            const data = JSON.stringify({ persos, lunes, nextPersoId, stocks }, null, 2);
+            const blob = new Blob([data], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "Escale_Simu_V9_" + new Date().toISOString().slice(0,10) + ".json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function importerDonnees(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    persos = parsed.persos || [];
+                    lunes = parsed.lunes || [];
+                    nextPersoId = parsed.nextPersoId || 1;
+                    stocks = parsed.stocks || { eau: 0, nrt: 0, med: 0, mat: 0 };
+                    appliquerStocksInitiaux();
+                    renderBasePersos();
+                    calculerSimulation();
+                } catch(err) { alert("Fichier invalide ou corrompu !"); }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function resetDonnees() {
+            if(confirm("Effacer TOUTES les données ?")) {
+                localStorage.removeItem('fractalEscaleSaveV9');
+                localStorage.removeItem('fractalEscaleSaveV8');
+                localStorage.removeItem('fractalEscaleSave');
+                location.reload();
+            }
+        }
+
+        // --- STOCKS INITIAUX ---
+        function appliquerStocksInitiaux() {
+            document.getElementById('stockInitEau').value = stocks.eau;
+            document.getElementById('stockInitNrt').value = stocks.nrt;
+            document.getElementById('stockInitMed').value = stocks.med;
+            document.getElementById('stockInitMat').value = stocks.mat;
+        }
+
+        function updateStockInitial() {
+            stocks.eau = parseFloat(document.getElementById('stockInitEau').value) || 0;
+            stocks.nrt = parseFloat(document.getElementById('stockInitNrt').value) || 0;
+            stocks.med = parseFloat(document.getElementById('stockInitMed').value) || 0;
+            stocks.mat = parseFloat(document.getElementById('stockInitMat').value) || 0;
+            calculerSimulation();
+        }
+
+        // --- GESTION EFFECTIF ---
+        function renderBasePersos() {
+            const tbody = document.getElementById('tbodyBasePersos');
+            tbody.innerHTML = '';
+            persos.forEach(function(p, index) {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><input type="text" class="nom-input" value="${p.nom}" onchange="updatePerso(${index}, 'nom', this.value)"></td>
+                        <td><input type="number" value="${p.pvBase}" step="1" onchange="updatePerso(${index}, 'pvBase', this.value)"></td>
+                        <td class="highlight">
+                            <div class="xp-container">
+                                <input type="number" value="${p.capEau}" step="0.01" onchange="updatePerso(${index}, 'capEau', this.value)">
+                                <span style="font-size:0.8em; color:#4caf50;">+<input type="number" class="input-xp" value="${p.incEau}" step="0.01" onchange="updatePerso(${index}, 'incEau', this.value)"></span>
+                            </div>
+                        </td>
+                        <td class="highlight">
+                            <div class="xp-container">
+                                <input type="number" value="${p.capNrt}" step="0.01" onchange="updatePerso(${index}, 'capNrt', this.value)">
+                                <span style="font-size:0.8em; color:#4caf50;">+<input type="number" class="input-xp" value="${p.incNrt}" step="0.01" onchange="updatePerso(${index}, 'incNrt', this.value)"></span>
+                            </div>
+                        </td>
+                        <td class="highlight">
+                            <div class="xp-container">
+                                <input type="number" value="${p.capMed}" step="0.01" onchange="updatePerso(${index}, 'capMed', this.value)">
+                                <span style="font-size:0.8em; color:#4caf50;">+<input type="number" class="input-xp" value="${p.incMed}" step="0.01" onchange="updatePerso(${index}, 'incMed', this.value)"></span>
+                            </div>
+                        </td>
+                        <td class="highlight">
+                            <div class="xp-container">
+                                <input type="number" value="${p.capMat}" step="0.01" onchange="updatePerso(${index}, 'capMat', this.value)">
+                                <span style="font-size:0.8em; color:#4caf50;">+<input type="number" class="input-xp" value="${p.incMat}" step="0.01" onchange="updatePerso(${index}, 'incMat', this.value)"></span>
+                            </div>
+                        </td>
+                        <td><button class="btn-del" onclick="supprimerPerso(${index})">Renvoyer</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function updatePerso(index, champ, valeur) {
+            if (champ !== 'nom') valeur = parseFloat(valeur) || 0;
+            persos[index][champ] = valeur;
+            calculerSimulation();
+        }
+
+        function ajouterPerso() {
+            let newId = nextPersoId++;
+            persos.push({ id: newId, nom: "Nouveau", pvBase: 10, capEau: 1, capNrt: 1, capMed: 0, capMat: 1, incEau: 0.05, incNrt: 0.05, incMed: 0.01, incMat: 0.05 });
+            lunes.forEach(function(l) { 
+                l.rations[newId] = { eau: true, nrt: true, med: true, tache: '' }; 
+            });
+            renderBasePersos();
+            calculerSimulation();
+        }
+
+        function supprimerPerso(index) {
+            let idRemoved = persos[index].id;
+            persos.splice(index, 1);
+            lunes.forEach(function(l) { 
+                delete l.rations[idRemoved]; 
+                if(l.overrides) delete l.overrides[idRemoved];
+            });
+            renderBasePersos();
+            calculerSimulation();
+        }
+
+        // --- GESTION DES LUNES ---
+        function ajouterLune() {
+            let nouvelleLune = { id: Date.now(), coutMat: 0, rations: {}, overrides: {} };
+            persos.forEach(function(p) {
+                nouvelleLune.rations[p.id] = { eau: true, nrt: true, med: true, tache: '' };
+            });
+            lunes.push(nouvelleLune);
+            calculerSimulation();
+        }
+
+        function supprimerLune(index) {
+            lunes.splice(index, 1);
+            calculerSimulation();
+        }
+
+        function updateRation(luneIndex, persoId, ressource, valeur) {
+            if (!lunes[luneIndex].rations[persoId]) {
+                lunes[luneIndex].rations[persoId] = { eau: false, nrt: false, med: false, tache: '' };
+            }
+            lunes[luneIndex].rations[persoId][ressource] = valeur;
+            calculerSimulation();
+        }
+
+        function updateLuneGlobal(luneIndex, champ, valeur) {
+            lunes[luneIndex][champ] = parseFloat(valeur) || 0;
+            calculerSimulation();
+        }
+
+        // --- GESTION DES OVERRIDES ---
+        function toggleOverrideMenu(luneIndex, persoId) {
+            let key = luneIndex + '-' + persoId;
+            openOverrides[key] = !openOverrides[key];
+            calculerSimulation();
+        }
+
+        function setOverride(luneIndex, persoId, champ, valeur) {
+            if (!lunes[luneIndex].overrides) lunes[luneIndex].overrides = {};
+            if (!lunes[luneIndex].overrides[persoId]) lunes[luneIndex].overrides[persoId] = {};
+            
+            if (valeur === "") {
+                delete lunes[luneIndex].overrides[persoId][champ];
+            } else {
+                lunes[luneIndex].overrides[persoId][champ] = parseFloat(valeur);
+            }
+            calculerSimulation();
+        }
+
+        function clearOverrides(luneIndex, persoId) {
+            if (lunes[luneIndex].overrides) {
+                delete lunes[luneIndex].overrides[persoId];
+            }
+            calculerSimulation();
+        }
+
+        // --- MOTEUR DE SIMULATION (AVEC XP & OVERRIDES) ---
+        function calculerSimulation() {
+            const timelineDiv = document.getElementById('timeline');
+            if (!timelineDiv) return;
+            timelineDiv.innerHTML = '';
+
+            let stockEau = stocks.eau;
+            let stockNrt = stocks.nrt;
+            let stockMed = stocks.med;
+            let stockMat = stocks.mat;
+
+            // Variables de suivi au fil du temps
+            let pvCourants = {};
+            let capCourantes = {};
+            let incCourants = {};
+            
+            persos.forEach(function(p) { 
+                pvCourants[p.id] = p.pvBase; 
+                capCourantes[p.id] = { eau: p.capEau, nrt: p.capNrt, med: p.capMed, mat: p.capMat };
+                incCourants[p.id] = { eau: p.incEau, nrt: p.incNrt, med: p.incMed, mat: p.incMat };
+            });
+
+            lunes.forEach(function(lune, luneIndex) {
+                
+                let luneProdEau = 0, luneProdNrt = 0, luneProdMed = 0, luneProdMat = 0;
+                let luneConsoEau = 0, luneConsoNrt = 0, luneConsoMed = 0;
+
+                // 1. Appliquer les OVERRIDES de cette lune AVANT le calcul
+                persos.forEach(function(p) {
+                    if (lune.overrides && lune.overrides[p.id]) {
+                        let ov = lune.overrides[p.id];
+                        if (ov.pv !== undefined) pvCourants[p.id] = ov.pv;
+                        if (ov.capEau !== undefined) capCourantes[p.id].eau = ov.capEau;
+                        if (ov.capNrt !== undefined) capCourantes[p.id].nrt = ov.capNrt;
+                        if (ov.capMed !== undefined) capCourantes[p.id].med = ov.capMed;
+                        if (ov.capMat !== undefined) capCourantes[p.id].mat = ov.capMat;
+                        if (ov.incEau !== undefined) incCourants[p.id].eau = ov.incEau;
+                        if (ov.incNrt !== undefined) incCourants[p.id].nrt = ov.incNrt;
+                        if (ov.incMed !== undefined) incCourants[p.id].med = ov.incMed;
+                        if (ov.incMat !== undefined) incCourants[p.id].mat = ov.incMat;
+                    }
+                });
+
+                // On sauvegarde l'état exact au début de la lune pour l'affichage
+                let capDebutLune = {};
+                let incDebutLune = {};
+
+                // 2. Calculs de Production et Consommation
+                persos.forEach(function(p) {
+                    capDebutLune[p.id] = { ...capCourantes[p.id] };
+                    incDebutLune[p.id] = { ...incCourants[p.id] };
+
+                    if (pvCourants[p.id] > 0) {
+                        let r = lune.rations[p.id] || { eau: false, nrt: false, med: false, tache: '' };
+                        
+                        // Production + Ajout XP
+                        if (r.tache === 'eau') { luneProdEau += capCourantes[p.id].eau; capCourantes[p.id].eau += (incCourants[p.id].eau || 0); }
+                        if (r.tache === 'nrt') { luneProdNrt += capCourantes[p.id].nrt; capCourantes[p.id].nrt += (incCourants[p.id].nrt || 0); }
+                        if (r.tache === 'med') { luneProdMed += capCourantes[p.id].med; capCourantes[p.id].med += (incCourants[p.id].med || 0); }
+                        if (r.tache === 'mat') { luneProdMat += capCourantes[p.id].mat; capCourantes[p.id].mat += (incCourants[p.id].mat || 0); }
+
+                        if (r.eau) luneConsoEau++;
+                        if (r.nrt) luneConsoNrt++;
+                        if (r.med) luneConsoMed++;
+                    }
+                });
+
+                stockEau = stockEau + luneProdEau - luneConsoEau;
+                stockNrt = stockNrt + luneProdNrt - luneConsoNrt;
+                stockMed = stockMed + luneProdMed - luneConsoMed;
+                stockMat = stockMat + luneProdMat - (lune.coutMat || 0);
+
+                let classEau = stockEau < 0 ? 'danger' : 'safe';
+                let classNrt = stockNrt < 0 ? 'danger' : 'safe';
+                let classMed = stockMed < 0 ? 'danger' : 'safe';
+                let classMat = stockMat < 0 ? 'danger' : 'mat-color';
+
+                // 3. Rendu HTML
+                let luneHtml = `
+                    <div class="panel lune-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px;">
+                            <h3 style="margin: 0; border: none; padding: 0;">LUNE ${luneIndex + 1}</h3>
+                            <button class="btn-del" onclick="supprimerLune(${luneIndex})">X Supprimer</button>
+                        </div>
+                        
+                        <div class="craft-box">
+                            <label>🛠️ Construction de la lune (Coût Mat) : 
+                                <input type="number" class="input-global" value="${lune.coutMat || 0}" step="1" onchange="updateLuneGlobal(${luneIndex}, 'coutMat', this.value)">
+                            </label>
+                        </div>
+
+                        <table>
+                            <tr>
+                                <th>Nom</th>
+                                <th>PV Début</th>
+                                <th style="background-color:#113333;">TÂCHE</th>
+                                <th>Boit (-1)</th>
+                                <th>Mange (-1)</th>
+                                <th>Med (-0.5)</th>
+                                <th>PV Fin</th>
+                                <th>Ajuster</th>
+                            </tr>
+                `;
+
+                persos.forEach(function(p) {
+                    let pvDebut = pvCourants[p.id];
+                    let r = lune.rations[p.id] || { eau: false, nrt: false, med: false, tache: '' };
+                    let cDebut = capDebutLune[p.id]; 
+                    
+                    let estMortAuDebut = (pvDebut <= 0);
+                    let classLigne = estMortAuDebut ? 'dead' : '';
+                    let disabled = estMortAuDebut ? 'disabled' : '';
+
+                    let pvFin = pvDebut;
+                    let classPv = '';
+                    let mortText = '';
+
+                    if (!estMortAuDebut) {
+                        let degats = (r.eau ? 0 : 1) + (r.nrt ? 0 : 1) + (r.med ? 0 : 0.5);
+                        pvFin = pvDebut - degats;
+                        pvCourants[p.id] = pvFin; 
+                        classPv = pvFin <= 0 ? 'danger' : (pvFin <= 5 ? 'warning' : 'safe');
+                        mortText = pvFin <= 0 ? ' (DÉCÈS)' : '';
+                    } else {
+                        mortText = ' (CADAVRE)';
+                    }
+
+                    let selRien = r.tache === '' ? 'selected' : '';
+                    let selEau = r.tache === 'eau' ? 'selected' : '';
+                    let selNrt = r.tache === 'nrt' ? 'selected' : '';
+                    let selMed = r.tache === 'med' ? 'selected' : '';
+                    let selMat = r.tache === 'mat' ? 'selected' : '';
+
+                    let hasOverride = lune.overrides && lune.overrides[p.id] && Object.keys(lune.overrides[p.id]).length > 0;
+                    let gearClass = hasOverride ? 'danger' : ''; // Devient rouge si une stat est altérée
+
+                    luneHtml += `
+                        <tr class="${classLigne}">
+                            <td>${p.nom}</td>
+                            <td>${pvDebut > 0 ? pvDebut : 0}</td>
+                            <td style="background-color:#112222;">
+                                <select onchange="updateRation(${luneIndex}, ${p.id}, 'tache', this.value)" ${disabled} style="width: 100%;">
+                                    <option value="" ${selRien}>Repos / Autre</option>
+                                    <option value="eau" ${selEau}>💧 Eau (${cDebut.eau.toFixed(2)})</option>
+                                    <option value="nrt" ${selNrt}>🍗 Nrt (${cDebut.nrt.toFixed(2)})</option>
+                                    <option value="med" ${selMed}>💊 Med (${cDebut.med.toFixed(2)})</option>
+                                    <option value="mat" ${selMat}>🧱 Mat (${cDebut.mat.toFixed(2)})</option>
+                                </select>
+                            </td>
+                            <td><input type="checkbox" ${r.eau && !estMortAuDebut ? 'checked' : ''} onchange="updateRation(${luneIndex}, ${p.id}, 'eau', this.checked)" ${disabled}></td>
+                            <td><input type="checkbox" ${r.nrt && !estMortAuDebut ? 'checked' : ''} onchange="updateRation(${luneIndex}, ${p.id}, 'nrt', this.checked)" ${disabled}></td>
+                            <td><input type="checkbox" ${r.med && !estMortAuDebut ? 'checked' : ''} onchange="updateRation(${luneIndex}, ${p.id}, 'med', this.checked)" ${disabled}></td>
+                            <td class="${classPv}">${pvFin > 0 ? pvFin : 0}${mortText}</td>
+                            <td><button class="btn-gear ${gearClass}" onclick="toggleOverrideMenu(${luneIndex}, ${p.id})">⚙️</button></td>
+                        </tr>
+                    `;
+
+                    // Ligne de SURCHARGE (cachée par défaut)
+                    let menuOpen = openOverrides[luneIndex + '-' + p.id];
+                    let ov = (lune.overrides && lune.overrides[p.id]) ? lune.overrides[p.id] : {};
+                    
+                    if (menuOpen) {
+                        luneHtml += `
+                            <tr class="override-row">
+                                <td colspan="8">
+                                    <div style="color:#00bcd4; font-size:0.8em; margin-bottom:5px;">⚠️ Forcer de nouvelles stats pour <b>${p.nom}</b> (s'appliquera à partir de cette lune) :</div>
+                                    <div class="override-box">
+                                        <div class="override-item">❤️ PV : <input type="number" placeholder="Laisse vide" value="${ov.pv!==undefined ? ov.pv : ''}" onchange="setOverride(${luneIndex}, ${p.id}, 'pv', this.value)"></div>
+                                        <div class="override-item">💧 Cap Eau: <input type="number" placeholder="Auto" value="${ov.capEau!==undefined ? ov.capEau : ''}" onchange="setOverride(${luneIndex}, ${p.id}, 'capEau', this.value)"></div>
+                                        <div class="override-item">🍗 Cap Nrt: <input type="number" placeholder="Auto" value="${ov.capNrt!==undefined ? ov.capNrt : ''}" onchange="setOverride(${luneIndex}, ${p.id}, 'capNrt', this.value)"></div>
+                                        <div class="override-item">💊 Cap Med: <input type="number" placeholder="Auto" value="${ov.capMed!==undefined ? ov.capMed : ''}" onchange="setOverride(${luneIndex}, ${p.id}, 'capMed', this.value)"></div>
+                                        <div class="override-item">📈 Nouv. Gain XP Eau: <input type="number" placeholder="Auto" value="${ov.incEau!==undefined ? ov.incEau : ''}" onchange="setOverride(${luneIndex}, ${p.id}, 'incEau', this.value)"></div>
+                                        <button class="btn-del" onclick="clearOverrides(${luneIndex}, ${p.id})">Effacer</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+
+                luneHtml += `</table>
+                    <div class="stats-box" style="margin-top: 15px;">
+                        <div class="stat-item">Stock Fin Lune EAU<br><span class="stat-val ${classEau}">${stockEau.toFixed(2)}</span></div>
+                        <div class="stat-item">Stock Fin Lune NRT<br><span class="stat-val ${classNrt}">${stockNrt.toFixed(2)}</span></div>
+                        <div class="stat-item">Stock Fin Lune MED<br><span class="stat-val ${classMed}">${stockMed.toFixed(2)}</span></div>
+                        <div class="stat-item mat-color">Stock Fin Lune MAT<br><span class="stat-val ${classMat}">${stockMat.toFixed(2)}</span></div>
+                    </div>
+                </div>`;
+
+                timelineDiv.innerHTML += luneHtml;
+            });
+
+            sauvegarderEnLocal();
+        }
+
+        // Init
+        if (!chargerDepuisLocal()) {
+            persos = [
+                { id: 1, nom: "Klostro", pvBase: 18, capEau: 2.96, capNrt: 2.42, capMed: 0.79, capMat: 0.14, incEau: 0.1, incNrt: 0.05, incMed: 0.05, incMat: 0.05 }
+            ];
+            nextPersoId = 2;
+            appliquerStocksInitiaux();
+            ajouterLune(); 
+        } else {
+            renderBasePersos();
+            calculerSimulation();
+        }
+
+    </script>
+</body>
+</html>

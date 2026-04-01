@@ -1,0 +1,17 @@
+{
+  # Global Caddy configuration.
+  email you@example.com
+}
+
+http://fractal.dev.local, http://localhost, http://127.0.0.1 {
+  redir https://{host}{uri} permanent
+}
+
+https://fractal.dev.local, https://localhost, https://127.0.0.1 {
+  tls internal
+
+  route {
+    reverse_proxy /api/* backend:3000
+    reverse_proxy /* frontend:5173
+  }
+}
