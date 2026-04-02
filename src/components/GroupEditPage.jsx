@@ -1,4 +1,9 @@
 import React from "react";
+import {
+  getGroupCapacity,
+  getGroupLeader,
+  getGroupMembers,
+} from "../utils/groupUtils";
 
 function GroupEditPage({
   group,
@@ -19,13 +24,10 @@ function GroupEditPage({
     );
   }
 
-  const memberPersos = persos.filter((perso) => perso.groupId === group.id);
+  const memberPersos = getGroupMembers(persos, group.id);
   const memberIds = memberPersos.map((perso) => perso.id);
-  const leader =
-    memberPersos.find((perso) => perso.id === group.chef) ||
-    memberPersos[0] ||
-    null;
-  const groupCapacity = Math.max(1, Math.floor(Number(leader?.cmd ?? 0)) + 1);
+  const leader = getGroupLeader(group, persos);
+  const groupCapacity = getGroupCapacity(leader);
   const isAtCapacity = memberPersos.length >= groupCapacity;
 
   const toggleMember = (persoId, checked) => {
@@ -70,10 +72,7 @@ function GroupEditPage({
           >
             <option value=''>Sélectionner</option>
             {memberPersos.map((perso) => {
-              const optionCapacity = Math.max(
-                1,
-                Math.floor(Number(perso.cmd ?? 0)) + 1,
-              );
+              const optionCapacity = getGroupCapacity(perso);
               const isTooSmall = memberPersos.length > optionCapacity;
               return (
                 <option key={perso.id} value={perso.id} disabled={isTooSmall}>
@@ -85,7 +84,7 @@ function GroupEditPage({
         </label>
       </div>
 
-      <div className='perso-form'>
+      <div className='perso-form-section'>
         <h3>Membres du groupe</h3>
         <p className='info-text'>
           Coche un perso pour l'ajouter à ce groupe. Le décocher le retire du

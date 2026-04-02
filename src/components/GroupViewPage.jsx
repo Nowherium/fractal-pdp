@@ -1,4 +1,15 @@
 import React from "react";
+import {
+  calculateGroupTotals,
+  getGroupCapacity,
+  getGroupLeader,
+  getGroupMembers,
+  getPersoCapacityValue,
+  getPersoCombatValue,
+  getPersoWeightLimit,
+  getPersoWeightValue,
+  isPersoOverweight,
+} from "../utils/groupUtils";
 
 const formatNumber = (value) => Number(value ?? 0).toFixed(2);
 
@@ -15,21 +26,10 @@ function GroupViewPage({ group, persos, closePage }) {
     );
   }
 
-  const memberPersos = persos.filter((perso) => perso.groupId === group.id);
-  const leader = memberPersos.find((perso) => perso.id === group.chef) || null;
-
-  const totals = memberPersos.reduce(
-    (acc, perso) => ({
-      eau: acc.eau + Number(perso.capEau ?? 0),
-      nrt: acc.nrt + Number(perso.capNrt ?? 0),
-      med: acc.med + Number(perso.capMed ?? 0),
-      mat: acc.mat + Number(perso.capMat ?? 0),
-      combat: acc.combat + Number(perso.combat ?? 0),
-    }),
-    { eau: 0, nrt: 0, med: 0, mat: 0, combat: 0 },
-  );
-
-  const groupCapacity = Math.max(1, Math.floor(Number(leader?.cmd ?? 0)) + 1);
+  const memberPersos = getGroupMembers(persos, group.id);
+  const leader = getGroupLeader(group, persos);
+  const totals = calculateGroupTotals(memberPersos);
+  const groupCapacity = getGroupCapacity(leader);
 
   return (
     <div className='panel'>
@@ -59,7 +59,9 @@ function GroupViewPage({ group, persos, closePage }) {
                 <th>Nrt</th>
                 <th>Med</th>
                 <th>Mat</th>
+                <th>Art</th>
                 <th>Combat</th>
+                <th>Poids</th>
               </tr>
             </thead>
             <tbody>
@@ -67,11 +69,18 @@ function GroupViewPage({ group, persos, closePage }) {
                 <tr key={perso.id}>
                   <td>{perso.nom}</td>
                   <td>{perso.id === group.chef ? "Leader" : "Membre"}</td>
-                  <td>{formatNumber(perso.capEau)}</td>
-                  <td>{formatNumber(perso.capNrt)}</td>
-                  <td>{formatNumber(perso.capMed)}</td>
-                  <td>{formatNumber(perso.capMat)}</td>
-                  <td>{formatNumber(perso.combat)}</td>
+                  <td>{formatNumber(getPersoCapacityValue(perso, "eau"))}</td>
+                  <td>{formatNumber(getPersoCapacityValue(perso, "nrt"))}</td>
+                  <td>{formatNumber(getPersoCapacityValue(perso, "med"))}</td>
+                  <td>{formatNumber(getPersoCapacityValue(perso, "mat"))}</td>
+                  <td>{formatNumber(getPersoCapacityValue(perso, "art"))}</td>
+                  <td>{formatNumber(getPersoCombatValue(perso))}</td>
+                  <td
+                    className={isPersoOverweight(perso) ? "danger" : undefined}
+                  >
+                    {formatNumber(getPersoWeightValue(perso))} /{" "}
+                    {formatNumber(getPersoWeightLimit(perso))}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -82,7 +91,9 @@ function GroupViewPage({ group, persos, closePage }) {
                 <th>{formatNumber(totals.nrt)}</th>
                 <th>{formatNumber(totals.med)}</th>
                 <th>{formatNumber(totals.mat)}</th>
+                <th>{formatNumber(totals.art)}</th>
                 <th>{formatNumber(totals.combat)}</th>
+                <th>{formatNumber(totals.poids)}</th>
               </tr>
             </tfoot>
           </table>
@@ -105,8 +116,16 @@ function GroupViewPage({ group, persos, closePage }) {
               <strong>{formatNumber(totals.mat)}</strong>
             </div>
             <div className='perso-field'>
+              <span className='perso-field-label'>Production totale Art</span>
+              <strong>{formatNumber(totals.art)}</strong>
+            </div>
+            <div className='perso-field'>
               <span className='perso-field-label'>Combat total</span>
               <strong>{formatNumber(totals.combat)}</strong>
+            </div>
+            <div className='perso-field'>
+              <span className='perso-field-label'>Poids total porté</span>
+              <strong>{formatNumber(totals.poids)}</strong>
             </div>
             <div className='perso-field'>
               <span className='perso-field-label'>Capacité max du groupe</span>

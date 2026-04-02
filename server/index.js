@@ -50,6 +50,13 @@ app.post("/api/reset", async (_req, res) => {
     const defaultState = {
       stocks: defaultStocks,
       persos: defaultPersos,
+      persoResources: [],
+      armes: [],
+      persoArmes: [],
+      outils: [],
+      persoOutils: [],
+      sacs: [],
+      persoSacs: [],
       lunes: [
         {
           id: defaultLuneId,
@@ -67,7 +74,9 @@ app.post("/api/reset", async (_req, res) => {
     res.json(state);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Impossible de réinitialiser la base de données" });
+    res
+      .status(500)
+      .json({ error: "Impossible de réinitialiser la base de données" });
   }
 });
 

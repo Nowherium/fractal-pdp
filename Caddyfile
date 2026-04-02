@@ -3,11 +3,7 @@
   email you@example.com
 }
 
-http://fractal.dev.local, http://localhost, http://127.0.0.1 {
-  redir https://{host}{uri} permanent
-}
-
-https://fractal.dev.local, https://localhost, https://127.0.0.1 {
+https://fractal.dev.local {
   tls internal
 
   route {
