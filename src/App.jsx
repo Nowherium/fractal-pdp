@@ -4,9 +4,13 @@ import PageTabs from "./components/PageTabs";
 import ReservePage from "./components/ReservePage";
 import EffectifPage from "./components/EffectifPage";
 import PersoPage from "./components/PersoPage";
+import GroupPage from "./components/GroupPage";
+import GroupEditPage from "./components/GroupEditPage";
+import GroupViewPage from "./components/GroupViewPage";
 import TimelinePage from "./components/TimelinePage";
 
 const defaultStocks = {};
+const defaultGroups = [{ id: 1, name: "Groupe 1", chef: null }];
 
 const buildStocks = (resources, stockValues = {}) =>
   Object.fromEntries(
@@ -18,6 +22,18 @@ const buildStocks = (resources, stockValues = {}) =>
 
 const defaultRation = () => ({ eau: true, nrt: true, med: true, tache: "" });
 
+const normalizeOptionalGroupId = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const normalizePersoFieldValue = (field, rawValue) => {
+  if (field === "nom") return rawValue;
+  if (field === "groupId") return normalizeOptionalGroupId(rawValue);
+  return Number(rawValue) || 0;
+};
+
 const normalizePersos = (persos) =>
   persos.map((p) => ({
     id: Number(p.id),
@@ -27,9 +43,21 @@ const normalizePersos = (persos) =>
     capNrt: Number(p.capNrt ?? 0),
     capMed: Number(p.capMed ?? 0),
     capMat: Number(p.capMat ?? 0),
+    capart: Number(p.capart ?? 0),
+    cmd: Number(p.cmd ?? 0),
     combat: Number(p.combat ?? 0),
-    groupId: Number(p.groupId ?? 1),
+    groupId: normalizeOptionalGroupId(p.groupId),
   }));
+
+const normalizeGroups = (groups) => {
+  const normalized = Array.isArray(groups) ? groups : [];
+  if (normalized.length === 0) return [];
+  return normalized.map((g) => ({
+    id: Number(g.id),
+    name: g.name || `Groupe ${g.id}`,
+    chef: g.chef === null || g.chef === undefined ? null : Number(g.chef),
+  }));
+};
 
 const computeIncrement = (cap) => (cap < 4 ? 0.1 : cap <= 6 ? 0.05 : 0.01);
 
@@ -62,6 +90,7 @@ const buildFallbackState = () => {
     lunes: [createLune(persos)],
     stocks: defaultStocks,
     nextPersoId: 1,
+    groups: [],
   };
 };
 
@@ -79,6 +108,7 @@ const buildState = (rawState) => {
     stocks: { ...buildStocks(resources), ...(rawState.stocks || {}) },
     nextPersoId:
       rawState.nextPersoId || Math.max(1, ...persos.map((p) => p.id + 1)),
+    groups: normalizeGroups(rawState.groups || []),
   };
 };
 
@@ -217,9 +247,11 @@ function App() {
   const [persos, setPersos] = useState([]);
   const [lunes, setLunes] = useState([]);
   const [stocks, setStocks] = useState(defaultStocks);
+  const [groups, setGroups] = useState([]);
   const [nextPersoId, setNextPersoId] = useState(2);
   const [page, setPage] = useState("reserve");
   const [selectedPersoId, setSelectedPersoId] = useState(null);
+  const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [openOverrides, setOpenOverrides] = useState({});
   const [saveStatus, setSaveStatus] = useState("(Chargement...)");
   const [ready, setReady] = useState(false);
@@ -233,6 +265,7 @@ function App() {
     setPersos(state.persos);
     setLunes(state.lunes);
     setStocks(state.stocks);
+    setGroups(state.groups);
     setNextPersoId(state.nextPersoId);
   };
 
@@ -268,7 +301,7 @@ function App() {
         await fetch("/api/state", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ persos, lunes, stocks, nextPersoId }),
+          body: JSON.stringify({ persos, lunes, stocks, nextPersoId, groups }),
         });
         const now = new Date().toLocaleTimeString();
         setSaveStatus("Sauvegardé à " + now);
@@ -284,37 +317,101 @@ function App() {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [persos, lunes, stocks, nextPersoId, ready]);
+  }, [persos, lunes, stocks, nextPersoId, groups, ready]);
 
   const handleStockChange = (field, rawValue) => {
     const value = Number(rawValue) || 0;
     setStocks((previous) => ({ ...previous, [field]: value }));
   };
 
+  const recalculateGroups = (nextPersos, previousGroups) => {
+    const membersByGroup = nextPersos.reduce((acc, perso) => {
+      if (perso.groupId === null || perso.groupId === undefined) {
+        return acc;
+      }
+      if (!acc[perso.groupId]) acc[perso.groupId] = [];
+      acc[perso.groupId].push(perso.id);
+      return acc;
+    }, {});
+
+    return previousGroups
+      .filter((group) => (membersByGroup[group.id] || []).length > 0)
+      .map((group) => {
+        const members = membersByGroup[group.id] || [];
+        if (group.chef !== null && members.includes(Number(group.chef))) {
+          return group;
+        }
+        return { ...group, chef: members[0] };
+      });
+  };
+
+  const getGroupCapacity = (leader) =>
+    Math.max(1, Math.floor(Number(leader?.cmd ?? 0)) + 1);
+
+  const validateGroupCapacities = (candidatePersos, candidateGroups) => {
+    for (const group of candidateGroups) {
+      const members = candidatePersos.filter(
+        (perso) => perso.groupId === group.id,
+      );
+      if (members.length === 0) continue;
+      const leader =
+        members.find((perso) => perso.id === group.chef) || members[0] || null;
+      const capacity = getGroupCapacity(leader);
+      if (members.length > capacity) {
+        return `Le groupe \"${group.name}\" dépasse la capacité de commandement de ${leader?.nom || "ce leader"} (${capacity} membres max).`;
+      }
+    }
+    return "";
+  };
+
   const handlePersoUpdate = (index, field, rawValue) => {
-    setPersos((previous) =>
-      previous.map((p, idx) =>
+    setPersos((previous) => {
+      const nextPersos = previous.map((p, idx) =>
         idx !== index
           ? p
           : {
               ...p,
-              [field]: field === "nom" ? rawValue : Number(rawValue) || 0,
+              [field]: normalizePersoFieldValue(field, rawValue),
             },
-      ),
-    );
+      );
+
+      if (field === "groupId" || field === "cmd") {
+        const nextGroups = recalculateGroups(nextPersos, groups);
+        const capacityError = validateGroupCapacities(nextPersos, nextGroups);
+        if (capacityError) {
+          window.alert(capacityError);
+          return previous;
+        }
+        setGroups(nextGroups);
+      }
+
+      return nextPersos;
+    });
   };
 
   const handlePersoUpdateById = (persoId, field, rawValue) => {
-    setPersos((previous) =>
-      previous.map((p) =>
+    setPersos((previous) => {
+      const nextPersos = previous.map((p) =>
         p.id !== persoId
           ? p
           : {
               ...p,
-              [field]: field === "nom" ? rawValue : Number(rawValue) || 0,
+              [field]: normalizePersoFieldValue(field, rawValue),
             },
-      ),
-    );
+      );
+
+      if (field === "groupId" || field === "cmd") {
+        const nextGroups = recalculateGroups(nextPersos, groups);
+        const capacityError = validateGroupCapacities(nextPersos, nextGroups);
+        if (capacityError) {
+          window.alert(capacityError);
+          return previous;
+        }
+        setGroups(nextGroups);
+      }
+
+      return nextPersos;
+    });
   };
 
   const addPerso = () => {
@@ -326,8 +423,10 @@ function App() {
       capNrt: 1,
       capMed: 0,
       capMat: 1,
+      capart: 0,
+      cmd: 0,
       combat: 0,
-      groupId: 1,
+      groupId: groups[0]?.id ?? null,
     };
     setPersos((previous) => [...previous, newPerso]);
     setLunes((previous) =>
@@ -452,9 +551,114 @@ function App() {
     setSelectedPersoId(null);
   };
 
+  const openGroupPage = (groupId) => {
+    setSelectedGroupId(groupId);
+    setPage("group");
+  };
+
+  const openGroupViewPage = (groupId) => {
+    setSelectedGroupId(groupId);
+    setPage("group-view");
+  };
+
+  const closeGroupPage = () => {
+    setPage("groupes");
+    setSelectedGroupId(null);
+  };
+
+  const handleGroupUpdate = (groupId, field, rawValue) => {
+    setGroups((previous) =>
+      previous.map((group) =>
+        group.id !== groupId
+          ? group
+          : {
+              ...group,
+              [field]:
+                field === "chef"
+                  ? rawValue === null
+                    ? null
+                    : Number(rawValue)
+                  : rawValue,
+            },
+      ),
+    );
+  };
+
+  const handleGroupMembersUpdate = (groupId, selectedMemberIds) => {
+    const uniqueIds = Array.from(
+      new Set(
+        selectedMemberIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id)),
+      ),
+    );
+
+    const nextPersos = persos.map((perso) => {
+      if (uniqueIds.includes(perso.id)) {
+        return { ...perso, groupId };
+      }
+      if (perso.groupId === groupId) {
+        return { ...perso, groupId: null };
+      }
+      return perso;
+    });
+
+    const nextGroups = recalculateGroups(nextPersos, groups);
+    const capacityError = validateGroupCapacities(nextPersos, nextGroups);
+    if (capacityError) {
+      window.alert(capacityError);
+      return;
+    }
+
+    setPersos(nextPersos);
+    setGroups(nextGroups);
+
+    if (uniqueIds.length === 0) {
+      setSelectedGroupId(null);
+      setPage("groupes");
+    }
+  };
+
+  const handleGroupUpdateSafe = (groupId, field, rawValue) => {
+    if (field !== "chef") {
+      handleGroupUpdate(groupId, field, rawValue);
+      return;
+    }
+
+    const members = persos
+      .filter((perso) => perso.groupId === groupId)
+      .map((perso) => perso.id);
+
+    const nextChef =
+      rawValue === null || rawValue === undefined
+        ? (members[0] ?? null)
+        : Number(rawValue);
+
+    if (nextChef === null || !members.includes(nextChef)) {
+      return;
+    }
+
+    const nextGroups = groups.map((group) =>
+      group.id !== groupId
+        ? group
+        : {
+            ...group,
+            chef: nextChef,
+          },
+    );
+
+    const capacityError = validateGroupCapacities(persos, nextGroups);
+    if (capacityError) {
+      window.alert(capacityError);
+      return;
+    }
+
+    setGroups(nextGroups);
+  };
+
   const exportData = () => {
     const data = JSON.stringify(
-      { persos, lunes, nextPersoId, stocks },
+      { persos, lunes, nextPersoId, stocks, groups },
       null,
       2,
     );
@@ -515,7 +719,8 @@ function App() {
   const pages = [
     { key: "reserve", label: "1. Réserve centrale" },
     { key: "effectif", label: "2. Effectif" },
-    { key: "timeline", label: "3. Ligne du temps" },
+    { key: "groupes", label: "3. Groupe" },
+    { key: "timeline", label: "4. Ligne du temps" },
   ];
 
   return (
@@ -550,9 +755,37 @@ function App() {
         />
       )}
 
+      {page === "groupes" && (
+        <GroupPage
+          groups={groups}
+          persos={persos}
+          openGroupPage={openGroupPage}
+          openGroupViewPage={openGroupViewPage}
+        />
+      )}
+
+      {page === "group-view" && (
+        <GroupViewPage
+          group={groups.find((g) => g.id === selectedGroupId)}
+          persos={persos}
+          closePage={closeGroupPage}
+        />
+      )}
+
+      {page === "group" && (
+        <GroupEditPage
+          group={groups.find((g) => g.id === selectedGroupId)}
+          persos={persos}
+          handleGroupUpdate={handleGroupUpdateSafe}
+          handleGroupMembersUpdate={handleGroupMembersUpdate}
+          closePage={closeGroupPage}
+        />
+      )}
+
       {page === "perso" && (
         <PersoPage
           perso={persos.find((p) => p.id === selectedPersoId)}
+          groups={groups}
           handlePersoUpdate={handlePersoUpdateById}
           closePage={closePersoPage}
         />

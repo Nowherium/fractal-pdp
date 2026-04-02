@@ -41,6 +41,14 @@ function EffectifPage({ persos, removePerso, addPerso, openPersoPage }) {
                 Capacité
               </span>
             </th>
+            <th className='highlight'>
+              🎭 Art
+              <br />
+              <span style={{ fontSize: "0.7em", color: "#4caf50" }}>
+                Capacité
+              </span>
+            </th>
+            <th className='highlight'>CMD</th>
             <th className='highlight'>Combat</th>
             <th>Action</th>
           </tr>
@@ -54,6 +62,8 @@ function EffectifPage({ persos, removePerso, addPerso, openPersoPage }) {
               <td className='highlight'>{p.capNrt}</td>
               <td className='highlight'>{p.capMed}</td>
               <td className='highlight'>{p.capMat}</td>
+              <td className='highlight'>{p.capart}</td>
+              <td className='highlight'>{p.cmd}</td>
               <td className='highlight'>{p.combat}</td>
               <td>
                 <button
