@@ -1,5 +1,3 @@
-import React from "react";
-
 const weaponFields = [
   { key: "name", label: "Nom", type: "text", step: undefined },
   { key: "att", label: "Att", type: "number", step: "0.1" },
@@ -48,7 +46,22 @@ function WeaponsPage({ armes, addArme, updateArme, removeArme }) {
                       min={field.key === "quantity" ? 0 : undefined}
                       value={arme[field.key] ?? ""}
                       onChange={(event) =>
-                        updateArme(index, field.key, event.target.value)
+                        updateArme(
+                          index,
+                          field.key,
+                          event.target.value,
+                          field.type === "text"
+                            ? { persist: false }
+                            : undefined,
+                        )
+                      }
+                      onBlur={
+                        field.type === "text"
+                          ? (event) =>
+                              updateArme(index, field.key, event.target.value, {
+                                persist: true,
+                              })
+                          : undefined
                       }
                     />
                   </td>

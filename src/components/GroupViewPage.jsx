@@ -1,4 +1,3 @@
-import React from "react";
 import {
   calculateGroupTotals,
   getGroupCapacity,
@@ -13,7 +12,7 @@ import {
 
 const formatNumber = (value) => Number(value ?? 0).toFixed(2);
 
-function GroupViewPage({ group, persos, closePage }) {
+function GroupViewPage({ group, persos, closePage, openEditPage }) {
   if (!group) {
     return (
       <div className='panel'>
@@ -33,9 +32,18 @@ function GroupViewPage({ group, persos, closePage }) {
 
   return (
     <div className='panel'>
-      <button type='button' onClick={closePage}>
-        ← Retour aux Groupes
-      </button>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        <button type='button' onClick={closePage}>
+          ← Retour aux Groupes
+        </button>
+        <button
+          className='btn-edit'
+          type='button'
+          onClick={() => openEditPage(group.id)}
+        >
+          Modifier ce groupe
+        </button>
+      </div>
 
       <h2>Récapitulatif de {group.name || "ce groupe"}</h2>
       <p className='info-text'>

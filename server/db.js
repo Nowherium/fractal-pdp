@@ -128,6 +128,25 @@ const buildGroupsPayload = (groups, persosPayload) => {
     return { groupsPayload: null, groupIds: [] };
   }
 
+  if (!Array.isArray(persosPayload)) {
+    const groupsPayload = groups
+      .map((group) => {
+        const id = Number(group.id);
+        if (!Number.isFinite(id)) return null;
+        return {
+          group_id: id,
+          name: group.name || `Groupe ${id}`,
+          chef: normalizeOptionalId(group.chef),
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      groupsPayload,
+      groupIds: groupsPayload.map((group) => group.group_id),
+    };
+  }
+
   const persoIdsByGroup = new Map();
   for (const perso of persosPayload) {
     if (perso.group_id === null || perso.group_id === undefined) continue;
@@ -544,9 +563,11 @@ const getState = async () => {
 };
 
 const insertState = async (state) => {
-  const persos = Array.isArray(state.persos) ? state.persos : [];
-  const lunes = Array.isArray(state.lunes) ? state.lunes : [];
-  const stocks = { ...defaultStocks, ...(state.stocks || {}) };
+  const persos = Array.isArray(state.persos) ? state.persos : null;
+  const lunes = Array.isArray(state.lunes) ? state.lunes : null;
+  const stocks = state.stocks
+    ? { ...defaultStocks, ...(state.stocks || {}) }
+    : null;
   const groups = Array.isArray(state.groups) ? state.groups : null;
   const armes = Array.isArray(state.armes) ? state.armes : null;
   const persoArmes = Array.isArray(state.persoArmes) ? state.persoArmes : null;
@@ -561,7 +582,7 @@ const insertState = async (state) => {
     : null;
 
   const persosById = new Map();
-  for (const p of persos) {
+  for (const p of persos || []) {
     const id = Number(p.id);
     if (!Number.isFinite(id)) continue;
     persosById.set(id, {
@@ -580,13 +601,13 @@ const insertState = async (state) => {
       group_id: normalizeOptionalId(p.groupId),
     });
   }
-  const persosPayload = Array.from(persosById.values());
-  const persoIds = persosPayload.map((p) => p.id);
+  const persosPayload = persos ? Array.from(persosById.values()) : null;
+  const persoIds = persosPayload?.map((p) => p.id) || [];
 
   const lunesById = new Map();
   const rationsPayload = [];
   const overridesPayload = [];
-  for (const lune of lunes) {
+  for (const lune of lunes || []) {
     const luneId = Number(lune.id);
     if (!Number.isFinite(luneId)) continue;
     lunesById.set(luneId, {
@@ -619,8 +640,8 @@ const insertState = async (state) => {
       });
     }
   }
-  const lunesPayload = Array.from(lunesById.values());
-  const luneIds = lunesPayload.map((lune) => lune.id);
+  const lunesPayload = lunes ? Array.from(lunesById.values()) : null;
+  const luneIds = lunesPayload?.map((lune) => lune.id) || [];
 
   const { groupsPayload, groupIds } = buildGroupsPayload(groups, persosPayload);
 
@@ -779,10 +800,12 @@ const insertState = async (state) => {
       quantity: normalizeNonNegativeNumber(entry.quantity),
     })) || null;
 
-  const stocksPayload = stockFields.map((code) => ({
-    code,
-    quantity: normalizeNumber(stocks[code]),
-  }));
+  const stocksPayload = stocks
+    ? stockFields.map((code) => ({
+        code,
+        quantity: normalizeNumber(stocks[code]),
+      }))
+    : null;
 
   const client = await pool.connect();
   try {
@@ -912,46 +935,49 @@ const insertState = async (state) => {
       }
     }
 
-    if (persosPayload.length > 0) {
-      await client.query(
-        `INSERT INTO persos (id, nom, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
-         SELECT id, nom, pvmax, pv, poidsmax, capeau, capnrt, capmed, capmat, capart, cmd, combat, group_id
-         FROM json_to_recordset($1::json) AS incoming(
-           id integer,
-           nom text,
-           pvmax numeric,
-           pv numeric,
-           poidsmax numeric,
-           capeau numeric,
-           capnrt numeric,
-           capmed numeric,
-           capmat numeric,
-           capart numeric,
-           cmd numeric,
-           combat numeric,
-           group_id integer
-         )
-         ON CONFLICT (id)
-         DO UPDATE SET
-           nom = EXCLUDED.nom,
-           pvmax = EXCLUDED.pvmax,
-           pv = EXCLUDED.pv,
-           poidsmax = EXCLUDED.poidsmax,
-           capEau = EXCLUDED.capEau,
-           capNrt = EXCLUDED.capNrt,
-           capMed = EXCLUDED.capMed,
-           capMat = EXCLUDED.capMat,
-           capart = EXCLUDED.capart,
-           cmd = EXCLUDED.cmd,
-           combat = EXCLUDED.combat,
-           group_id = EXCLUDED.group_id`,
-        [JSON.stringify(persosPayload)],
-      );
-      await client.query("DELETE FROM persos WHERE NOT (id = ANY($1::int[]))", [
-        persoIds,
-      ]);
-    } else {
-      await client.query("DELETE FROM persos");
+    if (persosPayload !== null) {
+      if (persosPayload.length > 0) {
+        await client.query(
+          `INSERT INTO persos (id, nom, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
+           SELECT id, nom, pvmax, pv, poidsmax, capeau, capnrt, capmed, capmat, capart, cmd, combat, group_id
+           FROM json_to_recordset($1::json) AS incoming(
+             id integer,
+             nom text,
+             pvmax numeric,
+             pv numeric,
+             poidsmax numeric,
+             capeau numeric,
+             capnrt numeric,
+             capmed numeric,
+             capmat numeric,
+             capart numeric,
+             cmd numeric,
+             combat numeric,
+             group_id integer
+           )
+           ON CONFLICT (id)
+           DO UPDATE SET
+             nom = EXCLUDED.nom,
+             pvmax = EXCLUDED.pvmax,
+             pv = EXCLUDED.pv,
+             poidsmax = EXCLUDED.poidsmax,
+             capEau = EXCLUDED.capEau,
+             capNrt = EXCLUDED.capNrt,
+             capMed = EXCLUDED.capMed,
+             capMat = EXCLUDED.capMat,
+             capart = EXCLUDED.capart,
+             cmd = EXCLUDED.cmd,
+             combat = EXCLUDED.combat,
+             group_id = EXCLUDED.group_id`,
+          [JSON.stringify(persosPayload)],
+        );
+        await client.query(
+          "DELETE FROM persos WHERE NOT (id = ANY($1::int[]))",
+          [persoIds],
+        );
+      } else {
+        await client.query("DELETE FROM persos");
+      }
     }
 
     if (groupsPayload !== null) {
@@ -1061,47 +1087,28 @@ const insertState = async (state) => {
       }
     }
 
-    if (lunesPayload.length > 0) {
-      await client.query(
-        `INSERT INTO lunes (id, coutMat)
-         SELECT id, coutmat
-         FROM json_to_recordset($1::json) AS incoming(id bigint, coutmat numeric)
-         ON CONFLICT (id)
-         DO UPDATE SET coutMat = EXCLUDED.coutMat`,
-        [JSON.stringify(lunesPayload)],
-      );
-      await client.query(
-        "DELETE FROM lunes WHERE NOT (id = ANY($1::bigint[]))",
-        [luneIds],
-      );
-    } else {
-      await client.query("DELETE FROM lunes");
-    }
+    if (lunesPayload !== null) {
+      if (lunesPayload.length > 0) {
+        await client.query(
+          `INSERT INTO lunes (id, coutMat)
+           SELECT id, coutmat
+           FROM json_to_recordset($1::json) AS incoming(id bigint, coutmat numeric)
+           ON CONFLICT (id)
+           DO UPDATE SET coutMat = EXCLUDED.coutMat`,
+          [JSON.stringify(lunesPayload)],
+        );
+        await client.query(
+          "DELETE FROM lunes WHERE NOT (id = ANY($1::bigint[]))",
+          [luneIds],
+        );
+      } else {
+        await client.query("DELETE FROM lunes");
+      }
 
-    if (rationsPayload.length > 0) {
-      await client.query(
-        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache)
-         SELECT lune_id, perso_id, eau, nrt, med, tache
-         FROM json_to_recordset($1::json) AS incoming(
-           lune_id bigint,
-           perso_id integer,
-           eau boolean,
-           nrt boolean,
-           med boolean,
-           tache text
-         )
-         ON CONFLICT (lune_id, perso_id)
-         DO UPDATE SET
-           eau = EXCLUDED.eau,
-           nrt = EXCLUDED.nrt,
-           med = EXCLUDED.med,
-           tache = EXCLUDED.tache`,
-        [JSON.stringify(rationsPayload)],
-      );
-      await client.query(
-        `DELETE FROM rations AS r
-         WHERE NOT EXISTS (
-           SELECT 1
+      if (rationsPayload.length > 0) {
+        await client.query(
+          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache)
+           SELECT lune_id, perso_id, eau, nrt, med, tache
            FROM json_to_recordset($1::json) AS incoming(
              lune_id bigint,
              perso_id integer,
@@ -1110,55 +1117,78 @@ const insertState = async (state) => {
              med boolean,
              tache text
            )
-           WHERE incoming.lune_id = r.lune_id
-             AND incoming.perso_id = r.perso_id
-         )`,
-        [JSON.stringify(rationsPayload)],
-      );
-    } else {
-      await client.query("DELETE FROM rations");
-    }
+           ON CONFLICT (lune_id, perso_id)
+           DO UPDATE SET
+             eau = EXCLUDED.eau,
+             nrt = EXCLUDED.nrt,
+             med = EXCLUDED.med,
+             tache = EXCLUDED.tache`,
+          [JSON.stringify(rationsPayload)],
+        );
+        await client.query(
+          `DELETE FROM rations AS r
+           WHERE NOT EXISTS (
+             SELECT 1
+             FROM json_to_recordset($1::json) AS incoming(
+               lune_id bigint,
+               perso_id integer,
+               eau boolean,
+               nrt boolean,
+               med boolean,
+               tache text
+             )
+             WHERE incoming.lune_id = r.lune_id
+               AND incoming.perso_id = r.perso_id
+           )`,
+          [JSON.stringify(rationsPayload)],
+        );
+      } else {
+        await client.query("DELETE FROM rations");
+      }
 
-    if (overridesPayload.length > 0) {
-      await client.query(
-        `INSERT INTO overrides (lune_id, perso_id, data)
-         SELECT lune_id, perso_id, data
-         FROM json_to_recordset($1::json) AS incoming(
-           lune_id bigint,
-           perso_id integer,
-           data jsonb
-         )
-         ON CONFLICT (lune_id, perso_id)
-         DO UPDATE SET data = EXCLUDED.data`,
-        [JSON.stringify(overridesPayload)],
-      );
-      await client.query(
-        `DELETE FROM overrides AS o
-         WHERE NOT EXISTS (
-           SELECT 1
+      if (overridesPayload.length > 0) {
+        await client.query(
+          `INSERT INTO overrides (lune_id, perso_id, data)
+           SELECT lune_id, perso_id, data
            FROM json_to_recordset($1::json) AS incoming(
              lune_id bigint,
              perso_id integer,
              data jsonb
            )
-           WHERE incoming.lune_id = o.lune_id
-             AND incoming.perso_id = o.perso_id
-         )`,
-        [JSON.stringify(overridesPayload)],
-      );
-    } else {
-      await client.query("DELETE FROM overrides");
+           ON CONFLICT (lune_id, perso_id)
+           DO UPDATE SET data = EXCLUDED.data`,
+          [JSON.stringify(overridesPayload)],
+        );
+        await client.query(
+          `DELETE FROM overrides AS o
+           WHERE NOT EXISTS (
+             SELECT 1
+             FROM json_to_recordset($1::json) AS incoming(
+               lune_id bigint,
+               perso_id integer,
+               data jsonb
+             )
+             WHERE incoming.lune_id = o.lune_id
+               AND incoming.perso_id = o.perso_id
+           )`,
+          [JSON.stringify(overridesPayload)],
+        );
+      } else {
+        await client.query("DELETE FROM overrides");
+      }
     }
 
-    await client.query(
-      `INSERT INTO city_resources (city_id, resource_id, quantity)
-       SELECT $1, r.id, incoming.quantity
-       FROM json_to_recordset($2::json) AS incoming(code text, quantity numeric)
-       JOIN resources AS r ON r.code = incoming.code
-       ON CONFLICT (city_id, resource_id)
-       DO UPDATE SET quantity = EXCLUDED.quantity`,
-      [defaultCity.id, JSON.stringify(stocksPayload)],
-    );
+    if (stocksPayload !== null) {
+      await client.query(
+        `INSERT INTO city_resources (city_id, resource_id, quantity)
+         SELECT $1, r.id, incoming.quantity
+         FROM json_to_recordset($2::json) AS incoming(code text, quantity numeric)
+         JOIN resources AS r ON r.code = incoming.code
+         ON CONFLICT (city_id, resource_id)
+         DO UPDATE SET quantity = EXCLUDED.quantity`,
+        [defaultCity.id, JSON.stringify(stocksPayload)],
+      );
+    }
 
     if (persoResourcesPayload !== null) {
       if (persoResourcesPayload.length > 0) {
@@ -1194,16 +1224,18 @@ const insertState = async (state) => {
       }
     }
 
-    await client.query(
-      `INSERT INTO perso_resources (perso_id, resource_id, quantity)
-       SELECT p.id, r.id, 0
-       FROM persos AS p
-       CROSS JOIN resources AS r
-       LEFT JOIN perso_resources pr
-         ON pr.perso_id = p.id
-        AND pr.resource_id = r.id
-       WHERE pr.perso_id IS NULL`,
-    );
+    if (persosPayload !== null || persoResourcesPayload !== null) {
+      await client.query(
+        `INSERT INTO perso_resources (perso_id, resource_id, quantity)
+         SELECT p.id, r.id, 0
+         FROM persos AS p
+         CROSS JOIN resources AS r
+         LEFT JOIN perso_resources pr
+           ON pr.perso_id = p.id
+          AND pr.resource_id = r.id
+         WHERE pr.perso_id IS NULL`,
+      );
+    }
 
     await client.query("COMMIT");
   } catch (error) {
@@ -1212,6 +1244,911 @@ const insertState = async (state) => {
   } finally {
     client.release();
   }
+};
+
+const withTransaction = async (callback) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await callback(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const ensureGroupExists = async (client, groupId, name) => {
+  const normalizedGroupId = normalizeOptionalId(groupId);
+  if (normalizedGroupId === null) return;
+
+  await client.query(
+    `INSERT INTO groups (group_id, name, chef)
+     VALUES ($1, $2, NULL)
+     ON CONFLICT (group_id) DO NOTHING`,
+    [normalizedGroupId, name || `Groupe ${normalizedGroupId}`],
+  );
+};
+
+const ensurePersoExists = async (client, persoId) => {
+  const { rowCount } = await client.query(
+    "SELECT 1 FROM persos WHERE id = $1 LIMIT 1",
+    [persoId],
+  );
+
+  if (rowCount === 0) {
+    throw new Error(`Le perso ${persoId} est introuvable.`);
+  }
+};
+
+const ensurePersoResourceCoverage = async (client, persoIds) => {
+  const normalizedPersoIds = (persoIds || [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+
+  if (normalizedPersoIds.length === 0) {
+    return;
+  }
+
+  await client.query(
+    `INSERT INTO perso_resources (perso_id, resource_id, quantity)
+     SELECT target.perso_id, r.id, 0
+     FROM unnest($1::int[]) AS target(perso_id)
+     CROSS JOIN resources AS r
+     LEFT JOIN perso_resources pr
+       ON pr.perso_id = target.perso_id
+      AND pr.resource_id = r.id
+     WHERE pr.perso_id IS NULL`,
+    [normalizedPersoIds],
+  );
+};
+
+const syncAndValidateGroups = async (client) => {
+  await client.query(
+    `UPDATE groups AS g
+     SET chef = NULL
+     WHERE NOT EXISTS (
+       SELECT 1 FROM persos AS p WHERE p.group_id = g.group_id
+     )`,
+  );
+
+  await client.query(
+    `UPDATE groups AS g
+     SET chef = leader.id
+     FROM (
+       SELECT DISTINCT ON (p.group_id) p.group_id, p.id
+       FROM persos AS p
+       WHERE p.group_id IS NOT NULL
+       ORDER BY p.group_id, p.id
+     ) AS leader
+     WHERE g.group_id = leader.group_id
+       AND (
+         g.chef IS NULL
+         OR NOT EXISTS (
+           SELECT 1
+           FROM persos AS p
+           WHERE p.id = g.chef
+             AND p.group_id = g.group_id
+         )
+       )`,
+  );
+
+  const { rows } = await client.query(
+    `SELECT
+       g.group_id,
+       g.name,
+       COUNT(m.id)::int AS member_count,
+       COALESCE(leader.cmd, 0) AS leader_cmd,
+       COALESCE(leader.nom, g.chef::text, g.name) AS leader_name
+     FROM groups AS g
+     LEFT JOIN persos AS m
+       ON m.group_id = g.group_id
+     LEFT JOIN persos AS leader
+       ON leader.id = g.chef
+      AND leader.group_id = g.group_id
+     GROUP BY g.group_id, g.name, leader.cmd, leader.nom, g.chef`,
+  );
+
+  for (const row of rows) {
+    if (Number(row.member_count) === 0) continue;
+    const capacity = getGroupCapacity(row.leader_cmd);
+    if (Number(row.member_count) > capacity) {
+      throw new Error(
+        `Le groupe ${row.name} dépasse la capacité de commandement de ${row.leader_name} (${capacity} membres max)`,
+      );
+    }
+  }
+};
+
+const validateQuantityAgainstAssignments = async (
+  client,
+  tableName,
+  relationTable,
+  relationField,
+  itemId,
+  quantity,
+  label,
+) => {
+  const { rows } = await client.query(
+    `SELECT COUNT(*)::int AS assigned_count
+     FROM ${relationTable}
+     WHERE ${relationField} = $1`,
+    [itemId],
+  );
+
+  const assignedCount = Number(rows[0]?.assigned_count || 0);
+  if (assignedCount > quantity) {
+    throw new Error(
+      `Le ${label} ${itemId} ne peut pas avoir une quantité inférieure aux ${assignedCount} attribution(s) existante(s).`,
+    );
+  }
+
+  const { rowCount } = await client.query(
+    `SELECT 1 FROM ${tableName} WHERE id = $1 LIMIT 1`,
+    [itemId],
+  );
+
+  return rowCount > 0;
+};
+
+const buildStocksPayload = (stocks) =>
+  Object.entries(stocks || {})
+    .filter(([code]) => stockFields.includes(code))
+    .map(([code, quantity]) => ({
+      code,
+      quantity: normalizeNumber(quantity),
+    }));
+
+const updateStocks = async (stocks) => {
+  const payload = buildStocksPayload(stocks);
+
+  if (payload.length === 0) {
+    return;
+  }
+
+  await pool.query(
+    `INSERT INTO city_resources (city_id, resource_id, quantity)
+     SELECT $1, r.id, incoming.quantity
+     FROM json_to_recordset($2::json) AS incoming(code text, quantity numeric)
+     JOIN resources AS r ON r.code = incoming.code
+     ON CONFLICT (city_id, resource_id)
+     DO UPDATE SET quantity = EXCLUDED.quantity`,
+    [defaultCity.id, JSON.stringify(payload)],
+  );
+};
+
+const updateStock = async (code, quantity) => {
+  const normalizedCode = String(code || "")
+    .trim()
+    .toLowerCase();
+  if (!stockFields.includes(normalizedCode)) {
+    throw new Error(`Code de ressource invalide: ${code}`);
+  }
+
+  await updateStocks({ [normalizedCode]: quantity });
+};
+
+const buildLunesWritePayload = (lunes) => {
+  const lunesById = new Map();
+  const rationsPayload = [];
+  const overridesPayload = [];
+
+  for (const lune of Array.isArray(lunes) ? lunes : []) {
+    const luneId = Number(lune.id);
+    if (!Number.isFinite(luneId)) continue;
+
+    lunesById.set(luneId, {
+      id: luneId,
+      coutmat: normalizeNumber(lune.coutMat),
+    });
+
+    const rations = lune.rations || {};
+    for (const [persoIdRaw, ration] of Object.entries(rations)) {
+      const persoId = Number(persoIdRaw);
+      if (!Number.isFinite(persoId)) continue;
+      rationsPayload.push({
+        lune_id: luneId,
+        perso_id: persoId,
+        eau: ration?.eau ?? true,
+        nrt: ration?.nrt ?? true,
+        med: ration?.med ?? true,
+        tache: ration?.tache || "",
+      });
+    }
+
+    const overrides = lune.overrides || {};
+    for (const [persoIdRaw, data] of Object.entries(overrides)) {
+      const persoId = Number(persoIdRaw);
+      if (!Number.isFinite(persoId)) continue;
+      overridesPayload.push({
+        lune_id: luneId,
+        perso_id: persoId,
+        data: data || {},
+      });
+    }
+  }
+
+  return {
+    lunesPayload: Array.from(lunesById.values()),
+    rationsPayload,
+    overridesPayload,
+  };
+};
+
+const getLuneById = async (client, luneId) => {
+  const { rows: luneRows } = await client.query(
+    "SELECT id, coutMat FROM lunes WHERE id = $1 LIMIT 1",
+    [luneId],
+  );
+
+  if (luneRows.length === 0) {
+    return null;
+  }
+
+  const { rows: rationRows } = await client.query(
+    "SELECT lune_id, perso_id, eau, nrt, med, tache FROM rations WHERE lune_id = $1",
+    [luneId],
+  );
+  const { rows: overrideRows } = await client.query(
+    "SELECT lune_id, perso_id, data FROM overrides WHERE lune_id = $1",
+    [luneId],
+  );
+
+  return buildLunes(luneRows, rationRows, overrideRows)[0] || null;
+};
+
+const upsertLune = async (lune) => {
+  const luneId = Number(lune?.id);
+  if (!Number.isFinite(luneId)) {
+    throw new Error("Identifiant de lune invalide.");
+  }
+
+  await withTransaction(async (client) => {
+    const existingLune = await getLuneById(client, luneId);
+    const mergedLune = {
+      ...(existingLune || {}),
+      ...(lune || {}),
+      id: luneId,
+      coutMat: normalizeNumber(lune?.coutMat ?? existingLune?.coutMat),
+      rations:
+        lune && Object.prototype.hasOwnProperty.call(lune, "rations")
+          ? lune.rations || {}
+          : existingLune?.rations || {},
+      overrides:
+        lune && Object.prototype.hasOwnProperty.call(lune, "overrides")
+          ? lune.overrides || {}
+          : existingLune?.overrides || {},
+    };
+
+    const { lunesPayload, rationsPayload, overridesPayload } =
+      buildLunesWritePayload([mergedLune]);
+
+    await client.query(
+      `INSERT INTO lunes (id, coutMat)
+       SELECT id, coutmat
+       FROM json_to_recordset($1::json) AS incoming(id bigint, coutmat numeric)
+       ON CONFLICT (id)
+       DO UPDATE SET coutMat = EXCLUDED.coutMat`,
+      [JSON.stringify(lunesPayload)],
+    );
+
+    await client.query("DELETE FROM rations WHERE lune_id = $1", [luneId]);
+    if (rationsPayload.length > 0) {
+      await client.query(
+        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache)
+         SELECT lune_id, perso_id, eau, nrt, med, tache
+         FROM json_to_recordset($1::json) AS incoming(
+           lune_id bigint,
+           perso_id integer,
+           eau boolean,
+           nrt boolean,
+           med boolean,
+           tache text
+         )`,
+        [JSON.stringify(rationsPayload)],
+      );
+    }
+
+    await client.query("DELETE FROM overrides WHERE lune_id = $1", [luneId]);
+    if (overridesPayload.length > 0) {
+      await client.query(
+        `INSERT INTO overrides (lune_id, perso_id, data)
+         SELECT lune_id, perso_id, data
+         FROM json_to_recordset($1::json) AS incoming(
+           lune_id bigint,
+           perso_id integer,
+           data jsonb
+         )`,
+        [JSON.stringify(overridesPayload)],
+      );
+    }
+  });
+};
+
+const deleteLune = async (luneId) => {
+  await pool.query("DELETE FROM lunes WHERE id = $1", [luneId]);
+};
+
+const upsertPerso = async (perso) => {
+  const id = Number(perso?.id);
+  if (!Number.isFinite(id)) {
+    throw new Error("Identifiant de perso invalide.");
+  }
+
+  await withTransaction(async (client) => {
+    const { rows: existingRows } = await client.query(
+      "SELECT * FROM persos WHERE id = $1 LIMIT 1",
+      [id],
+    );
+    const mergedPerso = {
+      ...(existingRows[0] ? normalizePersoRow(existingRows[0]) : {}),
+      ...(perso || {}),
+      id,
+    };
+
+    const payload = {
+      id,
+      nom: mergedPerso.nom || `Perso ${id}`,
+      pvmax: normalizeNonNegativeNumber(
+        mergedPerso.pvmax ?? mergedPerso.pvBase,
+      ),
+      pv: normalizeNonNegativeNumber(
+        mergedPerso.pv ?? mergedPerso.pvmax ?? mergedPerso.pvBase,
+      ),
+      poidsmax: normalizeNonNegativeNumber(mergedPerso.poidsMax ?? 20),
+      capeau: normalizeNumber(mergedPerso.capEau),
+      capnrt: normalizeNumber(mergedPerso.capNrt),
+      capmed: normalizeNumber(mergedPerso.capMed),
+      capmat: normalizeNumber(mergedPerso.capMat),
+      capart: normalizeNumber(mergedPerso.capart),
+      cmd: normalizeNumber(mergedPerso.cmd),
+      combat: normalizeNumber(mergedPerso.combat),
+      group_id: normalizeOptionalId(mergedPerso.groupId),
+    };
+    await ensureGroupExists(client, payload.group_id);
+    await client.query(
+      `INSERT INTO persos (id, nom, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       ON CONFLICT (id)
+       DO UPDATE SET
+         nom = EXCLUDED.nom,
+         pvmax = EXCLUDED.pvmax,
+         pv = EXCLUDED.pv,
+         poidsmax = EXCLUDED.poidsmax,
+         capEau = EXCLUDED.capEau,
+         capNrt = EXCLUDED.capNrt,
+         capMed = EXCLUDED.capMed,
+         capMat = EXCLUDED.capMat,
+         capart = EXCLUDED.capart,
+         cmd = EXCLUDED.cmd,
+         combat = EXCLUDED.combat,
+         group_id = EXCLUDED.group_id`,
+      [
+        payload.id,
+        payload.nom,
+        payload.pvmax,
+        payload.pv,
+        payload.poidsmax,
+        payload.capeau,
+        payload.capnrt,
+        payload.capmed,
+        payload.capmat,
+        payload.capart,
+        payload.cmd,
+        payload.combat,
+        payload.group_id,
+      ],
+    );
+
+    await ensurePersoResourceCoverage(client, [payload.id]);
+    await syncAndValidateGroups(client);
+  });
+};
+
+const deletePerso = async (persoId) => {
+  await withTransaction(async (client) => {
+    await client.query("DELETE FROM persos WHERE id = $1", [persoId]);
+    await syncAndValidateGroups(client);
+  });
+};
+
+const replacePersoResources = async (persoId, persoResources) => {
+  await withTransaction(async (client) => {
+    await ensurePersoExists(client, persoId);
+    await client.query("DELETE FROM perso_resources WHERE perso_id = $1", [
+      persoId,
+    ]);
+
+    const payload = (Array.isArray(persoResources) ? persoResources : [])
+      .map((entry) => ({
+        perso_id: persoId,
+        resource_id: Number(entry.resource_id),
+        quantity: normalizeNonNegativeNumber(entry.quantity),
+      }))
+      .filter(
+        (entry) =>
+          Number.isFinite(entry.resource_id) && Number(entry.quantity) > 0,
+      );
+
+    if (payload.length > 0) {
+      await client.query(
+        `INSERT INTO perso_resources (perso_id, resource_id, quantity)
+         SELECT perso_id, resource_id, quantity
+         FROM json_to_recordset($1::json) AS incoming(
+           perso_id integer,
+           resource_id integer,
+           quantity numeric
+         )
+         ON CONFLICT (perso_id, resource_id)
+         DO UPDATE SET quantity = EXCLUDED.quantity`,
+        [JSON.stringify(payload)],
+      );
+    }
+
+    await ensurePersoResourceCoverage(client, [persoId]);
+  });
+};
+
+const replacePersoArmes = async (persoId, persoArmes) => {
+  await withTransaction(async (client) => {
+    await ensurePersoExists(client, persoId);
+
+    const byArmeId = new Map();
+    for (const entry of Array.isArray(persoArmes) ? persoArmes : []) {
+      const armeId = Number(entry.arme_id);
+      if (!Number.isFinite(armeId)) continue;
+      byArmeId.set(armeId, {
+        perso_id: persoId,
+        arme_id: armeId,
+        equipee: Boolean(entry.equipee),
+      });
+    }
+
+    const payload = Array.from(byArmeId.values());
+    const equippedCount = payload.filter((entry) => entry.equipee).length;
+    if (equippedCount > 1) {
+      throw new Error(
+        `Le perso ${persoId} ne peut équiper qu'une seule arme à la fois`,
+      );
+    }
+
+    for (const entry of payload) {
+      const { rows: itemRows } = await client.query(
+        "SELECT quantity FROM armes WHERE id = $1 LIMIT 1",
+        [entry.arme_id],
+      );
+      if (itemRows.length === 0) {
+        throw new Error(`L'arme ${entry.arme_id} est introuvable.`);
+      }
+
+      const { rows: assignmentRows } = await client.query(
+        `SELECT COUNT(*)::int AS assigned_count
+         FROM perso_armes
+         WHERE arme_id = $1 AND perso_id <> $2`,
+        [entry.arme_id, persoId],
+      );
+
+      const assignedCount = Number(assignmentRows[0]?.assigned_count || 0) + 1;
+      const availableQuantity = Number(itemRows[0]?.quantity || 0);
+      if (assignedCount > availableQuantity) {
+        throw new Error(
+          `L'arme ${entry.arme_id} dépasse la quantité disponible (${availableQuantity}).`,
+        );
+      }
+    }
+
+    await client.query("DELETE FROM perso_armes WHERE perso_id = $1", [
+      persoId,
+    ]);
+
+    if (payload.length > 0) {
+      await client.query(
+        `INSERT INTO perso_armes (perso_id, arme_id, equipee)
+         SELECT perso_id, arme_id, equipee
+         FROM json_to_recordset($1::json) AS incoming(
+           perso_id integer,
+           arme_id integer,
+           equipee boolean
+         )`,
+        [JSON.stringify(payload)],
+      );
+    }
+  });
+};
+
+const replacePersoOutils = async (persoId, persoOutils) => {
+  await withTransaction(async (client) => {
+    await ensurePersoExists(client, persoId);
+
+    const byOutilId = new Map();
+    for (const entry of Array.isArray(persoOutils) ? persoOutils : []) {
+      const outilId = Number(entry.outil_id);
+      if (!Number.isFinite(outilId)) continue;
+      byOutilId.set(outilId, {
+        perso_id: persoId,
+        outil_id: outilId,
+      });
+    }
+
+    const payload = Array.from(byOutilId.values());
+
+    for (const entry of payload) {
+      const { rows: itemRows } = await client.query(
+        "SELECT quantity FROM outils WHERE id = $1 LIMIT 1",
+        [entry.outil_id],
+      );
+      if (itemRows.length === 0) {
+        throw new Error(`L'outil ${entry.outil_id} est introuvable.`);
+      }
+
+      const { rows: assignmentRows } = await client.query(
+        `SELECT COUNT(*)::int AS assigned_count
+         FROM perso_outils
+         WHERE outil_id = $1 AND perso_id <> $2`,
+        [entry.outil_id, persoId],
+      );
+
+      const assignedCount = Number(assignmentRows[0]?.assigned_count || 0) + 1;
+      const availableQuantity = Number(itemRows[0]?.quantity || 0);
+      if (assignedCount > availableQuantity) {
+        throw new Error(
+          `L'outil ${entry.outil_id} dépasse la quantité disponible (${availableQuantity}).`,
+        );
+      }
+    }
+
+    await client.query("DELETE FROM perso_outils WHERE perso_id = $1", [
+      persoId,
+    ]);
+
+    if (payload.length > 0) {
+      await client.query(
+        `INSERT INTO perso_outils (perso_id, outil_id)
+         SELECT perso_id, outil_id
+         FROM json_to_recordset($1::json) AS incoming(
+           perso_id integer,
+           outil_id integer
+         )`,
+        [JSON.stringify(payload)],
+      );
+    }
+  });
+};
+
+const replacePersoSacs = async (persoId, persoSacs) => {
+  await withTransaction(async (client) => {
+    await ensurePersoExists(client, persoId);
+
+    const bySacId = new Map();
+    for (const entry of Array.isArray(persoSacs) ? persoSacs : []) {
+      const sacId = Number(entry.sac_id);
+      if (!Number.isFinite(sacId)) continue;
+      bySacId.set(sacId, {
+        perso_id: persoId,
+        sac_id: sacId,
+        equipe: Boolean(entry.equipe),
+      });
+    }
+
+    const payload = Array.from(bySacId.values());
+    const equippedCount = payload.filter((entry) => entry.equipe).length;
+    if (equippedCount > 1) {
+      throw new Error(
+        `Le perso ${persoId} ne peut équiper qu'un seul sac à la fois`,
+      );
+    }
+
+    for (const entry of payload) {
+      const { rows: itemRows } = await client.query(
+        "SELECT quantity FROM sacs WHERE id = $1 LIMIT 1",
+        [entry.sac_id],
+      );
+      if (itemRows.length === 0) {
+        throw new Error(`Le sac ${entry.sac_id} est introuvable.`);
+      }
+
+      const { rows: assignmentRows } = await client.query(
+        `SELECT COUNT(*)::int AS assigned_count
+         FROM perso_sacs
+         WHERE sac_id = $1 AND perso_id <> $2`,
+        [entry.sac_id, persoId],
+      );
+
+      const assignedCount = Number(assignmentRows[0]?.assigned_count || 0) + 1;
+      const availableQuantity = Number(itemRows[0]?.quantity || 0);
+      if (assignedCount > availableQuantity) {
+        throw new Error(
+          `Le sac ${entry.sac_id} dépasse la quantité disponible (${availableQuantity}).`,
+        );
+      }
+    }
+
+    await client.query("DELETE FROM perso_sacs WHERE perso_id = $1", [persoId]);
+
+    if (payload.length > 0) {
+      await client.query(
+        `INSERT INTO perso_sacs (perso_id, sac_id, equipe)
+         SELECT perso_id, sac_id, equipe
+         FROM json_to_recordset($1::json) AS incoming(
+           perso_id integer,
+           sac_id integer,
+           equipe boolean
+         )`,
+        [JSON.stringify(payload)],
+      );
+    }
+  });
+};
+
+const upsertGroup = async (group) => {
+  const groupId = Number(group?.id);
+  if (!Number.isFinite(groupId)) {
+    throw new Error("Identifiant de groupe invalide.");
+  }
+
+  await withTransaction(async (client) => {
+    const { rows: existingRows } = await client.query(
+      `SELECT group_id AS id, name, chef
+       FROM groups
+       WHERE group_id = $1
+       LIMIT 1`,
+      [groupId],
+    );
+    const mergedGroup = {
+      ...(existingRows[0] || {}),
+      ...(group || {}),
+      id: groupId,
+    };
+
+    await client.query(
+      `INSERT INTO groups (group_id, name, chef)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (group_id)
+       DO UPDATE SET name = EXCLUDED.name, chef = EXCLUDED.chef`,
+      [
+        groupId,
+        mergedGroup.name || `Groupe ${groupId}`,
+        normalizeOptionalId(mergedGroup.chef),
+      ],
+    );
+
+    await syncAndValidateGroups(client);
+  });
+};
+
+const replaceGroupMembers = async (groupId, memberIds) => {
+  const normalizedGroupId = Number(groupId);
+  if (!Number.isFinite(normalizedGroupId)) {
+    throw new Error("Identifiant de groupe invalide.");
+  }
+
+  const normalizedMemberIds = Array.from(
+    new Set(
+      (memberIds || [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id)),
+    ),
+  );
+
+  await withTransaction(async (client) => {
+    await ensureGroupExists(client, normalizedGroupId);
+
+    await client.query(
+      `UPDATE persos
+       SET group_id = CASE
+         WHEN id = ANY($2::int[]) THEN $1
+         WHEN group_id = $1 THEN NULL
+         ELSE group_id
+       END`,
+      [normalizedGroupId, normalizedMemberIds],
+    );
+
+    await syncAndValidateGroups(client);
+  });
+};
+
+const upsertArme = async (arme) => {
+  const id = Number(arme?.id);
+  if (!Number.isFinite(id)) {
+    throw new Error("Identifiant d'arme invalide.");
+  }
+
+  await withTransaction(async (client) => {
+    const { rows: existingRows } = await client.query(
+      "SELECT * FROM armes WHERE id = $1 LIMIT 1",
+      [id],
+    );
+    const mergedArme = {
+      ...(existingRows[0] ? normalizeArmeRow(existingRows[0]) : {}),
+      ...(arme || {}),
+      id,
+    };
+
+    const payload = {
+      id,
+      name: mergedArme.name || "Arme sans nom",
+      att: normalizeNumber(mergedArme.att || 1),
+      degats: normalizeNumber(mergedArme.degats),
+      fiabilite: normalizeNumber(mergedArme.fiabilite),
+      pv: normalizeNumber(mergedArme.pv),
+      pvm: normalizeNumber(mergedArme.pvm),
+      poids: normalizeNumber(mergedArme.poids),
+      quantity: normalizeWeaponQuantity(mergedArme.quantity),
+    };
+    await validateQuantityAgainstAssignments(
+      client,
+      "armes",
+      "perso_armes",
+      "arme_id",
+      payload.id,
+      payload.quantity,
+      "arme",
+    );
+
+    await client.query(
+      `INSERT INTO armes (id, name, att, degats, fiabilite, pv, pvm, poids, quantity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (id)
+       DO UPDATE SET
+         name = EXCLUDED.name,
+         att = EXCLUDED.att,
+         degats = EXCLUDED.degats,
+         fiabilite = EXCLUDED.fiabilite,
+         pv = EXCLUDED.pv,
+         pvm = EXCLUDED.pvm,
+         poids = EXCLUDED.poids,
+         quantity = EXCLUDED.quantity`,
+      [
+        payload.id,
+        payload.name,
+        payload.att,
+        payload.degats,
+        payload.fiabilite,
+        payload.pv,
+        payload.pvm,
+        payload.poids,
+        payload.quantity,
+      ],
+    );
+  });
+};
+
+const deleteArme = async (armeId) => {
+  await pool.query("DELETE FROM armes WHERE id = $1", [armeId]);
+};
+
+const upsertOutil = async (outil) => {
+  const id = Number(outil?.id);
+  if (!Number.isFinite(id)) {
+    throw new Error("Identifiant d'outil invalide.");
+  }
+
+  await withTransaction(async (client) => {
+    const { rows: existingRows } = await client.query(
+      "SELECT * FROM outils WHERE id = $1 LIMIT 1",
+      [id],
+    );
+    const mergedOutil = {
+      ...(existingRows[0] ? normalizeOutilRow(existingRows[0]) : {}),
+      ...(outil || {}),
+      id,
+    };
+
+    const payload = {
+      id,
+      name: mergedOutil.name || "Outil sans nom",
+      specialite: normalizeToolSpecialite(mergedOutil.specialite),
+      bonus: normalizeNonNegativeNumber(mergedOutil.bonus ?? 1),
+      pv: normalizeNonNegativeNumber(mergedOutil.pv),
+      pvmax: normalizeNonNegativeNumber(mergedOutil.pvmax),
+      poids: normalizeNonNegativeNumber(mergedOutil.poids),
+      quantity: normalizeWeaponQuantity(mergedOutil.quantity),
+    };
+    await validateQuantityAgainstAssignments(
+      client,
+      "outils",
+      "perso_outils",
+      "outil_id",
+      payload.id,
+      payload.quantity,
+      "outil",
+    );
+
+    await client.query(
+      `INSERT INTO outils (id, name, specialite, bonus, pv, pvmax, poids, quantity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (id)
+       DO UPDATE SET
+         name = EXCLUDED.name,
+         specialite = EXCLUDED.specialite,
+         bonus = EXCLUDED.bonus,
+         pv = EXCLUDED.pv,
+         pvmax = EXCLUDED.pvmax,
+         poids = EXCLUDED.poids,
+         quantity = EXCLUDED.quantity`,
+      [
+        payload.id,
+        payload.name,
+        payload.specialite,
+        payload.bonus,
+        payload.pv,
+        payload.pvmax,
+        payload.poids,
+        payload.quantity,
+      ],
+    );
+  });
+};
+
+const deleteOutil = async (outilId) => {
+  await pool.query("DELETE FROM outils WHERE id = $1", [outilId]);
+};
+
+const upsertSac = async (sac) => {
+  const id = Number(sac?.id);
+  if (!Number.isFinite(id)) {
+    throw new Error("Identifiant de sac invalide.");
+  }
+
+  await withTransaction(async (client) => {
+    const { rows: existingRows } = await client.query(
+      "SELECT * FROM sacs WHERE id = $1 LIMIT 1",
+      [id],
+    );
+    const mergedSac = {
+      ...(existingRows[0] ? normalizeSacRow(existingRows[0]) : {}),
+      ...(sac || {}),
+      id,
+    };
+
+    const payload = {
+      id,
+      name: mergedSac.name || "Sac sans nom",
+      pv: normalizeNonNegativeNumber(mergedSac.pv),
+      pvmax: normalizeNonNegativeNumber(mergedSac.pvmax),
+      poids: normalizeNonNegativeNumber(mergedSac.poids),
+      capacite: normalizeNonNegativeNumber(mergedSac.capacite),
+      quantity: normalizeWeaponQuantity(mergedSac.quantity),
+    };
+    await validateQuantityAgainstAssignments(
+      client,
+      "sacs",
+      "perso_sacs",
+      "sac_id",
+      payload.id,
+      payload.quantity,
+      "sac",
+    );
+
+    await client.query(
+      `INSERT INTO sacs (id, name, pv, pvmax, poids, capacite, quantity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id)
+       DO UPDATE SET
+         name = EXCLUDED.name,
+         pv = EXCLUDED.pv,
+         pvmax = EXCLUDED.pvmax,
+         poids = EXCLUDED.poids,
+         capacite = EXCLUDED.capacite,
+         quantity = EXCLUDED.quantity`,
+      [
+        payload.id,
+        payload.name,
+        payload.pv,
+        payload.pvmax,
+        payload.poids,
+        payload.capacite,
+        payload.quantity,
+      ],
+    );
+  });
+};
+
+const deleteSac = async (sacId) => {
+  await pool.query("DELETE FROM sacs WHERE id = $1", [sacId]);
 };
 
 const initDb = async () => {
@@ -1745,6 +2682,23 @@ export {
   initDb,
   getState,
   insertState,
+  updateStock,
+  upsertLune,
+  deleteLune,
+  upsertPerso,
+  deletePerso,
+  replacePersoResources,
+  replacePersoArmes,
+  replacePersoOutils,
+  replacePersoSacs,
+  upsertGroup,
+  replaceGroupMembers,
+  upsertArme,
+  deleteArme,
+  upsertOutil,
+  deleteOutil,
+  upsertSac,
+  deleteSac,
   defaultStocks,
   defaultPersos,
   defaultRation,

@@ -1,5 +1,3 @@
-import React from "react";
-
 const bagFields = [
   { key: "name", label: "Nom", type: "text" },
   { key: "pv", label: "PV", type: "number", step: "1" },
@@ -46,7 +44,22 @@ function BagsPage({ sacs, addSac, updateSac, removeSac }) {
                       min={field.key === "name" ? undefined : 0}
                       value={sac[field.key] ?? ""}
                       onChange={(event) =>
-                        updateSac(index, field.key, event.target.value)
+                        updateSac(
+                          index,
+                          field.key,
+                          event.target.value,
+                          field.type === "text"
+                            ? { persist: false }
+                            : undefined,
+                        )
+                      }
+                      onBlur={
+                        field.type === "text"
+                          ? (event) =>
+                              updateSac(index, field.key, event.target.value, {
+                                persist: true,
+                              })
+                          : undefined
                       }
                     />
                   </td>

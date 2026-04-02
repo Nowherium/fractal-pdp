@@ -4,6 +4,23 @@ import {
   initDb,
   getState,
   insertState,
+  updateStock,
+  upsertLune,
+  deleteLune,
+  upsertPerso,
+  deletePerso,
+  replacePersoResources,
+  replacePersoArmes,
+  replacePersoOutils,
+  replacePersoSacs,
+  upsertGroup,
+  replaceGroupMembers,
+  upsertArme,
+  deleteArme,
+  upsertOutil,
+  deleteOutil,
+  upsertSac,
+  deleteSac,
   defaultStocks,
   defaultPersos,
   defaultRation,
@@ -31,6 +48,45 @@ app.get("/api/state", async (_req, res) => {
   }
 });
 
+const ensureNumericId = (res, rawId) => {
+  const id = Number(rawId);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Identifiant invalide" });
+    return null;
+  }
+  return id;
+};
+
+const ensureStockCode = (res, rawCode) => {
+  const stockCode = String(rawCode || "")
+    .trim()
+    .toLowerCase();
+
+  if (!Object.prototype.hasOwnProperty.call(defaultStocks, stockCode)) {
+    res.status(400).json({ error: "Code ressource invalide" });
+    return null;
+  }
+
+  return stockCode;
+};
+
+const runDbAction = async (res, action, fallbackError) => {
+  try {
+    await action();
+    res.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: error.message || fallbackError,
+    });
+  }
+};
+
+const registerPartialRoute = (path, handler) => {
+  app.patch(path, handler);
+  app.put(path, handler);
+};
+
 app.put("/api/state", async (req, res) => {
   try {
     await insertState(req.body);
@@ -42,6 +98,193 @@ app.put("/api/state", async (req, res) => {
       error: "Impossible de sauvegarder l'état dans la base de données",
     });
   }
+});
+
+registerPartialRoute("/api/stocks/:code", async (req, res) => {
+  const stockCode = ensureStockCode(res, req.params.code);
+  if (stockCode === null) return;
+
+  await runDbAction(
+    res,
+    () => updateStock(stockCode, req.body?.quantity),
+    "Impossible de sauvegarder cette ressource",
+  );
+});
+
+registerPartialRoute("/api/persos/:id", async (req, res) => {
+  const persoId = ensureNumericId(res, req.params.id);
+  if (persoId === null) return;
+
+  await runDbAction(
+    res,
+    () => upsertPerso({ ...(req.body?.perso || {}), id: persoId }),
+    "Impossible de sauvegarder le perso",
+  );
+});
+
+app.delete("/api/persos/:id", async (req, res) => {
+  const persoId = ensureNumericId(res, req.params.id);
+  if (persoId === null) return;
+
+  await runDbAction(
+    res,
+    () => deletePerso(persoId),
+    "Impossible de supprimer le perso",
+  );
+});
+
+registerPartialRoute("/api/persos/:id/resources", async (req, res) => {
+  const persoId = ensureNumericId(res, req.params.id);
+  if (persoId === null) return;
+
+  await runDbAction(
+    res,
+    () => replacePersoResources(persoId, req.body?.persoResources || []),
+    "Impossible de sauvegarder les ressources du perso",
+  );
+});
+
+registerPartialRoute("/api/persos/:id/armes", async (req, res) => {
+  const persoId = ensureNumericId(res, req.params.id);
+  if (persoId === null) return;
+
+  await runDbAction(
+    res,
+    () => replacePersoArmes(persoId, req.body?.persoArmes || []),
+    "Impossible de sauvegarder les armes du perso",
+  );
+});
+
+registerPartialRoute("/api/persos/:id/outils", async (req, res) => {
+  const persoId = ensureNumericId(res, req.params.id);
+  if (persoId === null) return;
+
+  await runDbAction(
+    res,
+    () => replacePersoOutils(persoId, req.body?.persoOutils || []),
+    "Impossible de sauvegarder les outils du perso",
+  );
+});
+
+registerPartialRoute("/api/persos/:id/sacs", async (req, res) => {
+  const persoId = ensureNumericId(res, req.params.id);
+  if (persoId === null) return;
+
+  await runDbAction(
+    res,
+    () => replacePersoSacs(persoId, req.body?.persoSacs || []),
+    "Impossible de sauvegarder les sacs du perso",
+  );
+});
+
+registerPartialRoute("/api/groups/:id", async (req, res) => {
+  const groupId = ensureNumericId(res, req.params.id);
+  if (groupId === null) return;
+
+  await runDbAction(
+    res,
+    () => upsertGroup({ ...(req.body?.group || {}), id: groupId }),
+    "Impossible de sauvegarder le groupe",
+  );
+});
+
+registerPartialRoute("/api/groups/:id/members", async (req, res) => {
+  const groupId = ensureNumericId(res, req.params.id);
+  if (groupId === null) return;
+
+  await runDbAction(
+    res,
+    () => replaceGroupMembers(groupId, req.body?.memberIds || []),
+    "Impossible de mettre à jour les membres du groupe",
+  );
+});
+
+registerPartialRoute("/api/lunes/:id", async (req, res) => {
+  const luneId = ensureNumericId(res, req.params.id);
+  if (luneId === null) return;
+
+  await runDbAction(
+    res,
+    () => upsertLune({ ...(req.body?.lune || {}), id: luneId }),
+    "Impossible de sauvegarder cette lune",
+  );
+});
+
+app.delete("/api/lunes/:id", async (req, res) => {
+  const luneId = ensureNumericId(res, req.params.id);
+  if (luneId === null) return;
+
+  await runDbAction(
+    res,
+    () => deleteLune(luneId),
+    "Impossible de supprimer cette lune",
+  );
+});
+
+registerPartialRoute("/api/armes/:id", async (req, res) => {
+  const armeId = ensureNumericId(res, req.params.id);
+  if (armeId === null) return;
+
+  await runDbAction(
+    res,
+    () => upsertArme({ ...(req.body?.arme || {}), id: armeId }),
+    "Impossible de sauvegarder l'arme",
+  );
+});
+
+app.delete("/api/armes/:id", async (req, res) => {
+  const armeId = ensureNumericId(res, req.params.id);
+  if (armeId === null) return;
+
+  await runDbAction(
+    res,
+    () => deleteArme(armeId),
+    "Impossible de supprimer l'arme",
+  );
+});
+
+registerPartialRoute("/api/outils/:id", async (req, res) => {
+  const outilId = ensureNumericId(res, req.params.id);
+  if (outilId === null) return;
+
+  await runDbAction(
+    res,
+    () => upsertOutil({ ...(req.body?.outil || {}), id: outilId }),
+    "Impossible de sauvegarder l'outil",
+  );
+});
+
+app.delete("/api/outils/:id", async (req, res) => {
+  const outilId = ensureNumericId(res, req.params.id);
+  if (outilId === null) return;
+
+  await runDbAction(
+    res,
+    () => deleteOutil(outilId),
+    "Impossible de supprimer l'outil",
+  );
+});
+
+registerPartialRoute("/api/sacs/:id", async (req, res) => {
+  const sacId = ensureNumericId(res, req.params.id);
+  if (sacId === null) return;
+
+  await runDbAction(
+    res,
+    () => upsertSac({ ...(req.body?.sac || {}), id: sacId }),
+    "Impossible de sauvegarder le sac",
+  );
+});
+
+app.delete("/api/sacs/:id", async (req, res) => {
+  const sacId = ensureNumericId(res, req.params.id);
+  if (sacId === null) return;
+
+  await runDbAction(
+    res,
+    () => deleteSac(sacId),
+    "Impossible de supprimer le sac",
+  );
 });
 
 app.post("/api/reset", async (_req, res) => {

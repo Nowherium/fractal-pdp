@@ -1,4 +1,3 @@
-import React from "react";
 import { calculateGroupTotals, getGroupMembers } from "../utils/groupUtils";
 
 const formatNumber = (value) => {

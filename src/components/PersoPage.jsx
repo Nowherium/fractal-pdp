@@ -1,5 +1,3 @@
-import React from "react";
-
 const persoFields = [
   { key: "nom", label: "Nom", type: "text" },
   { key: "pvmax", label: "PV max", type: "number", step: "1" },
@@ -32,6 +30,9 @@ const specialiteLabels = {
   mat: "🧱 Mat",
   art: "🎭 Art",
 };
+
+const getResourceDisplayName = (resource) =>
+  resource?.name || resource?.code?.toUpperCase() || "Ressource";
 
 function PersoPage({
   perso,
@@ -163,7 +164,23 @@ function PersoPage({
                 }
                 value={value ?? ""}
                 onChange={(event) =>
-                  handlePersoUpdate(perso.id, field.key, event.target.value)
+                  handlePersoUpdate(
+                    perso.id,
+                    field.key,
+                    event.target.value,
+                    field.type === "text" ? { persist: false } : undefined,
+                  )
+                }
+                onBlur={
+                  field.type === "text"
+                    ? (event) =>
+                        handlePersoUpdate(
+                          perso.id,
+                          field.key,
+                          event.target.value,
+                          { persist: true },
+                        )
+                    : undefined
                 }
               />
             </label>
@@ -213,7 +230,23 @@ function PersoPage({
             {resources.map((resource) => (
               <label key={resource.id} className='perso-field'>
                 <span className='perso-field-label'>
-                  {resource.name || resource.code?.toUpperCase() || "Ressource"}
+                  {resource.code?.toUpperCase() || "Ressource"}
+                  <span
+                    title={getResourceDisplayName(resource)}
+                    aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
+                    style={{
+                      display: "inline-block",
+                      marginLeft: "0.25rem",
+                      width: "1.1rem",
+                      height: "1.1rem",
+                      lineHeight: "1.1rem",
+                      textAlign: "center",
+                      fontSize: "0.85rem",
+                      cursor: "help",
+                    }}
+                  >
+                    ❔
+                  </span>
                 </span>
                 <input
                   className='perso-field-input'

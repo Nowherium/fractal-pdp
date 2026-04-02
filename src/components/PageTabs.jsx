@@ -1,5 +1,3 @@
-import React from "react";
-
 function PageTabs({ pages, currentPage, setPage }) {
   return (
     <div

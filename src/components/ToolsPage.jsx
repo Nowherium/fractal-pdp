@@ -1,5 +1,3 @@
-import React from "react";
-
 const specialites = [
   { value: "eau", label: "💧 Eau" },
   { value: "nrt", label: "🍗 Nrt" },
@@ -78,7 +76,27 @@ function ToolsPage({ outils, addOutil, updateOutil, removeOutil }) {
                         }
                         value={outil[field.key] ?? ""}
                         onChange={(event) =>
-                          updateOutil(index, field.key, event.target.value)
+                          updateOutil(
+                            index,
+                            field.key,
+                            event.target.value,
+                            field.type === "text"
+                              ? { persist: false }
+                              : undefined,
+                          )
+                        }
+                        onBlur={
+                          field.type === "text"
+                            ? (event) =>
+                                updateOutil(
+                                  index,
+                                  field.key,
+                                  event.target.value,
+                                  {
+                                    persist: true,
+                                  },
+                                )
+                            : undefined
                         }
                       />
                     )}

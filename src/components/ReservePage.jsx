@@ -1,7 +1,7 @@
-import React from "react";
-
 const formatWeight = (value) => Number(value ?? 0).toFixed(2);
 const getResourceUnitWeight = (resource) => (resource?.code === "crd" ? 0 : 1);
+const getResourceDisplayName = (resource) =>
+  resource?.name || resource?.code?.toUpperCase() || "Ressource";
 
 function ReservePage({
   resources,
@@ -133,8 +133,23 @@ function ReservePage({
         {resources.map((resource) => (
           <label key={resource.code} className='perso-field'>
             <span className='perso-field-label'>
-              Stock {resource.code.toUpperCase()} (poids{" "}
-              {formatWeight(getResourceUnitWeight(resource))}) :
+              Stock {resource.code.toUpperCase()}{" "}
+              <span
+                title={getResourceDisplayName(resource)}
+                aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
+                style={{
+                  display: "inline-block",
+                  marginLeft: "0.25rem",
+                  width: "1.1rem",
+                  height: "1.1rem",
+                  lineHeight: "1.1rem",
+                  textAlign: "center",
+                  fontSize: "0.85rem",
+                  cursor: "help",
+                }}
+              >
+                ❔
+              </span>
             </span>
             <input
               className='perso-field-input'
@@ -152,8 +167,6 @@ function ReservePage({
       <p className='info-text' style={{ marginTop: "1rem" }}>
         <strong>Poids total des ressources :</strong>{" "}
         {formatWeight(totalResourcesWeight)}
-        <br />
-        <em>`crd` a un poids nul et n'alourdit pas la réserve.</em>
         <br />
         <strong>Poids total des armes / outils / sacs en réserve :</strong>{" "}
         {formatWeight(totalReserveGearWeight)}

@@ -1,4 +1,3 @@
-import React from "react";
 import {
   getGroupCapacity,
   getGroupLeader,
@@ -52,7 +51,14 @@ function GroupEditPage({
             type='text'
             value={group.name}
             onChange={(event) =>
-              handleGroupUpdate(group.id, "name", event.target.value)
+              handleGroupUpdate(group.id, "name", event.target.value, {
+                persist: false,
+              })
+            }
+            onBlur={(event) =>
+              handleGroupUpdate(group.id, "name", event.target.value, {
+                persist: true,
+              })
             }
           />
         </label>
