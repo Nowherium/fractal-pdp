@@ -1,11 +1,18 @@
-const specialites = [
+import type { Outil } from "../types";
+
+const specialites: Array<{ value: string; label: string }> = [
   { value: "eau", label: "💧 Eau" },
   { value: "nrt", label: "🍗 Nrt" },
   { value: "mat", label: "🧱 Mat" },
   { value: "art", label: "🎭 Art" },
 ];
 
-const toolFields = [
+const toolFields: Array<{
+  key: string;
+  label: string;
+  type: "text" | "select" | "number";
+  step?: string;
+}> = [
   { key: "name", label: "Nom", type: "text" },
   { key: "specialite", label: "Spécialité", type: "select" },
   { key: "bonus", label: "Bonus x", type: "number", step: "0.1" },
@@ -15,7 +22,25 @@ const toolFields = [
   { key: "quantity", label: "Quantité", type: "number", step: "1" },
 ];
 
-function ToolsPage({ outils, addOutil, updateOutil, removeOutil }) {
+const toInputValue = (value: unknown, fallback: string | number = "") =>
+  typeof value === "string" || typeof value === "number" ? value : fallback;
+
+function ToolsPage({
+  outils,
+  addOutil,
+  updateOutil,
+  removeOutil,
+}: {
+  outils: Outil[];
+  addOutil: () => void;
+  updateOutil: (
+    index: number,
+    field: string,
+    rawValue: string | number,
+    options?: { persist?: boolean },
+  ) => void;
+  removeOutil: (index: number) => void;
+}) {
   return (
     <div className='panel'>
       <h2>6. Administration des outils</h2>
@@ -48,7 +73,7 @@ function ToolsPage({ outils, addOutil, updateOutil, removeOutil }) {
                     {field.type === "select" ? (
                       <select
                         className='perso-field-input'
-                        value={outil[field.key] ?? "eau"}
+                        value={toInputValue(outil[field.key], "eau")}
                         onChange={(event) =>
                           updateOutil(index, field.key, event.target.value)
                         }
@@ -74,7 +99,7 @@ function ToolsPage({ outils, addOutil, updateOutil, removeOutil }) {
                             ? 0
                             : undefined
                         }
-                        value={outil[field.key] ?? ""}
+                        value={toInputValue(outil[field.key])}
                         onChange={(event) =>
                           updateOutil(
                             index,

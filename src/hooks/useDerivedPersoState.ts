@@ -1,4 +1,14 @@
 import { useEffect } from "react";
+import type {
+  Arme,
+  Outil,
+  PersoResource,
+  PersoSac,
+  PersoOutil,
+  PersoArme,
+  Resource,
+  Sac,
+} from "../types";
 
 export const useDerivedPersoState = ({
   resources,
@@ -25,7 +35,9 @@ export const useDerivedPersoState = ({
           (entry) => entry.perso_id === perso.id && entry.equipee,
         );
         const nextEquippedWeaponId = equippedEntry?.arme_id ?? null;
-        const equippedArme = armesById.get(nextEquippedWeaponId);
+        const equippedArme = armesById.get(nextEquippedWeaponId) as
+          | Arme
+          | undefined;
         const nextCombatEffectif =
           nextEquippedWeaponId === null
             ? Number(perso.combat ?? 0)
@@ -35,7 +47,7 @@ export const useDerivedPersoState = ({
           (entry) => entry.perso_id === perso.id && entry.equipe,
         );
         const nextEquippedBagId = equippedBagEntry?.sac_id ?? null;
-        const equippedSac = sacsById.get(nextEquippedBagId);
+        const equippedSac = sacsById.get(nextEquippedBagId) as Sac | undefined;
         const nextPoidsMaxEffectif =
           Number(perso.poidsMax ?? 20) + Number(equippedSac?.capacite ?? 0);
 
@@ -57,7 +69,9 @@ export const useDerivedPersoState = ({
         const carriedResourcesWeight = persoResources
           .filter((entry) => entry.perso_id === perso.id)
           .reduce((total, entry) => {
-            const resource = resourcesById.get(entry.resource_id);
+            const resource = resourcesById.get(entry.resource_id) as
+              | Resource
+              | undefined;
             const unitWeight = resource?.code === "crd" ? 0 : 1;
             return (
               total +

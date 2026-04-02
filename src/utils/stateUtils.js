@@ -1,10 +1,64 @@
 export const defaultStocks = {};
 
+export const defaultCityMultipliers = {
+  eau: 1,
+  nrt: 1,
+  med: 1,
+  mat: 1,
+};
+
+export const defaultWeatherCoefficient = 1;
+export const defaultWeatherCoefficients = {
+  eau: defaultWeatherCoefficient,
+  nrt: defaultWeatherCoefficient,
+  med: defaultWeatherCoefficient,
+  mat: defaultWeatherCoefficient,
+};
+
+const normalizeCityMultiplierValue = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? Math.max(0, numericValue) : 1;
+};
+
+export const normalizeCityMultipliers = (cityMultipliers = {}) => ({
+  eau: normalizeCityMultiplierValue(cityMultipliers.eau),
+  nrt: normalizeCityMultiplierValue(cityMultipliers.nrt),
+  med: normalizeCityMultiplierValue(cityMultipliers.med),
+  mat: normalizeCityMultiplierValue(cityMultipliers.mat),
+});
+
+export const normalizeWeatherCoefficient = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return defaultWeatherCoefficient;
+  return Math.min(1, Math.max(0, numericValue));
+};
+
+export const normalizeWeatherCoefficients = (value) => {
+  if (typeof value === "number" || typeof value === "string") {
+    const coefficient = normalizeWeatherCoefficient(value);
+    return {
+      eau: coefficient,
+      nrt: coefficient,
+      med: coefficient,
+      mat: coefficient,
+    };
+  }
+
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    eau: normalizeWeatherCoefficient(source.eau),
+    nrt: normalizeWeatherCoefficient(source.nrt),
+    med: normalizeWeatherCoefficient(source.med),
+    mat: normalizeWeatherCoefficient(source.mat),
+  };
+};
+
 export const defaultRation = () => ({
   eau: true,
   nrt: true,
   med: true,
   tache: "",
+  drogue: null,
 });
 
 export const normalizeOptionalGroupId = (value) => {
@@ -93,7 +147,14 @@ export const normalizeGroups = (groups) => {
 
 export const normalizeLunes = (lunes = [], persos = []) =>
   lunes.map((lune) => {
-    const rations = { ...(lune.rations || {}) };
+    const existingRations = lune.rations || {};
+    const rations = Object.fromEntries(
+      Object.entries(existingRations).map(([persoId, ration]) => [
+        persoId,
+        { ...defaultRation(), ...(ration || {}) },
+      ]),
+    );
+
     persos.forEach((perso) => {
       if (!rations[perso.id]) rations[perso.id] = defaultRation();
     });
@@ -101,6 +162,7 @@ export const normalizeLunes = (lunes = [], persos = []) =>
     return {
       id: lune.id || Date.now(),
       coutMat: Number(lune.coutMat ?? 0),
+      meteo: normalizeWeatherCoefficients(lune.meteo),
       rations,
       overrides: lune.overrides || {},
     };
@@ -109,6 +171,7 @@ export const normalizeLunes = (lunes = [], persos = []) =>
 export const createLune = (persos = []) => ({
   id: Date.now(),
   coutMat: 0,
+  meteo: { ...defaultWeatherCoefficients },
   rations: Object.fromEntries(
     persos.map((perso) => [perso.id, defaultRation()]),
   ),
@@ -212,6 +275,7 @@ export const buildFallbackState = () => {
     persoResources: [],
     lunes: [createLune(persos)],
     stocks: defaultStocks,
+    cityMultipliers: defaultCityMultipliers,
     nextPersoId: 1,
     groups: [],
     armes: [],
@@ -237,6 +301,7 @@ export const buildState = (rawState = {}) => {
     persoResources: normalizePersoResources(rawState.persoResources || []),
     lunes: lunes.length > 0 ? lunes : [createLune(persos)],
     stocks: { ...buildStocks(resources), ...(rawState.stocks || {}) },
+    cityMultipliers: normalizeCityMultipliers(rawState.cityMultipliers || {}),
     nextPersoId:
       rawState.nextPersoId ||
       Math.max(1, ...persos.map((perso) => perso.id + 1)),

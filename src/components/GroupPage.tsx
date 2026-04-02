@@ -1,6 +1,7 @@
+import type { Group, Perso } from "../types";
 import { calculateGroupTotals, getGroupMembers } from "../utils/groupUtils";
 
-const formatNumber = (value) => {
+const formatNumber = (value: number | string | null | undefined) => {
   const numericValue = Number(value ?? 0);
   return Number.isInteger(numericValue)
     ? numericValue
@@ -13,14 +14,20 @@ function GroupPage({
   openGroupPage,
   openGroupViewPage,
   addGroup,
+}: {
+  groups: Group[];
+  persos: Perso[];
+  openGroupPage: (groupId: number) => void;
+  openGroupViewPage: (groupId: number) => void;
+  addGroup: () => void;
 }) {
-  const getChefLabel = (chefId) => {
+  const getChefLabel = (chefId: number | null | undefined) => {
     if (chefId === null || chefId === undefined) return "Aucun";
     const chef = persos.find((p) => p.id === chefId);
     return chef ? chef.nom : "Chef introuvable";
   };
 
-  const getMembersLabel = (groupId) => {
+  const getMembersLabel = (groupId: number) => {
     const members = getGroupMembers(persos, groupId);
     if (members.length === 0) return "Aucun membre";
     return members.map((member) => member.nom).join(", ");

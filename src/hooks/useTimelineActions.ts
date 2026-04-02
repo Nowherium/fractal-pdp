@@ -1,4 +1,10 @@
-import { createLune, defaultRation } from "../utils/stateUtils";
+import {
+  createLune,
+  defaultRation,
+  defaultWeatherCoefficients,
+  normalizeWeatherCoefficient,
+  normalizeWeatherCoefficients,
+} from "../utils/stateUtils";
 
 export const useTimelineActions = ({
   persos,
@@ -28,7 +34,14 @@ export const useTimelineActions = ({
       const current = lune.rations[persoId] || defaultRation();
       const nextRation = {
         ...current,
-        [field]: field === "tache" ? value : Boolean(value),
+        [field]:
+          field === "tache"
+            ? value
+            : field === "drogue"
+              ? value === "" || value === null || value === undefined
+                ? null
+                : String(value).toLowerCase()
+              : Boolean(value),
       };
       return {
         ...lune,
@@ -43,10 +56,31 @@ export const useTimelineActions = ({
   };
 
   const updateLuneGlobal = (luneIndex, field, rawValue) => {
-    const value = Number(rawValue) || 0;
-    const nextLunes = lunes.map((lune, idx) =>
-      idx !== luneIndex ? lune : { ...lune, [field]: value },
-    );
+    const nextLunes = lunes.map((lune, idx) => {
+      if (idx !== luneIndex) return lune;
+
+      if (field === "meteo") {
+        return {
+          ...lune,
+          meteo: normalizeWeatherCoefficients(rawValue),
+        };
+      }
+
+      if (field.startsWith("meteo.")) {
+        const resourceKey = field.replace("meteo.", "");
+        return {
+          ...lune,
+          meteo: {
+            ...defaultWeatherCoefficients,
+            ...normalizeWeatherCoefficients(lune.meteo),
+            [resourceKey]: normalizeWeatherCoefficient(rawValue),
+          },
+        };
+      }
+
+      const value = Math.max(0, Number(rawValue) || 0);
+      return { ...lune, [field]: value };
+    });
 
     setLunes(nextLunes);
     if (nextLunes[luneIndex]) {

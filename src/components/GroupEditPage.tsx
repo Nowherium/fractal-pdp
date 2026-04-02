@@ -1,3 +1,4 @@
+import type { Group, Perso } from "../types";
 import {
   getGroupCapacity,
   getGroupLeader,
@@ -10,6 +11,20 @@ function GroupEditPage({
   handleGroupUpdate,
   handleGroupMembersUpdate,
   closePage,
+}: {
+  group?: Group;
+  persos: Perso[];
+  handleGroupUpdate: (
+    groupId: number,
+    field: string,
+    rawValue: string | number | null,
+    options?: { persist?: boolean },
+  ) => void;
+  handleGroupMembersUpdate: (
+    groupId: number,
+    selectedMemberIds: number[],
+  ) => void;
+  closePage: () => void;
 }) {
   if (!group) {
     return (
@@ -29,7 +44,7 @@ function GroupEditPage({
   const groupCapacity = getGroupCapacity(leader);
   const isAtCapacity = memberPersos.length >= groupCapacity;
 
-  const toggleMember = (persoId, checked) => {
+  const toggleMember = (persoId: number, checked: boolean) => {
     const nextMemberIds = checked
       ? [...memberIds, persoId]
       : memberIds.filter((id) => id !== persoId);

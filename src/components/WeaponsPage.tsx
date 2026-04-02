@@ -1,4 +1,11 @@
-const weaponFields = [
+import type { Arme } from "../types";
+
+const weaponFields: Array<{
+  key: string;
+  label: string;
+  type: "text" | "number";
+  step?: string;
+}> = [
   { key: "name", label: "Nom", type: "text", step: undefined },
   { key: "att", label: "Att", type: "number", step: "0.1" },
   { key: "degats", label: "Dégâts", type: "number", step: "0.1" },
@@ -9,7 +16,25 @@ const weaponFields = [
   { key: "quantity", label: "Quantité", type: "number", step: "1" },
 ];
 
-function WeaponsPage({ armes, addArme, updateArme, removeArme }) {
+const toInputValue = (value: unknown, fallback: string | number = "") =>
+  typeof value === "string" || typeof value === "number" ? value : fallback;
+
+function WeaponsPage({
+  armes,
+  addArme,
+  updateArme,
+  removeArme,
+}: {
+  armes: Arme[];
+  addArme: () => void;
+  updateArme: (
+    index: number,
+    field: string,
+    rawValue: string | number,
+    options?: { persist?: boolean },
+  ) => void;
+  removeArme: (index: number) => void;
+}) {
   return (
     <div className='panel'>
       <h2>5. Administration des armes</h2>
@@ -44,7 +69,7 @@ function WeaponsPage({ armes, addArme, updateArme, removeArme }) {
                       type={field.type}
                       step={field.step}
                       min={field.key === "quantity" ? 0 : undefined}
-                      value={arme[field.key] ?? ""}
+                      value={toInputValue(arme[field.key])}
                       onChange={(event) =>
                         updateArme(
                           index,

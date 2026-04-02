@@ -1,3 +1,4 @@
+import type { Group, Perso } from "../types";
 import {
   calculateGroupTotals,
   getGroupCapacity,
@@ -10,9 +11,20 @@ import {
   isPersoOverweight,
 } from "../utils/groupUtils";
 
-const formatNumber = (value) => Number(value ?? 0).toFixed(2);
+const formatNumber = (value: number | string | null | undefined) =>
+  Number(value ?? 0).toFixed(2);
 
-function GroupViewPage({ group, persos, closePage, openEditPage }) {
+function GroupViewPage({
+  group,
+  persos,
+  closePage,
+  openEditPage,
+}: {
+  group?: Group;
+  persos: Perso[];
+  closePage: () => void;
+  openEditPage: (groupId: number) => void;
+}) {
   if (!group) {
     return (
       <div className='panel'>
@@ -94,7 +106,7 @@ function GroupViewPage({ group, persos, closePage, openEditPage }) {
             </tbody>
             <tfoot>
               <tr>
-                <th colSpan='2'>Total</th>
+                <th colSpan={2}>Total</th>
                 <th>{formatNumber(totals.eau)}</th>
                 <th>{formatNumber(totals.nrt)}</th>
                 <th>{formatNumber(totals.med)}</th>

@@ -1,4 +1,11 @@
-const bagFields = [
+import type { Sac } from "../types";
+
+const bagFields: Array<{
+  key: string;
+  label: string;
+  type: "text" | "number";
+  step?: string;
+}> = [
   { key: "name", label: "Nom", type: "text" },
   { key: "pv", label: "PV", type: "number", step: "1" },
   { key: "pvmax", label: "PV Max", type: "number", step: "1" },
@@ -7,7 +14,25 @@ const bagFields = [
   { key: "quantity", label: "Quantité", type: "number", step: "1" },
 ];
 
-function BagsPage({ sacs, addSac, updateSac, removeSac }) {
+const toInputValue = (value: unknown, fallback: string | number = "") =>
+  typeof value === "string" || typeof value === "number" ? value : fallback;
+
+function BagsPage({
+  sacs,
+  addSac,
+  updateSac,
+  removeSac,
+}: {
+  sacs: Sac[];
+  addSac: () => void;
+  updateSac: (
+    index: number,
+    field: string,
+    rawValue: string | number,
+    options?: { persist?: boolean },
+  ) => void;
+  removeSac: (index: number) => void;
+}) {
   return (
     <div className='panel'>
       <h2>7. Administration des sacs</h2>
@@ -42,7 +67,7 @@ function BagsPage({ sacs, addSac, updateSac, removeSac }) {
                       type={field.type}
                       step={field.step}
                       min={field.key === "name" ? undefined : 0}
-                      value={sac[field.key] ?? ""}
+                      value={toInputValue(sac[field.key])}
                       onChange={(event) =>
                         updateSac(
                           index,

@@ -1,9 +1,16 @@
-const wait = (ms) =>
-  new Promise((resolve) => {
+type ApiRequestOptions = {
+  method?: string;
+  body?: unknown;
+  headers?: HeadersInit;
+  retries?: number;
+};
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
 
-const parseResponseBody = async (response) => {
+const parseResponseBody = async (response: Response) => {
   const contentType = response.headers.get("content-type") || "";
 
   if (contentType.includes("application/json")) {
@@ -15,10 +22,10 @@ const parseResponseBody = async (response) => {
 };
 
 export const apiRequest = async (
-  endpoint,
-  { method = "GET", body, headers = {}, retries = 1 } = {},
+  endpoint: string,
+  { method = "GET", body, headers = {}, retries = 1 }: ApiRequestOptions = {},
 ) => {
-  let lastError = null;
+  let lastError: unknown = null;
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {

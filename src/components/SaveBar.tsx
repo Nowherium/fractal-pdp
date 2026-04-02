@@ -1,9 +1,17 @@
+import type { ChangeEvent, RefObject } from "react";
+
 function SaveBar({
   saveStatus,
   exportData,
   importData,
   resetData,
   fileInputRef,
+}: {
+  saveStatus: string;
+  exportData: () => void;
+  importData: (event: ChangeEvent<HTMLInputElement>) => void;
+  resetData: () => void;
+  fileInputRef: RefObject<HTMLInputElement | null>;
 }) {
   return (
     <div className='save-bar'>

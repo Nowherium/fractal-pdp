@@ -1,3 +1,4 @@
+import type { Perso } from "../types";
 import {
   getPersoCapacityValue,
   getPersoCombatValue,
@@ -6,14 +7,24 @@ import {
   isPersoOverweight,
 } from "../utils/groupUtils";
 
-const formatCombat = (value) => {
+const formatCombat = (value: number | string | null | undefined) => {
   const numericValue = Number(value ?? 0);
   return Number.isInteger(numericValue)
     ? numericValue
     : numericValue.toFixed(2);
 };
 
-function EffectifPage({ persos, removePerso, addPerso, openPersoPage }) {
+function EffectifPage({
+  persos,
+  removePerso,
+  addPerso,
+  openPersoPage,
+}: {
+  persos: Perso[];
+  removePerso: (index: number) => void;
+  addPerso: () => void;
+  openPersoPage: (persoId: number) => void;
+}) {
   return (
     <div className='panel'>
       <h2>2. L'Effectif & Potentiel de base</h2>

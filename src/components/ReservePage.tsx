@@ -1,19 +1,68 @@
-const formatWeight = (value) => Number(value ?? 0).toFixed(2);
-const getResourceUnitWeight = (resource) => (resource?.code === "crd" ? 0 : 1);
-const getResourceDisplayName = (resource) =>
+import type {
+  Arme,
+  CityMultipliers,
+  Outil,
+  PersoArme,
+  PersoOutil,
+  PersoSac,
+  Resource,
+  Sac,
+  Stocks,
+} from "../types";
+import { sortResources } from "../utils/resourceOrder";
+
+const formatWeight = (value: number | string | null | undefined) =>
+  Number(value ?? 0).toFixed(2);
+const getResourceUnitWeight = (resource?: Resource | null) =>
+  resource?.code === "crd" ? 0 : 1;
+const getResourceDisplayName = (resource?: Resource | null) =>
   resource?.name || resource?.code?.toUpperCase() || "Ressource";
+
+const cityBonusFields: Array<{ key: keyof CityMultipliers; label: string }> = [
+  { key: "eau", label: "💧 Eau" },
+  { key: "nrt", label: "🍗 Nrt" },
+  { key: "med", label: "💊 Med" },
+  { key: "mat", label: "🧱 Mat" },
+];
+
+type ReserveItem = {
+  id: number;
+  name: string;
+  quantity: number;
+  poids: number;
+  totalWeight: number;
+};
 
 function ReservePage({
   resources,
   stocks,
+  cityMultipliers,
   handleStockChange,
+  handleCityMultiplierChange,
   armes,
   persoArmes,
   outils,
   persoOutils,
   sacs,
   persoSacs,
+}: {
+  resources: Resource[];
+  stocks: Stocks;
+  cityMultipliers: CityMultipliers;
+  handleStockChange: (field: string, rawValue: string | number) => void;
+  handleCityMultiplierChange: (
+    field: keyof CityMultipliers,
+    rawValue: string | number,
+  ) => void;
+  armes: Arme[];
+  persoArmes: PersoArme[];
+  outils: Outil[];
+  persoOutils: PersoOutil[];
+  sacs: Sac[];
+  persoSacs: PersoSac[];
 }) {
+  const orderedResources = sortResources(resources);
+
   const totalResourcesWeight = resources.reduce(
     (total, resource) =>
       total +
@@ -90,7 +139,11 @@ function ReservePage({
 
   const totalReserveWeight = totalResourcesWeight + totalReserveGearWeight;
 
-  const renderReserveItems = (title, items, emptyLabel) => (
+  const renderReserveItems = (
+    title: string,
+    items: ReserveItem[],
+    emptyLabel: string,
+  ) => (
     <div style={{ marginTop: "1rem" }}>
       <h3>{title}</h3>
       {items.length === 0 ? (
@@ -122,7 +175,39 @@ function ReservePage({
 
   return (
     <div className='panel'>
-      <h2>1. Réserve Centrale</h2>
+      <h2>1. Ville</h2>
+      <p className='info-text'>
+        La ville applique ici des <strong>multiplicateurs de production</strong>{" "}
+        pour tous les persos. <strong>1</strong> = normal, <strong>1.2</strong>{" "}
+        = +20 %, <strong>0</strong> = aucune production.
+      </p>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: "12px",
+          marginBottom: "1rem",
+        }}
+      >
+        {cityBonusFields.map((field) => (
+          <label key={field.key} className='perso-field'>
+            <span className='perso-field-label'>Bonus {field.label}</span>
+            <input
+              className='perso-field-input'
+              type='number'
+              min='0'
+              step='0.05'
+              value={cityMultipliers[field.key] ?? 1}
+              onChange={(event) =>
+                handleCityMultiplierChange(field.key, event.target.value)
+              }
+            />
+          </label>
+        ))}
+      </div>
+
+      <h3>Réserve centrale</h3>
       <div
         style={{
           display: "grid",
@@ -130,7 +215,7 @@ function ReservePage({
           gap: "12px",
         }}
       >
-        {resources.map((resource) => (
+        {orderedResources.map((resource) => (
           <label key={resource.code} className='perso-field'>
             <span className='perso-field-label'>
               Stock {resource.code.toUpperCase()}{" "}

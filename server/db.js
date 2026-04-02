@@ -90,8 +90,26 @@ const defaultPersos = [
 
 const defaultGroup = { id: 1, name: "Default" };
 const defaultCity = { id: 1, name: "Ville centrale" };
+const defaultCityMultipliers = {
+  eau: 1,
+  nrt: 1,
+  med: 1,
+  mat: 1,
+};
+const defaultWeatherCoefficients = {
+  eau: 1,
+  nrt: 1,
+  med: 1,
+  mat: 1,
+};
 
-const defaultRation = () => ({ eau: true, nrt: true, med: true, tache: "" });
+const defaultRation = () => ({
+  eau: true,
+  nrt: true,
+  med: true,
+  tache: "",
+  drogue: null,
+});
 
 const pool = new Pool({ connectionString: DATABASE_URL });
 
@@ -101,8 +119,64 @@ const normalizeNumber = (value) => {
   return Number.isFinite(normalized) ? normalized : 0;
 };
 
+const normalizeResourceCode = (value, fallback = "") => {
+  const normalized = String(value ?? fallback)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  return normalized;
+};
+
+const normalizeResourceName = (value, fallback = "Ressource") => {
+  const normalized = String(value ?? "").trim();
+  return normalized || fallback;
+};
+
 const normalizeNonNegativeNumber = (value) =>
   Math.max(0, normalizeNumber(value));
+
+const normalizeMultiplier = (value, fallback = 1) => {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? Math.max(0, normalized) : fallback;
+};
+
+const normalizeWeatherCoefficient = (value, fallback = 1) => {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return fallback;
+  return Math.min(1, Math.max(0, normalized));
+};
+
+const normalizeWeatherCoefficients = (value) => {
+  if (typeof value === "number" || typeof value === "string") {
+    const coefficient = normalizeWeatherCoefficient(value, 1);
+    return {
+      eau: coefficient,
+      nrt: coefficient,
+      med: coefficient,
+      mat: coefficient,
+    };
+  }
+
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    eau: normalizeWeatherCoefficient(
+      source.eau ?? source.meteo_eau,
+      defaultWeatherCoefficients.eau,
+    ),
+    nrt: normalizeWeatherCoefficient(
+      source.nrt ?? source.meteo_nrt,
+      defaultWeatherCoefficients.nrt,
+    ),
+    med: normalizeWeatherCoefficient(
+      source.med ?? source.meteo_med,
+      defaultWeatherCoefficients.med,
+    ),
+    mat: normalizeWeatherCoefficient(
+      source.mat ?? source.meteo_mat,
+      defaultWeatherCoefficients.mat,
+    ),
+  };
+};
 
 const normalizeWeaponQuantity = (value) => {
   if (value === null || value === undefined || value === "") return 1;
@@ -309,6 +383,7 @@ const buildLunes = (luneRows, rationsRows, overridesRows) => {
       nrt: row.nrt,
       med: row.med,
       tache: row.tache,
+      drogue: row.drogue || null,
     };
   });
 
@@ -322,6 +397,12 @@ const buildLunes = (luneRows, rationsRows, overridesRows) => {
   return luneRows.map((row) => ({
     id: Number(row.id),
     coutMat: normalizeNumber(row.coutmat),
+    meteo: normalizeWeatherCoefficients({
+      eau: row.meteo_eau ?? row.meteo,
+      nrt: row.meteo_nrt ?? row.meteo,
+      med: row.meteo_med ?? row.meteo,
+      mat: row.meteo_mat ?? row.meteo,
+    }),
     rations: rationsByLune[Number(row.id)] || {},
     overrides: overridesByLune[Number(row.id)] || {},
   }));
@@ -347,12 +428,19 @@ const getState = async () => {
   );
 
   const { rows: cityRows } = await pool.query(
-    "SELECT id, name FROM cities ORDER BY id ASC",
+    "SELECT id, name, mult_eau, mult_nrt, mult_med, mult_mat FROM cities ORDER BY id ASC",
   );
   const cities = cityRows.map((row) => ({
     id: Number(row.id),
     name: row.name,
   }));
+  const activeCity = cityRows[0];
+  const cityMultipliers = {
+    eau: normalizeMultiplier(activeCity?.mult_eau, defaultCityMultipliers.eau),
+    nrt: normalizeMultiplier(activeCity?.mult_nrt, defaultCityMultipliers.nrt),
+    med: normalizeMultiplier(activeCity?.mult_med, defaultCityMultipliers.med),
+    mat: normalizeMultiplier(activeCity?.mult_mat, defaultCityMultipliers.mat),
+  };
 
   const { rows: groupRows } = await pool.query(
     "SELECT group_id, name, chef FROM groups ORDER BY group_id ASC",
@@ -531,10 +619,10 @@ const getState = async () => {
   const persos = persoRows.map(normalizePersoRow);
 
   const { rows: luneRows } = await pool.query(
-    "SELECT id, coutMat FROM lunes ORDER BY id ASC",
+    "SELECT id, coutMat, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat FROM lunes ORDER BY id ASC",
   );
   const { rows: rationsRows } = await pool.query(
-    "SELECT lune_id, perso_id, eau, nrt, med, tache FROM rations",
+    "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue FROM rations",
   );
   const { rows: overridesRows } = await pool.query(
     "SELECT lune_id, perso_id, data FROM overrides",
@@ -550,6 +638,7 @@ const getState = async () => {
     nextPersoId,
     resources,
     cities,
+    cityMultipliers,
     groups,
     cityResources,
     persoResources,
@@ -563,11 +652,13 @@ const getState = async () => {
 };
 
 const insertState = async (state) => {
+  const resources = Array.isArray(state.resources) ? state.resources : null;
   const persos = Array.isArray(state.persos) ? state.persos : null;
   const lunes = Array.isArray(state.lunes) ? state.lunes : null;
   const stocks = state.stocks
     ? { ...defaultStocks, ...(state.stocks || {}) }
     : null;
+  const cityMultipliers = state.cityMultipliers || null;
   const groups = Array.isArray(state.groups) ? state.groups : null;
   const armes = Array.isArray(state.armes) ? state.armes : null;
   const persoArmes = Array.isArray(state.persoArmes) ? state.persoArmes : null;
@@ -579,6 +670,37 @@ const insertState = async (state) => {
   const persoSacs = Array.isArray(state.persoSacs) ? state.persoSacs : null;
   const persoResources = Array.isArray(state.persoResources)
     ? state.persoResources
+    : null;
+
+  const resourcesPayload =
+    resources?.map((resource, index) => ({
+      id: Number(resource.id),
+      code: normalizeResourceCode(resource.code, `res${index + 1}`),
+      name: normalizeResourceName(
+        resource.name,
+        String(resource.code ?? `res${index + 1}`).toUpperCase(),
+      ),
+    })) || null;
+
+  const cityMultipliersPayload = cityMultipliers
+    ? {
+        eau: normalizeMultiplier(
+          cityMultipliers.eau,
+          defaultCityMultipliers.eau,
+        ),
+        nrt: normalizeMultiplier(
+          cityMultipliers.nrt,
+          defaultCityMultipliers.nrt,
+        ),
+        med: normalizeMultiplier(
+          cityMultipliers.med,
+          defaultCityMultipliers.med,
+        ),
+        mat: normalizeMultiplier(
+          cityMultipliers.mat,
+          defaultCityMultipliers.mat,
+        ),
+      }
     : null;
 
   const persosById = new Map();
@@ -610,9 +732,14 @@ const insertState = async (state) => {
   for (const lune of lunes || []) {
     const luneId = Number(lune.id);
     if (!Number.isFinite(luneId)) continue;
+    const meteo = normalizeWeatherCoefficients(lune.meteo);
     lunesById.set(luneId, {
       id: luneId,
       coutmat: normalizeNumber(lune.coutMat),
+      meteo_eau: meteo.eau,
+      meteo_nrt: meteo.nrt,
+      meteo_med: meteo.med,
+      meteo_mat: meteo.mat,
     });
 
     const rations = lune.rations || {};
@@ -626,6 +753,7 @@ const insertState = async (state) => {
         nrt: ration?.nrt ?? true,
         med: ration?.med ?? true,
         tache: ration?.tache || "",
+        drogue: ration?.drogue || null,
       });
     }
 
@@ -800,16 +928,50 @@ const insertState = async (state) => {
       quantity: normalizeNonNegativeNumber(entry.quantity),
     })) || null;
 
-  const stocksPayload = stocks
-    ? stockFields.map((code) => ({
-        code,
-        quantity: normalizeNumber(stocks[code]),
-      }))
-    : null;
+  const stocksPayload = stocks ? buildStocksPayload(stocks) : null;
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    if (resourcesPayload !== null && resourcesPayload.length > 0) {
+      await client.query(
+        `INSERT INTO resources (id, code, name)
+         SELECT id, code, name
+         FROM json_to_recordset($1::json) AS incoming(
+           id integer,
+           code text,
+           name text
+         )
+         ON CONFLICT (id)
+         DO UPDATE SET
+           code = EXCLUDED.code,
+           name = EXCLUDED.name`,
+        [JSON.stringify(resourcesPayload)],
+      );
+    }
+
+    if (cityMultipliersPayload !== null) {
+      await client.query(
+        `INSERT INTO cities (id, name, mult_eau, mult_nrt, mult_med, mult_mat)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id)
+         DO UPDATE SET
+           name = EXCLUDED.name,
+           mult_eau = EXCLUDED.mult_eau,
+           mult_nrt = EXCLUDED.mult_nrt,
+           mult_med = EXCLUDED.mult_med,
+           mult_mat = EXCLUDED.mult_mat`,
+        [
+          defaultCity.id,
+          defaultCity.name,
+          cityMultipliersPayload.eau,
+          cityMultipliersPayload.nrt,
+          cityMultipliersPayload.med,
+          cityMultipliersPayload.mat,
+        ],
+      );
+    }
 
     if (groupsPayload !== null && groupsPayload.length > 0) {
       await client.query(
@@ -1090,11 +1252,23 @@ const insertState = async (state) => {
     if (lunesPayload !== null) {
       if (lunesPayload.length > 0) {
         await client.query(
-          `INSERT INTO lunes (id, coutMat)
-           SELECT id, coutmat
-           FROM json_to_recordset($1::json) AS incoming(id bigint, coutmat numeric)
+          `INSERT INTO lunes (id, coutMat, meteo_eau, meteo_nrt, meteo_med, meteo_mat)
+           SELECT id, coutmat, meteo_eau, meteo_nrt, meteo_med, meteo_mat
+           FROM json_to_recordset($1::json) AS incoming(
+             id bigint,
+             coutmat numeric,
+             meteo_eau numeric,
+             meteo_nrt numeric,
+             meteo_med numeric,
+             meteo_mat numeric
+           )
            ON CONFLICT (id)
-           DO UPDATE SET coutMat = EXCLUDED.coutMat`,
+           DO UPDATE SET
+             coutMat = EXCLUDED.coutMat,
+             meteo_eau = EXCLUDED.meteo_eau,
+             meteo_nrt = EXCLUDED.meteo_nrt,
+             meteo_med = EXCLUDED.meteo_med,
+             meteo_mat = EXCLUDED.meteo_mat`,
           [JSON.stringify(lunesPayload)],
         );
         await client.query(
@@ -1107,22 +1281,24 @@ const insertState = async (state) => {
 
       if (rationsPayload.length > 0) {
         await client.query(
-          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache)
-           SELECT lune_id, perso_id, eau, nrt, med, tache
+          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue)
+           SELECT lune_id, perso_id, eau, nrt, med, tache, drogue
            FROM json_to_recordset($1::json) AS incoming(
              lune_id bigint,
              perso_id integer,
              eau boolean,
              nrt boolean,
              med boolean,
-             tache text
+             tache text,
+             drogue text
            )
            ON CONFLICT (lune_id, perso_id)
            DO UPDATE SET
              eau = EXCLUDED.eau,
              nrt = EXCLUDED.nrt,
              med = EXCLUDED.med,
-             tache = EXCLUDED.tache`,
+             tache = EXCLUDED.tache,
+             drogue = EXCLUDED.drogue`,
           [JSON.stringify(rationsPayload)],
         );
         await client.query(
@@ -1396,11 +1572,11 @@ const validateQuantityAgainstAssignments = async (
 
 const buildStocksPayload = (stocks) =>
   Object.entries(stocks || {})
-    .filter(([code]) => stockFields.includes(code))
     .map(([code, quantity]) => ({
-      code,
+      code: normalizeResourceCode(code),
       quantity: normalizeNumber(quantity),
-    }));
+    }))
+    .filter(({ code }) => code.length > 0);
 
 const updateStocks = async (stocks) => {
   const payload = buildStocksPayload(stocks);
@@ -1421,14 +1597,41 @@ const updateStocks = async (stocks) => {
 };
 
 const updateStock = async (code, quantity) => {
-  const normalizedCode = String(code || "")
-    .trim()
-    .toLowerCase();
-  if (!stockFields.includes(normalizedCode)) {
+  const normalizedCode = normalizeResourceCode(code);
+  if (!normalizedCode) {
     throw new Error(`Code de ressource invalide: ${code}`);
   }
 
   await updateStocks({ [normalizedCode]: quantity });
+};
+
+const updateCityMultipliers = async (cityMultipliers = {}) => {
+  const payload = {
+    eau: normalizeMultiplier(cityMultipliers.eau, defaultCityMultipliers.eau),
+    nrt: normalizeMultiplier(cityMultipliers.nrt, defaultCityMultipliers.nrt),
+    med: normalizeMultiplier(cityMultipliers.med, defaultCityMultipliers.med),
+    mat: normalizeMultiplier(cityMultipliers.mat, defaultCityMultipliers.mat),
+  };
+
+  await pool.query(
+    `INSERT INTO cities (id, name, mult_eau, mult_nrt, mult_med, mult_mat)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (id)
+     DO UPDATE SET
+       name = EXCLUDED.name,
+       mult_eau = EXCLUDED.mult_eau,
+       mult_nrt = EXCLUDED.mult_nrt,
+       mult_med = EXCLUDED.mult_med,
+       mult_mat = EXCLUDED.mult_mat`,
+    [
+      defaultCity.id,
+      defaultCity.name,
+      payload.eau,
+      payload.nrt,
+      payload.med,
+      payload.mat,
+    ],
+  );
 };
 
 const buildLunesWritePayload = (lunes) => {
@@ -1440,9 +1643,14 @@ const buildLunesWritePayload = (lunes) => {
     const luneId = Number(lune.id);
     if (!Number.isFinite(luneId)) continue;
 
+    const meteo = normalizeWeatherCoefficients(lune.meteo);
     lunesById.set(luneId, {
       id: luneId,
       coutmat: normalizeNumber(lune.coutMat),
+      meteo_eau: meteo.eau,
+      meteo_nrt: meteo.nrt,
+      meteo_med: meteo.med,
+      meteo_mat: meteo.mat,
     });
 
     const rations = lune.rations || {};
@@ -1456,6 +1664,7 @@ const buildLunesWritePayload = (lunes) => {
         nrt: ration?.nrt ?? true,
         med: ration?.med ?? true,
         tache: ration?.tache || "",
+        drogue: ration?.drogue || null,
       });
     }
 
@@ -1480,7 +1689,7 @@ const buildLunesWritePayload = (lunes) => {
 
 const getLuneById = async (client, luneId) => {
   const { rows: luneRows } = await client.query(
-    "SELECT id, coutMat FROM lunes WHERE id = $1 LIMIT 1",
+    "SELECT id, coutMat, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat FROM lunes WHERE id = $1 LIMIT 1",
     [luneId],
   );
 
@@ -1489,7 +1698,7 @@ const getLuneById = async (client, luneId) => {
   }
 
   const { rows: rationRows } = await client.query(
-    "SELECT lune_id, perso_id, eau, nrt, med, tache FROM rations WHERE lune_id = $1",
+    "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue FROM rations WHERE lune_id = $1",
     [luneId],
   );
   const { rows: overrideRows } = await client.query(
@@ -1513,6 +1722,7 @@ const upsertLune = async (lune) => {
       ...(lune || {}),
       id: luneId,
       coutMat: normalizeNumber(lune?.coutMat ?? existingLune?.coutMat),
+      meteo: normalizeWeatherCoefficients(lune?.meteo ?? existingLune?.meteo),
       rations:
         lune && Object.prototype.hasOwnProperty.call(lune, "rations")
           ? lune.rations || {}
@@ -1527,26 +1737,39 @@ const upsertLune = async (lune) => {
       buildLunesWritePayload([mergedLune]);
 
     await client.query(
-      `INSERT INTO lunes (id, coutMat)
-       SELECT id, coutmat
-       FROM json_to_recordset($1::json) AS incoming(id bigint, coutmat numeric)
+      `INSERT INTO lunes (id, coutMat, meteo_eau, meteo_nrt, meteo_med, meteo_mat)
+       SELECT id, coutmat, meteo_eau, meteo_nrt, meteo_med, meteo_mat
+       FROM json_to_recordset($1::json) AS incoming(
+         id bigint,
+         coutmat numeric,
+         meteo_eau numeric,
+         meteo_nrt numeric,
+         meteo_med numeric,
+         meteo_mat numeric
+       )
        ON CONFLICT (id)
-       DO UPDATE SET coutMat = EXCLUDED.coutMat`,
+       DO UPDATE SET
+         coutMat = EXCLUDED.coutMat,
+         meteo_eau = EXCLUDED.meteo_eau,
+         meteo_nrt = EXCLUDED.meteo_nrt,
+         meteo_med = EXCLUDED.meteo_med,
+         meteo_mat = EXCLUDED.meteo_mat`,
       [JSON.stringify(lunesPayload)],
     );
 
     await client.query("DELETE FROM rations WHERE lune_id = $1", [luneId]);
     if (rationsPayload.length > 0) {
       await client.query(
-        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache)
-         SELECT lune_id, perso_id, eau, nrt, med, tache
+        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue)
+         SELECT lune_id, perso_id, eau, nrt, med, tache, drogue
          FROM json_to_recordset($1::json) AS incoming(
            lune_id bigint,
            perso_id integer,
            eau boolean,
            nrt boolean,
            med boolean,
-           tache text
+           tache text,
+           drogue text
          )`,
         [JSON.stringify(rationsPayload)],
       );
@@ -1570,6 +1793,133 @@ const upsertLune = async (lune) => {
 
 const deleteLune = async (luneId) => {
   await pool.query("DELETE FROM lunes WHERE id = $1", [luneId]);
+};
+
+const upsertResource = async (resource) => {
+  const id = Number(resource?.id);
+  if (!Number.isFinite(id)) {
+    throw new Error("Identifiant de ressource invalide.");
+  }
+
+  const code = normalizeResourceCode(resource?.code, `res${id}`);
+  if (!code) {
+    throw new Error("Code de ressource invalide.");
+  }
+
+  const name = normalizeResourceName(resource?.name, code.toUpperCase());
+
+  await withTransaction(async (client) => {
+    const { rows: existingRows } = await client.query(
+      "SELECT code FROM resources WHERE id = $1 LIMIT 1",
+      [id],
+    );
+    const previousCode = normalizeResourceCode(existingRows[0]?.code);
+
+    const { rowCount } = await client.query(
+      "SELECT 1 FROM resources WHERE code = $1 AND id <> $2 LIMIT 1",
+      [code, id],
+    );
+
+    if (rowCount > 0) {
+      throw new Error(`Le code ressource \"${code}\" est déjà utilisé.`);
+    }
+
+    await client.query(
+      `INSERT INTO resources (id, code, name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id)
+       DO UPDATE SET
+         code = EXCLUDED.code,
+         name = EXCLUDED.name`,
+      [id, code, name],
+    );
+
+    if (previousCode && previousCode !== code) {
+      await client.query("UPDATE rations SET drogue = $1 WHERE drogue = $2", [
+        code,
+        previousCode,
+      ]);
+    }
+
+    await client.query(
+      `INSERT INTO city_resources (city_id, resource_id, quantity)
+       SELECT c.id, $1, 0
+       FROM cities AS c
+       LEFT JOIN city_resources AS cr
+         ON cr.city_id = c.id
+        AND cr.resource_id = $1
+       WHERE cr.city_id IS NULL`,
+      [id],
+    );
+
+    await client.query(
+      `INSERT INTO perso_resources (perso_id, resource_id, quantity)
+       SELECT p.id, $1, 0
+       FROM persos AS p
+       LEFT JOIN perso_resources AS pr
+         ON pr.perso_id = p.id
+        AND pr.resource_id = $1
+       WHERE pr.perso_id IS NULL`,
+      [id],
+    );
+  });
+};
+
+const deleteResource = async (resourceId) => {
+  await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      "SELECT id, code, name FROM resources WHERE id = $1 LIMIT 1",
+      [resourceId],
+    );
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    const resource = rows[0];
+    const code = normalizeResourceCode(resource.code);
+    const protectedCodes = new Set(["eau", "nrt", "med", "mat", "crd"]);
+
+    if (protectedCodes.has(code)) {
+      throw new Error(
+        `La ressource \"${code}\" est protégée et ne peut pas être supprimée.`,
+      );
+    }
+
+    const { rows: stockRows } = await client.query(
+      "SELECT COALESCE(SUM(quantity), 0) AS total FROM city_resources WHERE resource_id = $1",
+      [resourceId],
+    );
+    const stockTotal = Number(stockRows[0]?.total ?? 0);
+    if (stockTotal > 0) {
+      throw new Error(
+        `Impossible de supprimer \"${code}\" : il reste ${stockTotal} en réserve centrale.`,
+      );
+    }
+
+    const { rows: carriedRows } = await client.query(
+      "SELECT COALESCE(SUM(quantity), 0) AS total FROM perso_resources WHERE resource_id = $1",
+      [resourceId],
+    );
+    const carriedTotal = Number(carriedRows[0]?.total ?? 0);
+    if (carriedTotal > 0) {
+      throw new Error(
+        `Impossible de supprimer \"${code}\" : ${carriedTotal} unité(s) sont encore portées par des persos.`,
+      );
+    }
+
+    const { rowCount: plannedCount } = await client.query(
+      "SELECT 1 FROM rations WHERE drogue = $1 LIMIT 1",
+      [code],
+    );
+    if (plannedCount > 0) {
+      throw new Error(
+        `Impossible de supprimer \"${code}\" : cette ressource est encore planifiée comme drogue dans la timeline.`,
+      );
+    }
+
+    await client.query("DELETE FROM resources WHERE id = $1", [resourceId]);
+  });
 };
 
 const upsertPerso = async (perso) => {
@@ -2255,7 +2605,12 @@ const initDb = async () => {
 
     CREATE TABLE IF NOT EXISTS lunes (
       id bigint PRIMARY KEY,
-      coutMat numeric NOT NULL DEFAULT 0
+      coutMat numeric NOT NULL DEFAULT 0,
+      meteo numeric NOT NULL DEFAULT 1,
+      meteo_eau numeric NOT NULL DEFAULT 1,
+      meteo_nrt numeric NOT NULL DEFAULT 1,
+      meteo_med numeric NOT NULL DEFAULT 1,
+      meteo_mat numeric NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS rations (
@@ -2265,6 +2620,7 @@ const initDb = async () => {
       nrt boolean NOT NULL,
       med boolean NOT NULL,
       tache text NOT NULL,
+      drogue text,
       PRIMARY KEY (lune_id, perso_id)
     );
 
@@ -2278,6 +2634,45 @@ const initDb = async () => {
 
   await pool.query(
     `ALTER TABLE persos DROP COLUMN IF EXISTS incEau, DROP COLUMN IF EXISTS incNrt, DROP COLUMN IF EXISTS incMed, DROP COLUMN IF EXISTS incMat`,
+  );
+
+  await pool.query(`ALTER TABLE rations ADD COLUMN IF NOT EXISTS drogue text`);
+
+  await pool.query(
+    `ALTER TABLE lunes ADD COLUMN IF NOT EXISTS meteo numeric NOT NULL DEFAULT 1`,
+  );
+
+  await pool.query(
+    `ALTER TABLE lunes
+       ADD COLUMN IF NOT EXISTS meteo_eau numeric NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS meteo_nrt numeric NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS meteo_med numeric NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS meteo_mat numeric NOT NULL DEFAULT 1`,
+  );
+
+  await pool.query(
+    `UPDATE lunes
+     SET meteo = LEAST(1, GREATEST(COALESCE(meteo, 1), 0)),
+         meteo_eau = LEAST(1, GREATEST(COALESCE(meteo_eau, meteo, 1), 0)),
+         meteo_nrt = LEAST(1, GREATEST(COALESCE(meteo_nrt, meteo, 1), 0)),
+         meteo_med = LEAST(1, GREATEST(COALESCE(meteo_med, meteo, 1), 0)),
+         meteo_mat = LEAST(1, GREATEST(COALESCE(meteo_mat, meteo, 1), 0))`,
+  );
+
+  await pool.query(
+    `ALTER TABLE cities
+       ADD COLUMN IF NOT EXISTS mult_eau numeric NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS mult_nrt numeric NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS mult_med numeric NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS mult_mat numeric NOT NULL DEFAULT 1`,
+  );
+
+  await pool.query(
+    `UPDATE cities
+     SET mult_eau = COALESCE(mult_eau, 1),
+         mult_nrt = COALESCE(mult_nrt, 1),
+         mult_med = COALESCE(mult_med, 1),
+         mult_mat = COALESCE(mult_mat, 1)`,
   );
 
   const { rows: legacyPvBaseColumn } = await pool.query(
@@ -2578,8 +2973,8 @@ const initDb = async () => {
       0,
     ]);
     await pool.query(
-      "INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache) VALUES ($1, $2, $3, $4, $5, $6)",
-      [defaultLuneId, defaultPersos[0].id, true, true, true, ""],
+      "INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [defaultLuneId, defaultPersos[0].id, true, true, true, "", null],
     );
   }
 
@@ -2683,6 +3078,9 @@ export {
   getState,
   insertState,
   updateStock,
+  updateCityMultipliers,
+  upsertResource,
+  deleteResource,
   upsertLune,
   deleteLune,
   upsertPerso,

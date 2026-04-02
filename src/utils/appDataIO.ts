@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { resetState, saveState } from "./api";
 import { buildFallbackState, buildState } from "./stateUtils";
 
@@ -15,14 +16,31 @@ export const exportStateData = (state) => {
   URL.revokeObjectURL(url);
 };
 
-export const importStateFile = (event, { fileInputRef, setCompleteState }) => {
+export const importStateFile = (
+  event: { target: { files?: FileList | null } },
+  {
+    fileInputRef,
+    setCompleteState,
+  }: {
+    fileInputRef: RefObject<HTMLInputElement>;
+    setCompleteState: (state: unknown) => void;
+  },
+) => {
   const file = event.target.files?.[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = async (loadEvent) => {
     try {
-      const parsed = JSON.parse(loadEvent.target.result);
+      const rawText =
+        typeof loadEvent.target?.result === "string"
+          ? loadEvent.target.result
+          : "";
+      if (!rawText) {
+        throw new Error("Fichier vide ou invalide");
+      }
+
+      const parsed = JSON.parse(rawText);
       const importedState = buildState(parsed);
       setCompleteState(importedState);
       await saveState(importedState);

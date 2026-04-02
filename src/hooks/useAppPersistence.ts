@@ -39,6 +39,21 @@ export const useAppEntitySaves = ({ ready, isHydratingRef, setSaveStatus }) => {
   });
 
   return {
+    saveCityMultipliersEntity: (cityMultipliers) =>
+      queueSave(`city-multipliers`, `/api/city-multipliers`, {
+        cityMultipliers,
+      }),
+    saveResourceEntity: (resource) =>
+      queueSave(`resource-${resource.id}`, `/api/resources/${resource.id}`, {
+        resource,
+      }),
+    deleteResourceEntity: (resourceId) =>
+      queueSave(
+        `resource-${resourceId}`,
+        `/api/resources/${resourceId}`,
+        undefined,
+        "DELETE",
+      ),
     savePersoEntity: (perso) =>
       queueSave(`perso-${perso.id}`, `/api/persos/${perso.id}`, { perso }),
     deletePersoEntity: (persoId) =>

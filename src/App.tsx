@@ -1,7 +1,9 @@
 import { useMemo } from "react";
+import type { ChangeEvent } from "react";
 import SaveBar from "./components/SaveBar";
 import PageTabs from "./components/PageTabs";
 import ReservePage from "./components/ReservePage";
+import ResourcesPage from "./components/ResourcesPage";
 import EffectifPage from "./components/EffectifPage";
 import PersoPage from "./components/PersoPage";
 import GroupPage from "./components/GroupPage";
@@ -27,7 +29,9 @@ import { useDerivedPersoState } from "./hooks/useDerivedPersoState";
 import { useGroupActions } from "./hooks/useGroupActions";
 import { useInventoryActions } from "./hooks/useInventoryActions";
 import { usePersoActions } from "./hooks/usePersoActions";
+import { useResourceActions } from "./hooks/useResourceActions";
 import { useTimelineActions } from "./hooks/useTimelineActions";
+import type { CityMultipliers, PageTab } from "./types";
 
 function App() {
   const {
@@ -41,6 +45,8 @@ function App() {
     setLunes,
     stocks,
     setStocks,
+    cityMultipliers,
+    setCityMultipliers,
     groups,
     setGroups,
     armes,
@@ -84,6 +90,9 @@ function App() {
   });
 
   const {
+    saveCityMultipliersEntity,
+    saveResourceEntity,
+    deleteResourceEntity,
     savePersoEntity,
     deletePersoEntity,
     savePersoResourcesEntity,
@@ -119,11 +128,44 @@ function App() {
     setPersos,
   });
 
-  const handleStockChange = (field, rawValue) => {
+  const handleStockChange = (field: string, rawValue: string | number) => {
     const value = Number(rawValue) || 0;
-    setStocks((previous) => ({ ...previous, [field]: value }));
+    setStocks((previous: Record<string, number>) => ({
+      ...previous,
+      [field]: value,
+    }));
     saveStockEntity(field, value);
   };
+
+  const handleCityMultiplierChange = (
+    field: keyof CityMultipliers,
+    rawValue: string | number,
+  ) => {
+    const parsedValue = Number(rawValue);
+    const value = Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
+
+    setCityMultipliers((previous: CityMultipliers) => {
+      const next = { ...previous, [field]: value };
+      saveCityMultipliersEntity(next);
+      return next;
+    });
+  };
+
+  const {
+    addResource,
+    updateResource,
+    removeResource,
+    getResourceDeleteGuard,
+  } = useResourceActions({
+    resources,
+    stocks,
+    persoResources,
+    lunes,
+    setResources,
+    setStocks,
+    saveResourceEntity,
+    deleteResourceEntity,
+  });
 
   const {
     openPersoPage,
@@ -229,11 +271,13 @@ function App() {
 
   const exportData = () =>
     exportStateData({
+      resources,
       persos,
       persoResources,
       lunes,
       nextPersoId,
       stocks,
+      cityMultipliers,
       groups,
       armes,
       persoArmes,
@@ -243,7 +287,7 @@ function App() {
       persoSacs,
     });
 
-  const importData = (event) =>
+  const importData = (event: ChangeEvent<HTMLInputElement>) =>
     importStateFile(event, {
       fileInputRef,
       setCompleteState,
@@ -256,18 +300,28 @@ function App() {
     });
 
   const timelineData = useMemo(
-    () => simulateTimeline(persos, lunes, stocks, defaultRation),
-    [persos, lunes, stocks],
+    () =>
+      simulateTimeline(
+        persos,
+        lunes,
+        stocks,
+        defaultRation,
+        resources,
+        persoResources,
+        cityMultipliers,
+      ),
+    [persos, lunes, stocks, resources, persoResources, cityMultipliers],
   );
 
-  const pages = [
-    { key: "reserve", label: "1. Réserve centrale" },
+  const pages: PageTab[] = [
+    { key: "reserve", label: "1. Ville" },
     { key: "effectif", label: "2. Effectif" },
     { key: "groupes", label: "3. Groupe" },
     { key: "timeline", label: "4. Ligne du temps" },
     { key: "armes", label: "5. Armes" },
     { key: "outils", label: "6. Outils" },
     { key: "sacs", label: "7. Sacs" },
+    { key: "resources", label: "8. Ressources" },
   ];
 
   return (
@@ -289,13 +343,25 @@ function App() {
         <ReservePage
           resources={resources}
           stocks={stocks}
+          cityMultipliers={cityMultipliers}
           handleStockChange={handleStockChange}
+          handleCityMultiplierChange={handleCityMultiplierChange}
           armes={armes}
           persoArmes={persoArmes}
           outils={outils}
           persoOutils={persoOutils}
           sacs={sacs}
           persoSacs={persoSacs}
+        />
+      )}
+
+      {page === "resources" && (
+        <ResourcesPage
+          resources={resources}
+          addResource={addResource}
+          updateResource={updateResource}
+          removeResource={removeResource}
+          getResourceDeleteGuard={getResourceDeleteGuard}
         />
       )}
 
@@ -320,7 +386,7 @@ function App() {
 
       {page === "group-view" && (
         <GroupViewPage
-          group={groups.find((g) => g.id === selectedGroupId)}
+          group={groups.find((g: { id: number }) => g.id === selectedGroupId)}
           persos={persos}
           openEditPage={openGroupPage}
           closePage={closeGroupPage}
@@ -329,7 +395,7 @@ function App() {
 
       {page === "group" && (
         <GroupEditPage
-          group={groups.find((g) => g.id === selectedGroupId)}
+          group={groups.find((g: { id: number }) => g.id === selectedGroupId)}
           persos={persos}
           handleGroupUpdate={handleGroupUpdateSafe}
           handleGroupMembersUpdate={handleGroupMembersUpdate}
@@ -339,7 +405,7 @@ function App() {
 
       {page === "perso" && (
         <PersoPage
-          perso={persos.find((p) => p.id === selectedPersoId)}
+          perso={persos.find((p: { id: number }) => p.id === selectedPersoId)}
           resources={resources}
           groups={groups}
           armes={armes}

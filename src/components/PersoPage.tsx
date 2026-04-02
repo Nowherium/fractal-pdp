@@ -1,4 +1,23 @@
-const persoFields = [
+import type {
+  Arme,
+  Group,
+  Outil,
+  Perso,
+  PersoArme,
+  PersoOutil,
+  PersoResource,
+  PersoSac,
+  Resource,
+  Sac,
+} from "../types";
+import { sortResources } from "../utils/resourceOrder";
+
+const persoFields: Array<{
+  key: string;
+  label: string;
+  type: "text" | "number";
+  step?: string;
+}> = [
   { key: "nom", label: "Nom", type: "text" },
   { key: "pvmax", label: "PV max", type: "number", step: "1" },
   { key: "pv", label: "PV actuels", type: "number", step: "1" },
@@ -13,7 +32,7 @@ const persoFields = [
   { key: "groupId", label: "Groupe", type: "number", step: "1" },
 ];
 
-const capacityStep = (value) => {
+const capacityStep = (value: unknown) => {
   const numericValue = Number(value);
   if (Number.isNaN(numericValue)) return "0.1";
   if (numericValue < 4) return "0.1";
@@ -21,18 +40,21 @@ const capacityStep = (value) => {
   return "0.01";
 };
 
-const shouldUseIncrementStep = (fieldKey) =>
+const shouldUseIncrementStep = (fieldKey: string) =>
   fieldKey.startsWith("cap") || fieldKey === "cmd" || fieldKey === "combat";
 
-const specialiteLabels = {
+const specialiteLabels: Record<string, string> = {
   eau: "💧 Eau",
   nrt: "🍗 Nrt",
   mat: "🧱 Mat",
   art: "🎭 Art",
 };
 
-const getResourceDisplayName = (resource) =>
+const getResourceDisplayName = (resource?: Resource | null) =>
   resource?.name || resource?.code?.toUpperCase() || "Ressource";
+
+const toInputValue = (value: unknown, fallback: string | number = "") =>
+  typeof value === "string" || typeof value === "number" ? value : fallback;
 
 function PersoPage({
   perso,
@@ -51,6 +73,40 @@ function PersoPage({
   handlePersoToolsUpdate,
   handlePersoBagsUpdate,
   closePage,
+}: {
+  perso?: Perso;
+  resources: Resource[];
+  groups: Group[];
+  armes: Arme[];
+  persoArmes: PersoArme[];
+  outils: Outil[];
+  persoOutils: PersoOutil[];
+  sacs: Sac[];
+  persoSacs: PersoSac[];
+  persoResources: PersoResource[];
+  handlePersoUpdate: (
+    persoId: number,
+    field: string,
+    rawValue: string | number | null,
+    options?: { persist?: boolean },
+  ) => void;
+  handlePersoResourceUpdate: (
+    persoId: number,
+    resourceId: number,
+    rawValue: string | number,
+  ) => void;
+  handlePersoWeaponsUpdate: (
+    persoId: number,
+    carriedWeaponIds: number[],
+    equippedWeaponId: number | null,
+  ) => void;
+  handlePersoToolsUpdate: (persoId: number, carriedToolIds: number[]) => void;
+  handlePersoBagsUpdate: (
+    persoId: number,
+    carriedBagIds: number[],
+    equippedBagId: number | null,
+  ) => void;
+  closePage: () => void;
 }) {
   if (!perso) {
     return (
@@ -64,6 +120,8 @@ function PersoPage({
     );
   }
 
+  const orderedResources = sortResources(resources);
+
   const carriedWeaponIds = persoArmes
     .filter((entry) => entry.perso_id === perso.id)
     .map((entry) => entry.arme_id);
@@ -76,7 +134,7 @@ function PersoPage({
   const carriedBagIds = persoSacs
     .filter((entry) => entry.perso_id === perso.id)
     .map((entry) => entry.sac_id);
-  const carriedResourceQuantities = new Map(
+  const carriedResourceQuantities = new Map<number, number>(
     persoResources
       .filter((entry) => entry.perso_id === perso.id)
       .map((entry) => [entry.resource_id, Number(entry.quantity ?? 0)]),
@@ -90,7 +148,7 @@ function PersoPage({
   );
   const isOverweight = Number(perso.poidsTotal ?? 0) > effectiveWeightLimit;
 
-  const toggleWeapon = (weaponId, checked) => {
+  const toggleWeapon = (weaponId: number, checked: boolean) => {
     const nextCarriedWeaponIds = checked
       ? [...carriedWeaponIds, weaponId]
       : carriedWeaponIds.filter((id) => id !== weaponId);
@@ -105,7 +163,7 @@ function PersoPage({
     );
   };
 
-  const toggleTool = (toolId, checked) => {
+  const toggleTool = (toolId: number, checked: boolean) => {
     const nextCarriedToolIds = checked
       ? [...carriedToolIds, toolId]
       : carriedToolIds.filter((id) => id !== toolId);
@@ -113,7 +171,7 @@ function PersoPage({
     handlePersoToolsUpdate(perso.id, nextCarriedToolIds);
   };
 
-  const toggleBag = (bagId, checked) => {
+  const toggleBag = (bagId: number, checked: boolean) => {
     const nextCarriedBagIds = checked
       ? [...carriedBagIds, bagId]
       : carriedBagIds.filter((id) => id !== bagId);
@@ -162,7 +220,7 @@ function PersoPage({
                     ? 0
                     : undefined
                 }
-                value={value ?? ""}
+                value={toInputValue(value)}
                 onChange={(event) =>
                   handlePersoUpdate(
                     perso.id,
@@ -227,7 +285,7 @@ function PersoPage({
               gap: "12px",
             }}
           >
-            {resources.map((resource) => (
+            {orderedResources.map((resource) => (
               <label key={resource.id} className='perso-field'>
                 <span className='perso-field-label'>
                   {resource.code?.toUpperCase() || "Ressource"}

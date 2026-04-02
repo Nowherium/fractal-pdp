@@ -5,6 +5,9 @@ import {
   getState,
   insertState,
   updateStock,
+  updateCityMultipliers,
+  upsertResource,
+  deleteResource,
   upsertLune,
   deleteLune,
   upsertPerso,
@@ -62,7 +65,7 @@ const ensureStockCode = (res, rawCode) => {
     .trim()
     .toLowerCase();
 
-  if (!Object.prototype.hasOwnProperty.call(defaultStocks, stockCode)) {
+  if (!/^[a-z0-9]+$/.test(stockCode)) {
     res.status(400).json({ error: "Code ressource invalide" });
     return null;
   }
@@ -108,6 +111,36 @@ registerPartialRoute("/api/stocks/:code", async (req, res) => {
     res,
     () => updateStock(stockCode, req.body?.quantity),
     "Impossible de sauvegarder cette ressource",
+  );
+});
+
+registerPartialRoute("/api/city-multipliers", async (req, res) => {
+  await runDbAction(
+    res,
+    () => updateCityMultipliers(req.body?.cityMultipliers || {}),
+    "Impossible de sauvegarder les bonus de la ville",
+  );
+});
+
+registerPartialRoute("/api/resources/:id", async (req, res) => {
+  const resourceId = ensureNumericId(res, req.params.id);
+  if (resourceId === null) return;
+
+  await runDbAction(
+    res,
+    () => upsertResource({ ...(req.body?.resource || {}), id: resourceId }),
+    "Impossible de sauvegarder la ressource",
+  );
+});
+
+app.delete("/api/resources/:id", async (req, res) => {
+  const resourceId = ensureNumericId(res, req.params.id);
+  if (resourceId === null) return;
+
+  await runDbAction(
+    res,
+    () => deleteResource(resourceId),
+    "Impossible de supprimer la ressource",
   );
 });
 
