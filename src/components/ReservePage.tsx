@@ -25,6 +25,17 @@ const cityBonusFields: Array<{ key: keyof CityMultipliers; label: string }> = [
   { key: "mat", label: "🧱 Mat" },
 ];
 
+const panelClassName =
+  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+const cardGridClassName =
+  "grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3";
+const fieldCardClassName =
+  "flex flex-col gap-2 rounded-[10px] border border-border-main bg-[#141414] p-[14px]";
+const fieldLabelClassName = "text-[0.92em] tracking-[0.02em] text-accent-blue";
+const fieldInputClassName =
+  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-right text-[#f1f1f1]";
+
 type ReserveItem = {
   id: number;
   name: string;
@@ -144,7 +155,7 @@ function ReservePage({
     items: ReserveItem[],
     emptyLabel: string,
   ) => (
-    <div style={{ marginTop: "1rem" }}>
+    <div className='mt-4'>
       <h3>{title}</h3>
       {items.length === 0 ? (
         <p>{emptyLabel}</p>
@@ -174,27 +185,20 @@ function ReservePage({
   );
 
   return (
-    <div className='panel'>
+    <div className={panelClassName}>
       <h2>1. Ville</h2>
-      <p className='info-text'>
+      <p className={infoTextClassName}>
         La ville applique ici des <strong>multiplicateurs de production</strong>{" "}
         pour tous les persos. <strong>1</strong> = normal, <strong>1.2</strong>{" "}
         = +20 %, <strong>0</strong> = aucune production.
       </p>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "12px",
-          marginBottom: "1rem",
-        }}
-      >
+      <div className={`${cardGridClassName} mb-4`}>
         {cityBonusFields.map((field) => (
-          <label key={field.key} className='perso-field'>
-            <span className='perso-field-label'>Bonus {field.label}</span>
+          <label key={field.key} className={fieldCardClassName}>
+            <span className={fieldLabelClassName}>Bonus {field.label}</span>
             <input
-              className='perso-field-input'
+              className={fieldInputClassName}
               type='number'
               min='0'
               step='0.05'
@@ -208,36 +212,21 @@ function ReservePage({
       </div>
 
       <h3>Réserve centrale</h3>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "12px",
-        }}
-      >
+      <div className={cardGridClassName}>
         {orderedResources.map((resource) => (
-          <label key={resource.code} className='perso-field'>
-            <span className='perso-field-label'>
+          <label key={resource.code} className={fieldCardClassName}>
+            <span className={fieldLabelClassName}>
               Stock {resource.code.toUpperCase()}{" "}
               <span
                 title={getResourceDisplayName(resource)}
                 aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
-                style={{
-                  display: "inline-block",
-                  marginLeft: "0.25rem",
-                  width: "1.1rem",
-                  height: "1.1rem",
-                  lineHeight: "1.1rem",
-                  textAlign: "center",
-                  fontSize: "0.85rem",
-                  cursor: "help",
-                }}
+                className='ml-1 inline-block h-[1.1rem] w-[1.1rem] cursor-help text-center text-[0.85rem] leading-[1.1rem]'
               >
                 ❔
               </span>
             </span>
             <input
-              className='perso-field-input'
+              className={fieldInputClassName}
               type='number'
               value={stocks[resource.code] ?? 0}
               step='1'
@@ -249,7 +238,7 @@ function ReservePage({
         ))}
       </div>
 
-      <p className='info-text' style={{ marginTop: "1rem" }}>
+      <p className={`${infoTextClassName} mt-4`}>
         <strong>Poids total des ressources :</strong>{" "}
         {formatWeight(totalResourcesWeight)}
         <br />

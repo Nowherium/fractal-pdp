@@ -29,7 +29,72 @@ import {
   pool,
 } from "./shared";
 
-type GenericInput = Record<string, unknown>;
+type GenericInput = {
+  resources?: unknown;
+  persos?: unknown;
+  lunes?: unknown;
+  stocks?: unknown;
+  cityMultipliers?: unknown;
+  constructions?: unknown;
+  currentLune?: unknown;
+  groups?: unknown;
+  armes?: unknown;
+  persoArmes?: unknown;
+  persoOutils?: unknown;
+  persoSacs?: unknown;
+  persoResources?: unknown;
+  outils?: unknown;
+  sacs?: unknown;
+  id?: unknown;
+  code?: unknown;
+  name?: unknown;
+  nom?: unknown;
+  present?: unknown;
+  pvmax?: unknown;
+  pv?: unknown;
+  poidsMax?: unknown;
+  capEau?: unknown;
+  capNrt?: unknown;
+  capMed?: unknown;
+  capMat?: unknown;
+  capart?: unknown;
+  cmd?: unknown;
+  combat?: unknown;
+  groupId?: unknown;
+  meteo?: unknown;
+  constructionPlacements?: unknown;
+  placedConstructionIds?: unknown;
+  rations?: unknown;
+  overrides?: unknown;
+  specialite?: unknown;
+  bonus?: unknown;
+  pvm?: unknown;
+  poids?: unknown;
+  quantity?: unknown;
+  capacite?: unknown;
+  perso_id?: unknown;
+  arme_id?: unknown;
+  equipee?: unknown;
+  outil_id?: unknown;
+  sac_id?: unknown;
+  equipe?: unknown;
+  resource_id?: unknown;
+  eau?: unknown;
+  nrt?: unknown;
+  med?: unknown;
+  mat?: unknown;
+  rewardType?: unknown;
+  resourceCode?: unknown;
+  att?: unknown;
+  degats?: unknown;
+  fiabilite?: unknown;
+} & Record<string, unknown>;
+type CityMultiplierInput = {
+  eau?: unknown;
+  nrt?: unknown;
+  med?: unknown;
+  mat?: unknown;
+} & Record<string, unknown>;
 type LuneRationInput = {
   eau?: unknown;
   nrt?: unknown;
@@ -37,6 +102,38 @@ type LuneRationInput = {
   tache?: unknown;
   drogue?: unknown;
   constructionId?: unknown;
+};
+
+const asGenericInputArray = (value: unknown): GenericInput[] | null =>
+  Array.isArray(value) ? (value as GenericInput[]) : null;
+
+const asUnknownRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+
+const normalizeLuneMeteoInput = (value: unknown) =>
+  normalizeWeatherCoefficients(
+    typeof value === "number" || typeof value === "string"
+      ? value
+      : value && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : {},
+  );
+
+const normalizeLuneConstructionPayload = (
+  lune: GenericInput,
+  luneId: number,
+) => {
+  if (Array.isArray(lune.constructionPlacements)) {
+    return normalizeConstructionPlacements(lune.constructionPlacements, luneId);
+  }
+
+  if (Array.isArray(lune.placedConstructionIds)) {
+    return normalizeConstructionPlacements(lune.placedConstructionIds, luneId);
+  }
+
+  return [];
 };
 
 const getState = async () => {
@@ -266,7 +363,7 @@ const getState = async () => {
     constructions = luneRows.flatMap((row) =>
       Array.isArray(row.constructions)
         ? row.constructions.filter(
-            (construction: Record<string, unknown>) =>
+            (construction: GenericInput) =>
               construction &&
               typeof construction === "object" &&
               (construction.resourceCode || construction.rewardType),
@@ -299,23 +396,15 @@ const getState = async () => {
 };
 
 const insertState = async (state: GenericInput) => {
-  const resources = Array.isArray(state.resources)
-    ? (state.resources as GenericInput[])
+  const resources = asGenericInputArray(state.resources);
+  const persos = asGenericInputArray(state.persos);
+  const lunes = asGenericInputArray(state.lunes);
+  const stocks = asUnknownRecord(state.stocks)
+    ? { ...defaultStocks, ...(asUnknownRecord(state.stocks) ?? {}) }
     : null;
-  const persos = Array.isArray(state.persos)
-    ? (state.persos as GenericInput[])
+  const cityMultipliers = asUnknownRecord(state.cityMultipliers)
+    ? (asUnknownRecord(state.cityMultipliers) as CityMultiplierInput)
     : null;
-  const lunes = Array.isArray(state.lunes)
-    ? (state.lunes as GenericInput[])
-    : null;
-  const stocks =
-    state.stocks && typeof state.stocks === "object"
-      ? { ...defaultStocks, ...(state.stocks as Record<string, unknown>) }
-      : null;
-  const cityMultipliers =
-    state.cityMultipliers && typeof state.cityMultipliers === "object"
-      ? (state.cityMultipliers as Record<string, unknown>)
-      : null;
   const constructions = Array.isArray(state.constructions)
     ? state.constructions
     : null;
@@ -323,30 +412,14 @@ const insertState = async (state: GenericInput) => {
     state.currentLune,
     defaultCurrentLune,
   );
-  const groups = Array.isArray(state.groups)
-    ? (state.groups as GenericInput[])
-    : null;
-  const armes = Array.isArray(state.armes)
-    ? (state.armes as GenericInput[])
-    : null;
-  const persoArmes = Array.isArray(state.persoArmes)
-    ? (state.persoArmes as GenericInput[])
-    : null;
-  const outils = Array.isArray(state.outils)
-    ? (state.outils as GenericInput[])
-    : null;
-  const persoOutils = Array.isArray(state.persoOutils)
-    ? (state.persoOutils as GenericInput[])
-    : null;
-  const sacs = Array.isArray(state.sacs)
-    ? (state.sacs as GenericInput[])
-    : null;
-  const persoSacs = Array.isArray(state.persoSacs)
-    ? (state.persoSacs as GenericInput[])
-    : null;
-  const persoResources = Array.isArray(state.persoResources)
-    ? (state.persoResources as GenericInput[])
-    : null;
+  const groups = asGenericInputArray(state.groups);
+  const armes = asGenericInputArray(state.armes);
+  const persoArmes = asGenericInputArray(state.persoArmes);
+  const outils = asGenericInputArray(state.outils);
+  const persoOutils = asGenericInputArray(state.persoOutils);
+  const sacs = asGenericInputArray(state.sacs);
+  const persoSacs = asGenericInputArray(state.persoSacs);
+  const persoResources = asGenericInputArray(state.persoResources);
 
   const resourcesPayload =
     resources?.map((resource: GenericInput, index: number) => ({
@@ -435,25 +508,15 @@ const insertState = async (state: GenericInput) => {
   for (const lune of lunes || []) {
     const luneId = Number(lune.id);
     if (!Number.isFinite(luneId)) continue;
-    const meteoSource = lune.meteo;
-    const meteo = normalizeWeatherCoefficients(
-      typeof meteoSource === "number" || typeof meteoSource === "string"
-        ? meteoSource
-        : meteoSource && typeof meteoSource === "object"
-          ? (meteoSource as Record<string, unknown>)
-          : {},
-    );
+
+    const meteo = normalizeLuneMeteoInput(lune.meteo);
     lunesById.set(luneId, {
       id: luneId,
       meteo_eau: meteo.eau,
       meteo_nrt: meteo.nrt,
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
-      constructions: Array.isArray(lune.constructionPlacements)
-        ? normalizeConstructionPlacements(lune.constructionPlacements, luneId)
-        : Array.isArray(lune.placedConstructionIds)
-          ? normalizeConstructionPlacements(lune.placedConstructionIds, luneId)
-          : [],
+      constructions: normalizeLuneConstructionPayload(lune, luneId),
     });
 
     const rations =

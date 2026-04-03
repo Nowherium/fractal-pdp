@@ -12,6 +12,28 @@ import type {
   Sac,
 } from "../types";
 
+type ToolMultiplierBySpecialite = Record<"eau" | "nrt" | "mat" | "art", number>;
+
+const defaultToolMultipliers: ToolMultiplierBySpecialite = {
+  eau: 1,
+  nrt: 1,
+  mat: 1,
+  art: 1,
+};
+
+const normalizeToolSpecialite = (
+  specialite: Outil["specialite"],
+): keyof ToolMultiplierBySpecialite => {
+  if (specialite === "nrt" || specialite === "mat" || specialite === "art") {
+    return specialite;
+  }
+
+  return "eau";
+};
+
+const sumItemWeights = <T extends { poids?: number }>(items: T[]): number =>
+  items.reduce((total, item) => total + Number(item.poids ?? 0), 0);
+
 interface UseDerivedPersoStateParams {
   resources: Resource[];
   armes: Arme[];
@@ -99,17 +121,19 @@ export const useDerivedPersoState = ({
             );
           }, 0);
 
-        const multiplierBySpecialite = carriedTools.reduce<
-          Record<string, number>
-        >(
-          (acc, outil) => ({
-            ...acc,
-            [outil.specialite ?? "eau"]:
-              Number(acc[outil.specialite ?? "eau"] ?? 1) *
-              Number(outil.bonus ?? 1),
-          }),
-          { eau: 1, nrt: 1, mat: 1, art: 1 },
-        );
+        const multiplierBySpecialite =
+          carriedTools.reduce<ToolMultiplierBySpecialite>(
+            (acc, outil) => {
+              const specialite = normalizeToolSpecialite(outil.specialite);
+
+              return {
+                ...acc,
+                [specialite]:
+                  Number(acc[specialite] ?? 1) * Number(outil.bonus ?? 1),
+              };
+            },
+            { ...defaultToolMultipliers },
+          );
 
         const nextCapEauEffectif =
           Number(perso.capEau ?? 0) * Number(multiplierBySpecialite.eau ?? 1);
@@ -121,18 +145,9 @@ export const useDerivedPersoState = ({
         const nextCapArtEffectif =
           Number(perso.capart ?? 0) * Number(multiplierBySpecialite.art ?? 1);
         const nextPoidsTotal =
-          carriedWeapons.reduce(
-            (total, arme) => total + Number(arme.poids ?? 0),
-            0,
-          ) +
-          carriedTools.reduce(
-            (total, outil) => total + Number(outil.poids ?? 0),
-            0,
-          ) +
-          carriedBags.reduce(
-            (total, sac) => total + Number(sac.poids ?? 0),
-            0,
-          ) +
+          sumItemWeights(carriedWeapons) +
+          sumItemWeights(carriedTools) +
+          sumItemWeights(carriedBags) +
           carriedResourcesWeight;
 
         if (

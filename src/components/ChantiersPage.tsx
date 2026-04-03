@@ -41,10 +41,17 @@ const getStatusClassName = (
   fallbackStatus?: LuneConstruction["status"],
 ) => {
   const status = state?.statusCode ?? fallbackStatus ?? "todo";
-  if (status === "done" || state?.isCompleted) return "safe";
-  if (status === "in-progress") return "warning";
-  return "info";
+  if (status === "done" || state?.isCompleted) return "text-accent-green";
+  if (status === "in-progress") return "text-accent-yellow";
+  return "text-accent-blue";
 };
+
+const panelClassName =
+  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+const inputClassName =
+  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
+const numberInputClassName = `${inputClassName} text-right`;
 
 function ChantiersPage({
   constructions,
@@ -71,9 +78,9 @@ function ChantiersPage({
     resources.length > 0 ? resources : [{ id: 0, code: "mat", name: "MAT" }];
 
   return (
-    <div className='panel'>
+    <div className={panelClassName}>
       <h2>4. Administration des chantiers</h2>
-      <p className='info-text'>
+      <p className={infoTextClassName}>
         Les chantiers sont définis ici une seule fois. Ici,
         <strong> À faire</strong> signifie <strong>posé nulle part</strong>,
         <strong> En cours</strong> pose le chantier à partir de la
@@ -105,7 +112,7 @@ function ChantiersPage({
                 <tr key={construction.id}>
                   <td>
                     <input
-                      className='perso-field-input'
+                      className={inputClassName}
                       type='text'
                       value={construction.name}
                       onChange={(event) =>
@@ -119,7 +126,7 @@ function ChantiersPage({
                   </td>
                   <td>
                     <select
-                      className='perso-field-input'
+                      className={inputClassName}
                       value={construction.resourceCode}
                       onChange={(event) =>
                         updateConstruction(
@@ -138,7 +145,7 @@ function ChantiersPage({
                   </td>
                   <td>
                     <input
-                      className='perso-field-input'
+                      className={numberInputClassName}
                       type='number'
                       min='0'
                       step='1'
@@ -154,7 +161,7 @@ function ChantiersPage({
                   </td>
                   <td>
                     <input
-                      className='perso-field-input'
+                      className={numberInputClassName}
                       type='number'
                       min='1'
                       step='1'
@@ -170,7 +177,7 @@ function ChantiersPage({
                   </td>
                   <td>
                     <select
-                      className='perso-field-input'
+                      className={inputClassName}
                       value={construction.rewardType}
                       onChange={(event) =>
                         updateConstruction(
@@ -189,7 +196,7 @@ function ChantiersPage({
                   </td>
                   <td>
                     <select
-                      className='perso-field-input'
+                      className={inputClassName}
                       value={progress?.status ?? construction.status ?? "todo"}
                       onChange={(event) =>
                         updateConstruction(
@@ -206,24 +213,23 @@ function ChantiersPage({
                       ))}
                     </select>
                     <div
-                      className={getStatusClassName(
+                      className={`mt-1.5 font-bold ${getStatusClassName(
                         state,
                         progress?.status ?? construction.status,
-                      )}
-                      style={{ marginTop: "0.4rem" }}
+                      )}`}
                     >
                       {getStatusLabel(
                         state,
                         progress?.status ?? construction.status,
                       )}
                     </div>
-                    <div className='info-text' style={{ marginTop: "0.3rem" }}>
+                    <div className='mt-1 text-[0.85em] italic text-[#888]'>
                       {state?.statusLabel || "Appliqué à la timeline."}
                     </div>
                   </td>
                   <td>
                     <button
-                      className='btn-del'
+                      className='btn-del mt-0'
                       type='button'
                       onClick={() => removeConstruction(construction.id)}
                     >
@@ -237,7 +243,7 @@ function ChantiersPage({
         </table>
       )}
 
-      <button className='btn-add' type='button' onClick={addConstruction}>
+      <button className='btn-add mt-3' type='button' onClick={addConstruction}>
         + Ajouter un chantier
       </button>
     </div>

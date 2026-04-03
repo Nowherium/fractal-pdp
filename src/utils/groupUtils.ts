@@ -77,8 +77,10 @@ export const recalculateGroups = (
       if (perso.groupId === null || perso.groupId === undefined) {
         return acc;
       }
-      if (!acc[perso.groupId]) acc[perso.groupId] = [];
-      acc[perso.groupId].push(perso.id);
+
+      const members = acc[perso.groupId] ?? [];
+      members.push(perso.id);
+      acc[perso.groupId] = members;
       return acc;
     },
     {},
@@ -95,7 +97,7 @@ export const recalculateGroups = (
       return group;
     }
 
-    return { ...group, chef: members[0] };
+    return { ...group, chef: members[0] ?? null };
   });
 };
 

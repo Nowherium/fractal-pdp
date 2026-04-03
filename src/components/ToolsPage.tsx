@@ -25,6 +25,12 @@ const toolFields: Array<{
 const toInputValue = (value: unknown, fallback: string | number = "") =>
   typeof value === "string" || typeof value === "number" ? value : fallback;
 
+const panelClassName =
+  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+const inputClassName =
+  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
+
 function ToolsPage({
   outils,
   addOutil,
@@ -42,9 +48,9 @@ function ToolsPage({
   removeOutil: (index: number) => void;
 }) {
   return (
-    <div className='panel'>
+    <div className={panelClassName}>
       <h2>6. Administration des outils</h2>
-      <p className='info-text'>
+      <p className={infoTextClassName}>
         Gère ici les outils de production disponibles pour les personnages. Le
         champ bonus est un multiplicateur : par exemple `1.2` signifie x1,2.
       </p>
@@ -72,7 +78,7 @@ function ToolsPage({
                   <td key={field.key}>
                     {field.type === "select" ? (
                       <select
-                        className='perso-field-input'
+                        className={inputClassName}
                         value={toInputValue(outil[field.key], "eau")}
                         onChange={(event) =>
                           updateOutil(index, field.key, event.target.value)
@@ -89,7 +95,7 @@ function ToolsPage({
                       </select>
                     ) : (
                       <input
-                        className='perso-field-input'
+                        className={`${inputClassName} ${field.type === "number" ? "text-right" : ""}`}
                         type={field.type}
                         step={field.step}
                         min={
@@ -129,7 +135,7 @@ function ToolsPage({
                 ))}
                 <td>
                   <button
-                    className='btn-del'
+                    className='btn-del mt-0'
                     type='button'
                     onClick={() => removeOutil(index)}
                   >
@@ -142,7 +148,7 @@ function ToolsPage({
         </table>
       )}
 
-      <button className='btn-add' type='button' onClick={addOutil}>
+      <button className='btn-add mt-3' type='button' onClick={addOutil}>
         + Ajouter un outil
       </button>
     </div>

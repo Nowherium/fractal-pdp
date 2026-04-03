@@ -14,21 +14,30 @@ import {
 const formatNumber = (value: number | string | null | undefined) =>
   Number(value ?? 0).toFixed(2);
 
+const panelClassName =
+  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
+const statGridClassName =
+  "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
+const statCardClassName =
+  "flex flex-col gap-2 rounded-[10px] border border-border-main bg-[#141414] p-[14px]";
+const statLabelClassName = "text-[0.92em] tracking-[0.02em] text-accent-blue";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+
 function GroupViewPage({
   group,
   persos,
   closePage,
   openEditPage,
 }: {
-  group?: Group;
+  group?: Group | undefined;
   persos: Perso[];
   closePage: () => void;
   openEditPage: (groupId: number) => void;
 }) {
   if (!group) {
     return (
-      <div className='panel'>
-        <button type='button' onClick={closePage}>
+      <div className={panelClassName}>
+        <button className='mt-0' type='button' onClick={closePage}>
           ← Retour aux Groupes
         </button>
         <h2>Groupe introuvable</h2>
@@ -43,13 +52,13 @@ function GroupViewPage({
   const groupCapacity = getGroupCapacity(leader);
 
   return (
-    <div className='panel'>
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <button type='button' onClick={closePage}>
+    <div className={panelClassName}>
+      <div className='flex flex-wrap gap-2'>
+        <button className='mt-0' type='button' onClick={closePage}>
           ← Retour aux Groupes
         </button>
         <button
-          className='btn-edit'
+          className='mt-0'
           type='button'
           onClick={() => openEditPage(group.id)}
         >
@@ -58,7 +67,7 @@ function GroupViewPage({
       </div>
 
       <h2>Récapitulatif de {group.name || "ce groupe"}</h2>
-      <p className='info-text'>
+      <p className={infoTextClassName}>
         Chef: <strong>{leader?.nom || "Aucun"}</strong> • Membres:{" "}
         {memberPersos.length} • Capacité max du groupe:{" "}
         <strong>
@@ -118,37 +127,37 @@ function GroupViewPage({
             </tfoot>
           </table>
 
-          <div className='perso-form'>
-            <div className='perso-field'>
-              <span className='perso-field-label'>Production totale Eau</span>
+          <div className={statGridClassName}>
+            <div className={statCardClassName}>
+              <span className={statLabelClassName}>Production totale Eau</span>
               <strong>{formatNumber(totals.eau)}</strong>
             </div>
-            <div className='perso-field'>
-              <span className='perso-field-label'>Production totale Nrt</span>
+            <div className={statCardClassName}>
+              <span className={statLabelClassName}>Production totale Nrt</span>
               <strong>{formatNumber(totals.nrt)}</strong>
             </div>
-            <div className='perso-field'>
-              <span className='perso-field-label'>Production totale Med</span>
+            <div className={statCardClassName}>
+              <span className={statLabelClassName}>Production totale Med</span>
               <strong>{formatNumber(totals.med)}</strong>
             </div>
-            <div className='perso-field'>
-              <span className='perso-field-label'>Production totale Mat</span>
+            <div className={statCardClassName}>
+              <span className={statLabelClassName}>Production totale Mat</span>
               <strong>{formatNumber(totals.mat)}</strong>
             </div>
-            <div className='perso-field'>
-              <span className='perso-field-label'>Production totale Art</span>
+            <div className={statCardClassName}>
+              <span className={statLabelClassName}>Production totale Art</span>
               <strong>{formatNumber(totals.art)}</strong>
             </div>
-            <div className='perso-field'>
-              <span className='perso-field-label'>Combat total</span>
+            <div className={statCardClassName}>
+              <span className={statLabelClassName}>Combat total</span>
               <strong>{formatNumber(totals.combat)}</strong>
             </div>
-            <div className='perso-field'>
-              <span className='perso-field-label'>Poids total porté</span>
+            <div className={statCardClassName}>
+              <span className={statLabelClassName}>Poids total porté</span>
               <strong>{formatNumber(totals.poids)}</strong>
             </div>
-            <div className='perso-field'>
-              <span className='perso-field-label'>Capacité max du groupe</span>
+            <div className={statCardClassName}>
+              <span className={statLabelClassName}>Capacité max du groupe</span>
               <strong>
                 {memberPersos.length} / {groupCapacity}
               </strong>

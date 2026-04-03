@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import type { LuneConstruction } from "../src/types";
 import { simulateTimeline } from "../src/utils/timelineSimulation";
 import {
   buildConstructionProgressById,
@@ -48,9 +49,13 @@ test("ignores absent persos in timeline calculations", () => {
     1,
   );
 
+  assert.ok(segment);
+  const absentRow = segment.rows[1];
+
+  assert.ok(absentRow);
   assert.equal(segment.stats.stockEau, 6);
-  assert.equal(segment.rows[1].isAbsent, true);
-  assert.match(segment.rows[1].mortText, /ABSENT/);
+  assert.equal(absentRow.isAbsent, true);
+  assert.match(absentRow.mortText ?? "", /ABSENT/);
 });
 
 test("keeps chantier progress across lunes once the cost is paid", () => {
@@ -66,7 +71,7 @@ test("keeps chantier progress across lunes once the cost is paid", () => {
     buildersRequired: 2,
     rewardType: "eau",
     status: "todo",
-  };
+  } satisfies LuneConstruction;
 
   const lunes = [
     {
@@ -121,22 +126,24 @@ test("keeps chantier progress across lunes once the cost is paid", () => {
     1,
   );
 
-  assert.equal(
-    timeline[0].constructionStates["chantier-1"].statusCode,
-    "in-progress",
-  );
-  assert.equal(
-    timeline[0].constructionStates["chantier-1"].remainingBuilders,
-    1,
-  );
-  assert.equal(timeline[0].stats.stockMat, 0);
+  const firstSegment = timeline[0];
+  const secondSegment = timeline[1];
+  const firstConstructionState =
+    firstSegment?.constructionStates?.["chantier-1"];
+  const secondConstructionState =
+    secondSegment?.constructionStates?.["chantier-1"];
 
-  assert.equal(timeline[1].constructionStates["chantier-1"].statusCode, "done");
-  assert.equal(
-    timeline[1].constructionStates["chantier-1"].remainingBuilders,
-    0,
-  );
-  assert.equal(timeline[1].stats.stockMat, 0);
+  assert.ok(firstSegment);
+  assert.ok(secondSegment);
+  assert.ok(firstConstructionState);
+  assert.ok(secondConstructionState);
+  assert.equal(firstConstructionState.statusCode, "in-progress");
+  assert.equal(firstConstructionState.remainingBuilders, 1);
+  assert.equal(firstSegment.stats.stockMat, 0);
+
+  assert.equal(secondConstructionState.statusCode, "done");
+  assert.equal(secondConstructionState.remainingBuilders, 0);
+  assert.equal(secondSegment.stats.stockMat, 0);
 });
 
 test("supports explicit construction progress separate from the chantier definition", () => {
@@ -147,7 +154,7 @@ test("supports explicit construction progress separate from the chantier definit
     resourceCost: 3,
     buildersRequired: 2,
     rewardType: "eau",
-  };
+  } satisfies LuneConstruction;
 
   const [segment] = simulateTimeline(
     [],
@@ -180,15 +187,13 @@ test("supports explicit construction progress separate from the chantier definit
     },
   );
 
-  assert.equal(
-    segment.constructionStates["chantier-1"].statusCode,
-    "in-progress",
-  );
-  assert.equal(segment.constructionStates["chantier-1"].remainingBuilders, 1);
-  assert.match(
-    segment.constructionStates["chantier-1"].statusLabel,
-    /en pause|restant/,
-  );
+  assert.ok(segment);
+  const constructionState = segment.constructionStates?.["chantier-1"];
+
+  assert.ok(constructionState);
+  assert.equal(constructionState.statusCode, "in-progress");
+  assert.equal(constructionState.remainingBuilders, 1);
+  assert.match(constructionState.statusLabel, /en pause|restant/);
 });
 
 test("supports explicit lune placements separate from placedConstructionIds", () => {
@@ -200,7 +205,7 @@ test("supports explicit lune placements separate from placedConstructionIds", ()
     buildersRequired: 1,
     rewardType: "mat",
     status: "todo",
-  };
+  } satisfies LuneConstruction;
 
   const [segment] = simulateTimeline(
     [],
@@ -225,25 +230,26 @@ test("supports explicit lune placements separate from placedConstructionIds", ()
     1,
   );
 
-  assert.equal(
-    segment.constructionStates["chantier-2"].statusCode,
-    "in-progress",
-  );
+  assert.ok(segment);
+  const constructionState = segment.constructionStates?.["chantier-2"];
+
+  assert.ok(constructionState);
+  assert.equal(constructionState.statusCode, "in-progress");
 });
 
 test("normalizes legacy placed ids into constructionPlacements only in app state", () => {
+  const construction = {
+    id: "chantier-3",
+    name: "Atelier",
+    resourceCode: "mat",
+    resourceCost: 1,
+    buildersRequired: 1,
+    rewardType: "mat",
+  } satisfies LuneConstruction;
+
   const state = buildState({
     persos: [],
-    constructions: [
-      {
-        id: "chantier-3",
-        name: "Atelier",
-        resourceCode: "mat",
-        resourceCost: 1,
-        buildersRequired: 1,
-        rewardType: "mat",
-      },
-    ],
+    constructions: [construction],
     lunes: [
       {
         id: 1,
@@ -256,25 +262,28 @@ test("normalizes legacy placed ids into constructionPlacements only in app state
     ],
   });
 
-  assert.deepEqual(state.lunes[0].constructionPlacements, [
+  const firstLune = state.lunes[0];
+
+  assert.ok(firstLune);
+  assert.deepEqual(firstLune.constructionPlacements, [
     { luneId: 1, constructionId: "chantier-3", isPlaced: true },
   ]);
-  assert.equal("placedConstructionIds" in state.lunes[0], false);
+  assert.equal("placedConstructionIds" in firstLune, false);
 });
 
 test("lets a chantier return to 'todo' when it is no longer placed", () => {
+  const construction = {
+    id: "chantier-reset",
+    name: "Hangar",
+    resourceCode: "mat",
+    resourceCost: 4,
+    buildersRequired: 2,
+    rewardType: "mat",
+    status: "todo",
+  } satisfies LuneConstruction;
+
   const progressById = buildConstructionProgressById(
-    [
-      {
-        id: "chantier-reset",
-        name: "Hangar",
-        resourceCode: "mat",
-        resourceCost: 4,
-        buildersRequired: 2,
-        rewardType: "mat",
-        status: "todo",
-      },
-    ],
+    [construction],
     [
       {
         id: 1,
@@ -297,7 +306,10 @@ test("lets a chantier return to 'todo' when it is no longer placed", () => {
     },
   );
 
-  assert.equal(progressById["chantier-reset"].status, "todo");
+  const resetProgress = progressById["chantier-reset"];
+
+  assert.ok(resetProgress);
+  assert.equal(resetProgress.status, "todo");
 
   const [segment] = simulateTimeline(
     [],
@@ -331,7 +343,11 @@ test("lets a chantier return to 'todo' when it is no longer placed", () => {
     progressById,
   );
 
-  assert.equal(segment.constructionStates["chantier-reset"].statusCode, "todo");
+  assert.ok(segment);
+  const constructionState = segment.constructionStates?.["chantier-reset"];
+
+  assert.ok(constructionState);
+  assert.equal(constructionState.statusCode, "todo");
 });
 
 test("restarts future simulation from the real current-lune stocks", () => {
@@ -374,6 +390,11 @@ test("restarts future simulation from the real current-lune stocks", () => {
     2,
   );
 
-  assert.equal(timeline[0].stats.stockEau, 11);
-  assert.equal(timeline[1].stats.stockEau, 11.1);
+  const firstSegment = timeline[0];
+  const secondSegment = timeline[1];
+
+  assert.ok(firstSegment);
+  assert.ok(secondSegment);
+  assert.equal(firstSegment.stats.stockEau, 11);
+  assert.equal(secondSegment.stats.stockEau, 11.1);
 });

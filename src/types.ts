@@ -52,6 +52,11 @@ export interface Perso {
   capMed?: number;
   capMat?: number;
   capart?: number;
+  capEauEffectif?: number;
+  capNrtEffectif?: number;
+  capMedEffectif?: number;
+  capMatEffectif?: number;
+  capArtEffectif?: number;
   cmd?: number;
   groupId?: number | null;
   equippedWeaponId?: number | null;
@@ -179,11 +184,23 @@ export interface LunePlacement {
   isPlaced: boolean;
 }
 
+export interface LuneOverride {
+  present?: boolean;
+  pv?: number;
+  capEau?: number;
+  capNrt?: number;
+  capMed?: number;
+  capMat?: number;
+  capArt?: number;
+  combat?: number;
+  [key: string]: number | boolean | undefined;
+}
+
 export interface Lune {
   id: number;
   meteo: WeatherCoefficients;
   rations: Record<string, Ration>;
-  overrides: Record<string, Record<string, number | boolean>>;
+  overrides: Record<string, LuneOverride>;
   constructionPlacements: LunePlacement[];
   constructions: LuneConstruction[];
 }

@@ -1,3 +1,6 @@
+import AssignmentChecklist from "./shared/AssignmentChecklist";
+import OptionalItemSelect from "./shared/OptionalItemSelect";
+
 import type {
   Arme,
   Group,
@@ -56,6 +59,34 @@ const getResourceDisplayName = (resource?: Resource | null) =>
 const toInputValue = (value: unknown, fallback: string | number = "") =>
   typeof value === "string" || typeof value === "number" ? value : fallback;
 
+const toggleIdInList = (ids: number[], itemId: number, checked: boolean) =>
+  checked ? [...ids, itemId] : ids.filter((id) => id !== itemId);
+
+const getAssignmentAvailability = (
+  quantity: unknown,
+  assignedCount: number,
+  isCarried: boolean,
+) => {
+  const maxQuantity = Math.max(0, Math.floor(Number(quantity ?? 1) || 0));
+
+  return {
+    maxQuantity,
+    isUnavailable: !isCarried && assignedCount >= maxQuantity,
+  };
+};
+
+const panelClassName =
+  "rounded-lg border border-border-strong bg-panel p-[15px]";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+const formGridClassName =
+  "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
+const fieldCardClassName =
+  "flex flex-col gap-2 rounded-[10px] border border-border-main bg-[#141414] p-[14px]";
+const fieldLabelClassName = "text-[0.92em] tracking-[0.02em] text-accent-blue";
+const fieldInputClassName =
+  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
+const sectionClassName = "mt-6 space-y-2.5";
+
 function PersoPage({
   perso,
   resources,
@@ -74,7 +105,7 @@ function PersoPage({
   handlePersoBagsUpdate,
   closePage,
 }: {
-  perso?: Perso;
+  perso?: Perso | undefined;
   resources: Resource[];
   groups: Group[];
   armes: Arme[];
@@ -110,8 +141,8 @@ function PersoPage({
 }) {
   if (!perso) {
     return (
-      <div className='panel'>
-        <button type='button' onClick={closePage}>
+      <div className={panelClassName}>
+        <button className='mt-0' type='button' onClick={closePage}>
           ← Retour à l'Effectif
         </button>
         <h2>Personnage introuvable</h2>
@@ -149,9 +180,11 @@ function PersoPage({
   const isOverweight = Number(perso.poidsTotal ?? 0) > effectiveWeightLimit;
 
   const toggleWeapon = (weaponId: number, checked: boolean) => {
-    const nextCarriedWeaponIds = checked
-      ? [...carriedWeaponIds, weaponId]
-      : carriedWeaponIds.filter((id) => id !== weaponId);
+    const nextCarriedWeaponIds = toggleIdInList(
+      carriedWeaponIds,
+      weaponId,
+      checked,
+    );
 
     const nextEquippedWeaponId =
       !checked && equippedWeaponId === weaponId ? null : equippedWeaponId;
@@ -164,17 +197,13 @@ function PersoPage({
   };
 
   const toggleTool = (toolId: number, checked: boolean) => {
-    const nextCarriedToolIds = checked
-      ? [...carriedToolIds, toolId]
-      : carriedToolIds.filter((id) => id !== toolId);
+    const nextCarriedToolIds = toggleIdInList(carriedToolIds, toolId, checked);
 
     handlePersoToolsUpdate(perso.id, nextCarriedToolIds);
   };
 
   const toggleBag = (bagId: number, checked: boolean) => {
-    const nextCarriedBagIds = checked
-      ? [...carriedBagIds, bagId]
-      : carriedBagIds.filter((id) => id !== bagId);
+    const nextCarriedBagIds = toggleIdInList(carriedBagIds, bagId, checked);
 
     const nextEquippedBagId =
       !checked && equippedBagId === bagId ? null : equippedBagId;
@@ -182,15 +211,88 @@ function PersoPage({
     handlePersoBagsUpdate(perso.id, nextCarriedBagIds, nextEquippedBagId);
   };
 
+  const weaponAssignmentItems = armes.map((arme) => {
+    const isCarried = carriedWeaponIds.includes(arme.id);
+    const assignedCount = persoArmes.filter(
+      (entry) => entry.arme_id === arme.id,
+    ).length;
+    const { maxQuantity, isUnavailable } = getAssignmentAvailability(
+      arme.quantity,
+      assignedCount,
+      isCarried,
+    );
+
+    return {
+      id: arme.id,
+      checked: isCarried,
+      disabled: isUnavailable,
+      label: `${arme.name} (x${arme.att} att, dégâts ${arme.degats}) • ${assignedCount}/${maxQuantity} attribuée(s)${isUnavailable ? " — indisponible" : ""}`,
+    };
+  });
+
+  const carriedWeaponOptions = armes
+    .filter((arme) => carriedWeaponIds.includes(arme.id))
+    .map((arme) => ({
+      value: arme.id,
+      label: `${arme.name} (x${arme.att})`,
+    }));
+
+  const bagAssignmentItems = sacs.map((sac) => {
+    const isCarried = carriedBagIds.includes(sac.id);
+    const assignedCount = persoSacs.filter(
+      (entry) => entry.sac_id === sac.id,
+    ).length;
+    const { maxQuantity, isUnavailable } = getAssignmentAvailability(
+      sac.quantity,
+      assignedCount,
+      isCarried,
+    );
+
+    return {
+      id: sac.id,
+      checked: isCarried,
+      disabled: isUnavailable,
+      label: `${sac.name} (+${sac.capacite} capacité, poids ${sac.poids}) • ${assignedCount}/${maxQuantity} attribué(s)${isUnavailable ? " — indisponible" : ""}`,
+    };
+  });
+
+  const carriedBagOptions = sacs
+    .filter((sac) => carriedBagIds.includes(sac.id))
+    .map((sac) => ({
+      value: sac.id,
+      label: `${sac.name} (+${sac.capacite})`,
+    }));
+
+  const toolAssignmentItems = outils.map((outil) => {
+    const isCarried = carriedToolIds.includes(outil.id);
+    const assignedCount = persoOutils.filter(
+      (entry) => entry.outil_id === outil.id,
+    ).length;
+    const { maxQuantity, isUnavailable } = getAssignmentAvailability(
+      outil.quantity,
+      assignedCount,
+      isCarried,
+    );
+
+    return {
+      id: outil.id,
+      checked: isCarried,
+      disabled: isUnavailable,
+      label: `${outil.name} (x${outil.bonus} ${specialiteLabels[outil.specialite ?? "eau"] || outil.specialite || "eau"}) • ${assignedCount}/${maxQuantity} attribué(s)${isUnavailable ? " — indisponible" : ""}`,
+    };
+  });
+
   return (
-    <div className='panel'>
-      <button type='button' onClick={closePage}>
+    <div className={panelClassName}>
+      <button className='mt-0' type='button' onClick={closePage}>
         ← Retour à l'Effectif
       </button>
       <h2>Modifier {perso.nom || "le personnage"}</h2>
-      <p className='info-text'>
+      <p className={infoTextClassName}>
         Poids total porté :{" "}
-        <strong className={isOverweight ? "danger" : undefined}>
+        <strong
+          className={isOverweight ? "font-bold text-accent-red" : undefined}
+        >
           {Number(perso.poidsTotal ?? 0).toFixed(2)} /{" "}
           {effectiveWeightLimit.toFixed(2)}
         </strong>
@@ -199,7 +301,7 @@ function PersoPage({
           : ""}
         {isOverweight ? " — surcharge, déplacement impossible" : ""}
       </p>
-      <div className='perso-form'>
+      <div className={formGridClassName}>
         {persoFields.map((field) => {
           const value = perso[field.key];
           const step = shouldUseIncrementStep(field.key)
@@ -207,10 +309,10 @@ function PersoPage({
             : field.step;
 
           return (
-            <label key={field.key} className='perso-field'>
-              <span className='perso-field-label'>{field.label}</span>
+            <label key={field.key} className={fieldCardClassName}>
+              <span className={fieldLabelClassName}>{field.label}</span>
               <input
-                className='perso-field-input'
+                className={`${fieldInputClassName} ${field.type === "number" ? "text-right" : ""}`}
                 type={field.type}
                 step={step}
                 min={
@@ -244,10 +346,10 @@ function PersoPage({
             </label>
           );
         })}
-        <label className='perso-field'>
-          <span className='perso-field-label'>Groupe</span>
+        <label className={fieldCardClassName}>
+          <span className={fieldLabelClassName}>Groupe</span>
           <select
-            className='perso-field-input'
+            className={fieldInputClassName}
             value={perso.groupId ?? ""}
             onChange={(event) =>
               handlePersoUpdate(
@@ -267,9 +369,9 @@ function PersoPage({
         </label>
       </div>
 
-      <div className='perso-form-section'>
+      <div className={sectionClassName}>
         <h3>Ressources portées</h3>
-        <p className='info-text'>
+        <p className={infoTextClassName}>
           Chaque ressource portée ajoute son équivalent en poids, sauf `crd` qui
           a un poids nul : 1 ressource = 1 de poids, 0,1 ressource = 0,1 de
           poids, mais `crd` = 0.
@@ -278,36 +380,21 @@ function PersoPage({
         {resources.length === 0 ? (
           <p>Aucune ressource disponible pour le moment.</p>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-              gap: "12px",
-            }}
-          >
+          <div className='grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3'>
             {orderedResources.map((resource) => (
-              <label key={resource.id} className='perso-field'>
-                <span className='perso-field-label'>
+              <label key={resource.id} className={fieldCardClassName}>
+                <span className={fieldLabelClassName}>
                   {resource.code?.toUpperCase() || "Ressource"}
                   <span
                     title={getResourceDisplayName(resource)}
                     aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
-                    style={{
-                      display: "inline-block",
-                      marginLeft: "0.25rem",
-                      width: "1.1rem",
-                      height: "1.1rem",
-                      lineHeight: "1.1rem",
-                      textAlign: "center",
-                      fontSize: "0.85rem",
-                      cursor: "help",
-                    }}
+                    className='ml-1 inline-block h-[1.1rem] w-[1.1rem] cursor-help text-center text-[0.85rem] leading-[1.1rem]'
                   >
                     ❔
                   </span>
                 </span>
                 <input
-                  className='perso-field-input'
+                  className={`${fieldInputClassName} text-right`}
                   type='number'
                   step='0.1'
                   min='0'
@@ -326,9 +413,9 @@ function PersoPage({
         )}
       </div>
 
-      <div className='perso-form-section'>
+      <div className={sectionClassName}>
         <h3>Armes portées</h3>
-        <p className='info-text'>
+        <p className={infoTextClassName}>
           Sélectionne les armes portées par ce perso, puis choisis laquelle est
           équipée.
         </p>
@@ -337,71 +424,30 @@ function PersoPage({
           <p>Aucune arme disponible pour le moment.</p>
         ) : (
           <>
-            <div className='group-members-list'>
-              {armes.map((arme) => {
-                const isCarried = carriedWeaponIds.includes(arme.id);
-                const maxQuantity = Math.max(
-                  0,
-                  Math.floor(Number(arme.quantity ?? 1) || 0),
-                );
-                const assignedCount = persoArmes.filter(
-                  (entry) => entry.arme_id === arme.id,
-                ).length;
-                const isUnavailable =
-                  !isCarried && assignedCount >= maxQuantity;
-
-                return (
-                  <label key={arme.id} className='group-member-item'>
-                    <input
-                      type='checkbox'
-                      checked={isCarried}
-                      disabled={isUnavailable}
-                      onChange={(event) =>
-                        toggleWeapon(arme.id, event.target.checked)
-                      }
-                    />
-                    <span>
-                      {arme.name} (x{arme.att} att, dégâts {arme.degats}) •{" "}
-                      {assignedCount}/{maxQuantity} attribuée(s)
-                      {isUnavailable ? " — indisponible" : ""}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-
-            <label className='perso-field'>
-              <span className='perso-field-label'>Arme équipée</span>
-              <select
-                className='perso-field-input'
-                value={equippedWeaponId ?? ""}
-                onChange={(event) =>
-                  handlePersoWeaponsUpdate(
-                    perso.id,
-                    carriedWeaponIds,
-                    event.target.value === ""
-                      ? null
-                      : Number(event.target.value),
-                  )
-                }
-              >
-                <option value=''>Aucune</option>
-                {armes
-                  .filter((arme) => carriedWeaponIds.includes(arme.id))
-                  .map((arme) => (
-                    <option key={arme.id} value={arme.id}>
-                      {arme.name} (x{arme.att})
-                    </option>
-                  ))}
-              </select>
-            </label>
+            <AssignmentChecklist
+              items={weaponAssignmentItems}
+              onToggle={toggleWeapon}
+            />
+            <OptionalItemSelect
+              label='Arme équipée'
+              value={equippedWeaponId ?? ""}
+              options={carriedWeaponOptions}
+              noneLabel='Aucune'
+              onChange={(nextWeaponId) =>
+                handlePersoWeaponsUpdate(
+                  perso.id,
+                  carriedWeaponIds,
+                  nextWeaponId,
+                )
+              }
+            />
           </>
         )}
       </div>
 
-      <div className='perso-form-section'>
+      <div className={sectionClassName}>
         <h3>Sacs portés</h3>
-        <p className='info-text'>
+        <p className={infoTextClassName}>
           Un perso peut porter plusieurs sacs. Un seul sac équipé ajoute sa
           capacité au poids max, mais le poids de tous les sacs portés compte
           dans le poids total, équipés ou non.
@@ -411,71 +457,26 @@ function PersoPage({
           <p>Aucun sac disponible pour le moment.</p>
         ) : (
           <>
-            <div className='group-members-list'>
-              {sacs.map((sac) => {
-                const isCarried = carriedBagIds.includes(sac.id);
-                const maxQuantity = Math.max(
-                  0,
-                  Math.floor(Number(sac.quantity ?? 1) || 0),
-                );
-                const assignedCount = persoSacs.filter(
-                  (entry) => entry.sac_id === sac.id,
-                ).length;
-                const isUnavailable =
-                  !isCarried && assignedCount >= maxQuantity;
-
-                return (
-                  <label key={sac.id} className='group-member-item'>
-                    <input
-                      type='checkbox'
-                      checked={isCarried}
-                      disabled={isUnavailable}
-                      onChange={(event) =>
-                        toggleBag(sac.id, event.target.checked)
-                      }
-                    />
-                    <span>
-                      {sac.name} (+{sac.capacite} capacité, poids {sac.poids}) •{" "}
-                      {assignedCount}/{maxQuantity} attribué(s)
-                      {isUnavailable ? " — indisponible" : ""}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-
-            <label className='perso-field'>
-              <span className='perso-field-label'>Sac équipé</span>
-              <select
-                className='perso-field-input'
-                value={equippedBagId ?? ""}
-                onChange={(event) =>
-                  handlePersoBagsUpdate(
-                    perso.id,
-                    carriedBagIds,
-                    event.target.value === ""
-                      ? null
-                      : Number(event.target.value),
-                  )
-                }
-              >
-                <option value=''>Aucun</option>
-                {sacs
-                  .filter((sac) => carriedBagIds.includes(sac.id))
-                  .map((sac) => (
-                    <option key={sac.id} value={sac.id}>
-                      {sac.name} (+{sac.capacite})
-                    </option>
-                  ))}
-              </select>
-            </label>
+            <AssignmentChecklist
+              items={bagAssignmentItems}
+              onToggle={toggleBag}
+            />
+            <OptionalItemSelect
+              label='Sac équipé'
+              value={equippedBagId ?? ""}
+              options={carriedBagOptions}
+              noneLabel='Aucun'
+              onChange={(nextBagId) =>
+                handlePersoBagsUpdate(perso.id, carriedBagIds, nextBagId)
+              }
+            />
           </>
         )}
       </div>
 
-      <div className='perso-form-section'>
+      <div className={sectionClassName}>
         <h3>Outils portés</h3>
-        <p className='info-text'>
+        <p className={infoTextClassName}>
           Les bonus des outils s'appliquent automatiquement dès qu'ils sont
           portés par le personnage.
         </p>
@@ -483,40 +484,10 @@ function PersoPage({
         {outils.length === 0 ? (
           <p>Aucun outil disponible pour le moment.</p>
         ) : (
-          <div className='group-members-list'>
-            {outils.map((outil) => {
-              const isCarried = carriedToolIds.includes(outil.id);
-              const maxQuantity = Math.max(
-                0,
-                Math.floor(Number(outil.quantity ?? 1) || 0),
-              );
-              const assignedCount = persoOutils.filter(
-                (entry) => entry.outil_id === outil.id,
-              ).length;
-              const isUnavailable = !isCarried && assignedCount >= maxQuantity;
-
-              return (
-                <label key={outil.id} className='group-member-item'>
-                  <input
-                    type='checkbox'
-                    checked={isCarried}
-                    disabled={isUnavailable}
-                    onChange={(event) =>
-                      toggleTool(outil.id, event.target.checked)
-                    }
-                  />
-                  <span>
-                    {outil.name} (x{outil.bonus}{" "}
-                    {specialiteLabels[outil.specialite ?? "eau"] ||
-                      outil.specialite ||
-                      "eau"}
-                    ) • {assignedCount}/{maxQuantity} attribué(s)
-                    {isUnavailable ? " — indisponible" : ""}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
+          <AssignmentChecklist
+            items={toolAssignmentItems}
+            onToggle={toggleTool}
+          />
         )}
       </div>
     </div>

@@ -4,6 +4,12 @@ import { compareResources } from "../utils/resourceOrder";
 const toInputValue = (value: unknown, fallback = "") =>
   typeof value === "string" || typeof value === "number" ? value : fallback;
 
+const panelClassName =
+  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+const inputClassName =
+  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
+
 function ResourcesPage({
   resources,
   addResource,
@@ -30,9 +36,9 @@ function ResourcesPage({
     .sort((left, right) => compareResources(left.resource, right.resource));
 
   return (
-    <div className='panel'>
+    <div className={panelClassName}>
       <h2>8. Administration des ressources</h2>
-      <p className='info-text'>
+      <p className={infoTextClassName}>
         Gère ici la table `resources` : code interne + nom affiché.
         <br />
         Les quantités de stock restent éditables dans la page Réserve centrale.
@@ -62,7 +68,7 @@ function ResourcesPage({
                   <td>{resource.id}</td>
                   <td>
                     <input
-                      className='perso-field-input'
+                      className={inputClassName}
                       type='text'
                       value={toInputValue(resource.code)}
                       onChange={(event) =>
@@ -79,7 +85,7 @@ function ResourcesPage({
                   </td>
                   <td>
                     <input
-                      className='perso-field-input'
+                      className={inputClassName}
                       type='text'
                       value={toInputValue(resource.name, resource.code)}
                       onChange={(event) =>
@@ -96,25 +102,16 @@ function ResourcesPage({
                   </td>
                   <td>
                     <button
-                      className='btn-del'
+                      className='btn-del mt-0'
                       type='button'
                       onClick={() => removeResource(index)}
                       disabled={!deleteGuard.canDelete}
                       title={deleteGuard.reason}
-                      style={{
-                        opacity: deleteGuard.canDelete ? 1 : 0.5,
-                        cursor: deleteGuard.canDelete
-                          ? "pointer"
-                          : "not-allowed",
-                      }}
                     >
                       Supprimer
                     </button>
                     {!deleteGuard.canDelete ? (
-                      <div
-                        className='info-text'
-                        style={{ marginTop: "0.35rem", fontSize: "0.75rem" }}
-                      >
+                      <div className='mt-[0.35rem] text-[0.75rem] italic text-[#888]'>
                         {deleteGuard.reason}
                       </div>
                     ) : null}
@@ -126,7 +123,7 @@ function ResourcesPage({
         </table>
       )}
 
-      <button className='btn-add' type='button' onClick={addResource}>
+      <button className='btn-add mt-3' type='button' onClick={addResource}>
         + Ajouter une ressource
       </button>
     </div>

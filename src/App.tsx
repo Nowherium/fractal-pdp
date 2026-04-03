@@ -481,12 +481,16 @@ function App() {
         fileInputRef={fileInputRef}
       />
 
-      {loadError ? <div className='info-text'>{loadError}</div> : null}
+      {loadError ? (
+        <div className='mb-2.5 text-[0.85em] italic text-[#888]'>
+          {loadError}
+        </div>
+      ) : null}
 
-      <div className='current-lune-bar'>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <div className='mb-4 flex flex-wrap items-center justify-center gap-3'>
+        <div className='flex flex-wrap gap-2'>
           <button
-            className='btn-add current-lune-action'
+            className='btn-add mt-0'
             type='button'
             disabled={!canShowMorePastLunes}
             onClick={handleShowPastLunes}
@@ -495,7 +499,7 @@ function App() {
             {visiblePastLunes > 0 ? ` (${visiblePastLunes})` : ""}
           </button>
           <button
-            className='btn-add current-lune-action'
+            className='btn-add mt-0'
             type='button'
             disabled={!canShowLessPastLunes}
             onClick={handleHidePastLunes}
@@ -503,7 +507,7 @@ function App() {
             ⏩ Lunes suivantes
           </button>
           <button
-            className='btn-add current-lune-action'
+            className='btn-add mt-0'
             type='button'
             disabled={!canShowLessPastLunes}
             onClick={handleBackToCurrentLune}
@@ -512,10 +516,10 @@ function App() {
           </button>
         </div>
 
-        <label className='current-lune-label'>
+        <label className='inline-flex items-center gap-2.5 rounded-lg border border-[#3a3a3a] bg-[#161616] px-[14px] py-2.5 font-bold text-accent-blue'>
           🌘 Lune actuelle
           <input
-            className='current-lune-input'
+            className='w-[90px] text-center'
             type='number'
             min='1'
             step='1'
@@ -525,7 +529,7 @@ function App() {
         </label>
 
         <button
-          className='btn-add current-lune-action'
+          className='btn-add mt-0'
           type='button'
           onClick={handleAdvanceTurn}
         >

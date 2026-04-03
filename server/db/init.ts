@@ -148,30 +148,36 @@ const ensureDefaultGameState = async (): Promise<void> => {
   );
   if (persoRowsExisting.length === 0) {
     const defaultLuneId = 1;
+    const defaultPerso = defaultPersos[0];
+
+    if (!defaultPerso) {
+      return;
+    }
+
     await pool.query(
       "INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
       [
-        defaultPersos[0].id,
-        defaultPersos[0].nom,
-        defaultPersos[0].present,
-        defaultPersos[0].pvmax,
-        defaultPersos[0].pv,
-        defaultPersos[0].poidsMax,
-        defaultPersos[0].capEau,
-        defaultPersos[0].capNrt,
-        defaultPersos[0].capMed,
-        defaultPersos[0].capMat,
-        defaultPersos[0].capart,
-        defaultPersos[0].cmd,
-        defaultPersos[0].combat,
-        defaultPersos[0].groupId,
+        defaultPerso.id,
+        defaultPerso.nom,
+        defaultPerso.present,
+        defaultPerso.pvmax,
+        defaultPerso.pv,
+        defaultPerso.poidsMax,
+        defaultPerso.capEau,
+        defaultPerso.capNrt,
+        defaultPerso.capMed,
+        defaultPerso.capMat,
+        defaultPerso.capart,
+        defaultPerso.cmd,
+        defaultPerso.combat,
+        defaultPerso.groupId,
       ],
     );
 
     await pool.query("INSERT INTO lunes (id) VALUES ($1)", [defaultLuneId]);
     await pool.query(
       "INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-      [defaultLuneId, defaultPersos[0].id, true, true, true, "", null, null],
+      [defaultLuneId, defaultPerso.id, true, true, true, "", null, null],
     );
   }
 

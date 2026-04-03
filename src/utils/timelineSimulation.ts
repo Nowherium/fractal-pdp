@@ -47,6 +47,43 @@ import {
   normalizeLuneConstructions,
 } from "./stateUtils";
 
+const productionTaskKeys = ["eau", "nrt", "med", "mat"] as const;
+type ProductionTaskKey = (typeof productionTaskKeys)[number];
+
+const overrideCapMappings = [
+  ["capEau", "eau"],
+  ["capNrt", "nrt"],
+  ["capMed", "med"],
+  ["capMat", "mat"],
+  ["capArt", "art"],
+] as const;
+
+const isProductionTask = (task: string): task is ProductionTaskKey =>
+  productionTaskKeys.includes(task as ProductionTaskKey);
+
+const createEmptyPersoCaps = (): PersoCaps => ({
+  eau: 0,
+  nrt: 0,
+  med: 0,
+  mat: 0,
+  art: 0,
+});
+
+const getOrCreatePersoCaps = (
+  capCourantes: SimulationState["capCourantes"],
+  persoId: number,
+  fallback: Partial<PersoCaps> = {},
+): PersoCaps => {
+  const existingCaps = capCourantes[persoId];
+  if (existingCaps) {
+    return existingCaps;
+  }
+
+  const nextCaps = { ...createEmptyPersoCaps(), ...fallback };
+  capCourantes[persoId] = nextCaps;
+  return nextCaps;
+};
+
 const buildDrugStocksByPerso = (
   resources: Resource[] = [],
   persoResources: PersoResource[] = [],
@@ -97,11 +134,9 @@ const buildInitialConstructionProgress = (
         0,
         Number(construction.buildersRequired ?? 0) || 0,
       );
+      const progressEntry = constructionProgressById[construction.id];
       const progress: ConstructionProgressSnapshot =
-        constructionProgressById?.[construction.id] &&
-        typeof constructionProgressById[construction.id] === "object"
-          ? constructionProgressById[construction.id]
-          : {};
+        progressEntry && typeof progressEntry === "object" ? progressEntry : {};
       const initialStatus = progress.status ?? construction.status ?? "todo";
       const rawRemainingBuilders = Number(
         progress.remainingBuilders ??
@@ -192,25 +227,25 @@ const applyLuneOverrides = ({
     const override = overrides[perso.id];
     if (!override) return;
 
+    const currentCaps = getOrCreatePersoCaps(capCourantes, perso.id);
+
     if (override.present !== undefined) {
       presenceCourante[perso.id] = normalizePresenceValue(
         override.present,
-        presenceCourante[perso.id],
+        presenceCourante[perso.id] ?? true,
       );
     }
     if (override.pv !== undefined) {
       pvCourants[perso.id] = Math.max(0, Number(override.pv) || 0);
     }
-    if (override.capEau !== undefined)
-      capCourantes[perso.id].eau = Number(override.capEau) || 0;
-    if (override.capNrt !== undefined)
-      capCourantes[perso.id].nrt = Number(override.capNrt) || 0;
-    if (override.capMed !== undefined)
-      capCourantes[perso.id].med = Number(override.capMed) || 0;
-    if (override.capMat !== undefined)
-      capCourantes[perso.id].mat = Number(override.capMat) || 0;
-    if (override.capArt !== undefined)
-      capCourantes[perso.id].art = Number(override.capArt) || 0;
+
+    for (const [overrideKey, capKey] of overrideCapMappings) {
+      const overrideValue = override[overrideKey];
+      if (overrideValue !== undefined) {
+        currentCaps[capKey] = Number(overrideValue) || 0;
+      }
+    }
+
     if (override.combat !== undefined) {
       combatCourants[perso.id] = Number(override.combat) || 0;
     }
@@ -230,8 +265,8 @@ const buildConstructionPlanForLune = ({
   activeConstructionsForLune: SimulatedConstruction[];
 } => {
   const constructionsForLune = normalizedConstructions.map((construction) => {
-    const progress: ConstructionProgressSnapshot =
-      constructionProgressById[construction.id] || {};
+    const progressEntry = constructionProgressById[construction.id];
+    const progress: ConstructionProgressSnapshot = progressEntry ?? {};
     const remainingBuilders = progress.completed
       ? 0
       : Math.max(
@@ -290,20 +325,32 @@ const simulatePersoForLune = ({
   presenceCourante: SimulationState["presenceCourante"];
   remainingDrugStocksByPerso: PersoDrugStocks;
 }): ProcessPersoResult => {
-  const basePvDebut = pvCourants[perso.id];
-  const ration = { ...defaultRation(), ...(lune.rations[perso.id] || {}) };
-  const override = overrides[perso.id] || {};
+  const basePvDebut = Number(pvCourants[perso.id] ?? 0);
+  const ration = { ...defaultRation(), ...(lune.rations[perso.id] ?? {}) };
+  const override = overrides[perso.id] ?? {};
   const hasOverride = Object.keys(override).length > 0;
   const isAbsent = presenceCourante[perso.id] === false;
   const mortAuDebut = basePvDebut <= 0;
   const selectedDrugCode = normalizeDrugCode(ration.drogue);
-  const availableDrugs = buildAvailableDrugsMap(
-    remainingDrugStocksByPerso[perso.id],
-  );
+  const persoDrugStocks =
+    remainingDrugStocksByPerso[perso.id] ??
+    (remainingDrugStocksByPerso[perso.id] = {});
+  const availableDrugs = buildAvailableDrugsMap(persoDrugStocks);
 
-  const baseCapsAtStart = { ...capCourantes[perso.id] };
+  const baseCapsAtStart: PersoCaps = {
+    eau: Number(capCourantes[perso.id]?.eau ?? 0),
+    nrt: Number(capCourantes[perso.id]?.nrt ?? 0),
+    med: Number(capCourantes[perso.id]?.med ?? 0),
+    mat: Number(capCourantes[perso.id]?.mat ?? 0),
+    art: Number(capCourantes[perso.id]?.art ?? 0),
+  };
+  const currentCaps = getOrCreatePersoCaps(
+    capCourantes,
+    perso.id,
+    baseCapsAtStart,
+  );
   const baseCombatAtStart = Number(combatCourants[perso.id] ?? 0);
-  let cDebut = {
+  let cDebut: PersoCaps = {
     eau:
       baseCapsAtStart.eau * productionMultipliers.eau * weatherCoefficients.eau,
     nrt:
@@ -372,7 +419,7 @@ const simulatePersoForLune = ({
       drugClassName = "warning";
     } else {
       if (requiresResource) {
-        remainingDrugStocksByPerso[perso.id][selectedDrugCode] = Math.max(
+        persoDrugStocks[selectedDrugCode] = Math.max(
           0,
           availableQuantity - requiredQuantity,
         );
@@ -403,25 +450,11 @@ const simulatePersoForLune = ({
   }
 
   if (!mortAuDebut) {
-    if (ration.tache === "eau") {
-      production.eau += cDebut.eau;
-      capCourantes[perso.id].eau =
-        baseCapsAtStart.eau + computeIncrement(baseCapsAtStart.eau);
-    }
-    if (ration.tache === "nrt") {
-      production.nrt += cDebut.nrt;
-      capCourantes[perso.id].nrt =
-        baseCapsAtStart.nrt + computeIncrement(baseCapsAtStart.nrt);
-    }
-    if (ration.tache === "med") {
-      production.med += cDebut.med;
-      capCourantes[perso.id].med =
-        baseCapsAtStart.med + computeIncrement(baseCapsAtStart.med);
-    }
-    if (ration.tache === "mat") {
-      production.mat += cDebut.mat;
-      capCourantes[perso.id].mat =
-        baseCapsAtStart.mat + computeIncrement(baseCapsAtStart.mat);
+    if (isProductionTask(ration.tache)) {
+      production[ration.tache] += cDebut[ration.tache];
+      currentCaps[ration.tache] =
+        baseCapsAtStart[ration.tache] +
+        computeIncrement(baseCapsAtStart[ration.tache]);
     }
     if (ration.tache === "construire" && ration.constructionId) {
       constructionAssignment = {
@@ -479,10 +512,13 @@ const projectStocksForLune = (
   luneTotals: LuneTotals,
 ): StockSnapshot => ({
   ...resourceStocks,
-  eau: Number(resourceStocks.eau ?? 0) + luneTotals.eau - luneTotals.consoEau,
-  nrt: Number(resourceStocks.nrt ?? 0) + luneTotals.nrt - luneTotals.consoNrt,
-  med: Number(resourceStocks.med ?? 0) + luneTotals.med - luneTotals.consoMed,
-  mat: Number(resourceStocks.mat ?? 0) + luneTotals.mat,
+  eau:
+    Number(resourceStocks["eau"] ?? 0) + luneTotals.eau - luneTotals.consoEau,
+  nrt:
+    Number(resourceStocks["nrt"] ?? 0) + luneTotals.nrt - luneTotals.consoNrt,
+  med:
+    Number(resourceStocks["med"] ?? 0) + luneTotals.med - luneTotals.consoMed,
+  mat: Number(resourceStocks["mat"] ?? 0) + luneTotals.mat,
 });
 
 const groupAssignmentsByConstructionId = (
@@ -490,8 +526,9 @@ const groupAssignmentsByConstructionId = (
 ): Record<string, ConstructionAssignment[]> =>
   constructionAssignments.reduce<Record<string, ConstructionAssignment[]>>(
     (acc, assignment) => {
-      acc[assignment.constructionId] = acc[assignment.constructionId] || [];
-      acc[assignment.constructionId].push(assignment);
+      const assignments = acc[assignment.constructionId] ?? [];
+      assignments.push(assignment);
+      acc[assignment.constructionId] = assignments;
       return acc;
     },
     {},
@@ -579,7 +616,8 @@ const processConstructionProgress = ({
           const currentValue = Number(
             baseCapsAtStart[construction.rewardType] ?? 0,
           );
-          capCourantes[persoId][construction.rewardType] =
+          const currentCaps = getOrCreatePersoCaps(capCourantes, persoId);
+          currentCaps[construction.rewardType] =
             currentValue + computeIncrement(currentValue);
         }
       });
@@ -733,10 +771,10 @@ export const simulateTimeline = (
       Number(lune.id ?? 0) >= Number(currentLune ?? 1)
     ) {
       Object.assign(resourceStocks, baseResourceStocks);
-      stockEau = Number(baseResourceStocks.eau ?? 0);
-      stockNrt = Number(baseResourceStocks.nrt ?? 0);
-      stockMed = Number(baseResourceStocks.med ?? 0);
-      stockMat = Number(baseResourceStocks.mat ?? 0);
+      stockEau = Number(baseResourceStocks["eau"] ?? 0);
+      stockNrt = Number(baseResourceStocks["nrt"] ?? 0);
+      stockMed = Number(baseResourceStocks["med"] ?? 0);
+      stockMat = Number(baseResourceStocks["mat"] ?? 0);
       hasResetStocksForCurrentLune = true;
     }
     const overrides = lune.overrides || {};

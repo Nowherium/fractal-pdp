@@ -8,6 +8,10 @@ const formatNumber = (value: number | string | null | undefined) => {
     : numericValue.toFixed(2);
 };
 
+const panelClassName =
+  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+
 function GroupPage({
   groups,
   persos,
@@ -36,9 +40,9 @@ function GroupPage({
   };
 
   return (
-    <div className='panel'>
+    <div className={panelClassName}>
       <h2>3. Groupe</h2>
-      <p className='info-text'>
+      <p className={infoTextClassName}>
         Liste des groupes connus. Chaque groupe affiche son chef et peut être
         consulté ou modifié. La colonne <strong>Présents</strong> permet de
         basculer tout le groupe en présent/absent.
@@ -78,9 +82,10 @@ function GroupPage({
                   <td>{getChefLabel(group.chef)}</td>
                   <td>{getMembersLabel(group.id)}</td>
                   <td>
-                    <label className='group-presence-toggle'>
+                    <label className='inline-flex items-center gap-2 text-[0.9em]'>
                       <input
                         type='checkbox'
+                        className='h-[18px] w-[18px] cursor-pointer accent-green-500'
                         checked={allPresent}
                         disabled={members.length === 0}
                         aria-label={`Présence du groupe ${group.name}`}
@@ -100,22 +105,16 @@ function GroupPage({
                   <td>{formatNumber(totals.art)}</td>
                   <td>{formatNumber(totals.combat)}</td>
                   <td>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "0.5rem",
-                        flexWrap: "wrap",
-                      }}
-                    >
+                    <div className='flex flex-wrap gap-2'>
                       <button
-                        className='btn-edit'
+                        className='mt-0'
                         type='button'
                         onClick={() => openGroupViewPage(group.id)}
                       >
                         Voir
                       </button>
                       <button
-                        className='btn-edit'
+                        className='mt-0'
                         type='button'
                         onClick={() => openGroupPage(group.id)}
                       >
@@ -130,7 +129,7 @@ function GroupPage({
         </table>
       )}
 
-      <button className='btn-add' type='button' onClick={addGroup}>
+      <button className='btn-add mt-3' type='button' onClick={addGroup}>
         + Créer un groupe
       </button>
     </div>

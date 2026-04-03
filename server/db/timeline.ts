@@ -7,7 +7,14 @@ import {
   pool,
 } from "./shared";
 
-type LuneInput = Record<string, unknown>;
+type LuneInput = {
+  id?: unknown;
+  meteo?: unknown;
+  constructionPlacements?: unknown;
+  placedConstructionIds?: unknown;
+  rations?: unknown;
+  overrides?: unknown;
+} & Record<string, unknown>;
 type RationInput = {
   eau?: unknown;
   nrt?: unknown;
@@ -15,6 +22,35 @@ type RationInput = {
   tache?: unknown;
   drogue?: unknown;
   constructionId?: unknown;
+};
+
+const asRationRecord = (value: unknown): Record<string, RationInput> =>
+  value && typeof value === "object"
+    ? (value as Record<string, RationInput>)
+    : {};
+
+const asOverrideRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+const normalizeLuneMeteoInput = (value: unknown) =>
+  normalizeWeatherCoefficients(
+    typeof value === "number" || typeof value === "string"
+      ? value
+      : value && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : {},
+  );
+
+const normalizeLuneConstructionPayload = (lune: LuneInput, luneId: number) => {
+  if (Array.isArray(lune.constructionPlacements)) {
+    return normalizeConstructionPlacements(lune.constructionPlacements, luneId);
+  }
+
+  if (Array.isArray(lune.placedConstructionIds)) {
+    return normalizeConstructionPlacements(lune.placedConstructionIds, luneId);
+  }
+
+  return [];
 };
 
 const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
@@ -49,31 +85,17 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
     const luneId = Number(lune.id);
     if (!Number.isFinite(luneId)) continue;
 
-    const meteoSource = lune.meteo;
-    const meteo = normalizeWeatherCoefficients(
-      typeof meteoSource === "number" || typeof meteoSource === "string"
-        ? meteoSource
-        : meteoSource && typeof meteoSource === "object"
-          ? (meteoSource as Record<string, unknown>)
-          : {},
-    );
+    const meteo = normalizeLuneMeteoInput(lune.meteo);
     lunesById.set(luneId, {
       id: luneId,
       meteo_eau: meteo.eau,
       meteo_nrt: meteo.nrt,
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
-      constructions: Array.isArray(lune.constructionPlacements)
-        ? normalizeConstructionPlacements(lune.constructionPlacements, luneId)
-        : Array.isArray(lune.placedConstructionIds)
-          ? normalizeConstructionPlacements(lune.placedConstructionIds, luneId)
-          : [],
+      constructions: normalizeLuneConstructionPayload(lune, luneId),
     });
 
-    const rations =
-      lune.rations && typeof lune.rations === "object"
-        ? (lune.rations as Record<string, RationInput>)
-        : {};
+    const rations = asRationRecord(lune.rations);
     for (const [persoIdRaw, ration] of Object.entries(rations)) {
       const persoId = Number(persoIdRaw);
       if (!Number.isFinite(persoId)) continue;
@@ -91,10 +113,7 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
       });
     }
 
-    const overrides =
-      lune.overrides && typeof lune.overrides === "object"
-        ? (lune.overrides as Record<string, unknown>)
-        : {};
+    const overrides = asOverrideRecord(lune.overrides);
     for (const [persoIdRaw, data] of Object.entries(overrides)) {
       const persoId = Number(persoIdRaw);
       if (!Number.isFinite(persoId)) continue;
@@ -156,8 +175,8 @@ const upsertLune = async (lune: LuneInput) => {
     };
 
     const defaultMeteo = normalizeWeatherCoefficients(1);
-    const meteo = normalizeWeatherCoefficients(
-      mergedLune.meteo ?? existingLune?.meteo ?? defaultMeteo,
+    const meteo = normalizeLuneMeteoInput(
+      mergedLune["meteo"] ?? existingLune?.meteo ?? defaultMeteo,
     );
 
     const { lunesPayload, rationsPayload, overridesPayload } =

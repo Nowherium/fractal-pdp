@@ -20,7 +20,25 @@ import type {
   WeatherCoefficients,
 } from "../types";
 
-type RawState = Record<string, unknown>;
+type RawState = {
+  resources?: unknown;
+  persos?: unknown;
+  lunes?: unknown;
+  persoResources?: unknown;
+  constructions?: unknown;
+  constructionProgress?: unknown;
+  currentLune?: unknown;
+  stocks?: unknown;
+  cityMultipliers?: unknown;
+  nextPersoId?: unknown;
+  groups?: unknown;
+  armes?: unknown;
+  persoArmes?: unknown;
+  outils?: unknown;
+  persoOutils?: unknown;
+  sacs?: unknown;
+  persoSacs?: unknown;
+} & Record<string, unknown>;
 type PlacementEntry = {
   id?: string | number;
   constructionId?: string | number;
@@ -196,11 +214,9 @@ export const buildConstructionProgressById = (
 
   return Object.fromEntries(
     normalizeLuneConstructions(constructions).map((construction) => {
+      const progressEntry = progressSource[String(construction.id)];
       const existingProgress: Partial<ConstructionProgressById[string]> =
-        progressSource[String(construction.id)] &&
-        typeof progressSource[String(construction.id)] === "object"
-          ? progressSource[String(construction.id)]
-          : {};
+        progressEntry && typeof progressEntry === "object" ? progressEntry : {};
       const buildersRequired = Math.max(
         1,
         Math.floor(Number(construction.buildersRequired ?? 1) || 1),

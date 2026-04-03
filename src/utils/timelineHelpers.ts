@@ -77,8 +77,8 @@ export const normalizePresenceValue = (
 export const createStockSnapshot = (
   stocks: Record<string, number> = {},
 ): StockSnapshot => ({
-  eau: Number(stocks.eau ?? 0),
-  nrt: Number(stocks.nrt ?? 0),
-  med: Number(stocks.med ?? 0),
-  mat: Number(stocks.mat ?? 0),
+  eau: Number(stocks["eau"] ?? 0),
+  nrt: Number(stocks["nrt"] ?? 0),
+  med: Number(stocks["med"] ?? 0),
+  mat: Number(stocks["mat"] ?? 0),
 });

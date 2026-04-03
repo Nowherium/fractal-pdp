@@ -17,6 +17,12 @@ const bagFields: Array<{
 const toInputValue = (value: unknown, fallback: string | number = "") =>
   typeof value === "string" || typeof value === "number" ? value : fallback;
 
+const panelClassName =
+  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+const inputClassName =
+  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
+
 function BagsPage({
   sacs,
   addSac,
@@ -34,9 +40,9 @@ function BagsPage({
   removeSac: (index: number) => void;
 }) {
   return (
-    <div className='panel'>
+    <div className={panelClassName}>
       <h2>7. Administration des sacs</h2>
-      <p className='info-text'>
+      <p className={infoTextClassName}>
         Gère ici les sacs disponibles pour les personnages. Un perso peut en
         porter plusieurs, un seul sac équipé ajoute sa capacité au poids max, et
         le poids de chaque sac porté compte dans le poids total.
@@ -63,7 +69,7 @@ function BagsPage({
                 {bagFields.map((field) => (
                   <td key={field.key}>
                     <input
-                      className='perso-field-input'
+                      className={`${inputClassName} ${field.type === "number" ? "text-right" : ""}`}
                       type={field.type}
                       step={field.step}
                       min={field.key === "name" ? undefined : 0}
@@ -91,7 +97,7 @@ function BagsPage({
                 ))}
                 <td>
                   <button
-                    className='btn-del'
+                    className='btn-del mt-0'
                     type='button'
                     onClick={() => removeSac(index)}
                   >
@@ -104,7 +110,7 @@ function BagsPage({
         </table>
       )}
 
-      <button className='btn-add' type='button' onClick={addSac}>
+      <button className='btn-add mt-3' type='button' onClick={addSac}>
         + Ajouter un sac
       </button>
     </div>

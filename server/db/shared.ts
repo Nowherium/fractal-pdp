@@ -1,12 +1,89 @@
 import { Pool, type PoolClient } from "pg";
 
 const DATABASE_URL =
-  process.env.DATABASE_URL || "postgres://postgres:postgres@db:5432/fractal";
+  process.env["DATABASE_URL"] || "postgres://postgres:postgres@db:5432/fractal";
 
 const pool = new Pool({ connectionString: DATABASE_URL });
 
-type DbRow = Record<string, unknown>;
-type GenericInput = Record<string, unknown>;
+type DbRow = {
+  id?: unknown;
+  code?: unknown;
+  name?: unknown;
+  nom?: unknown;
+  present?: unknown;
+  pvmax?: unknown;
+  pv?: unknown;
+  capeau?: unknown;
+  capnrt?: unknown;
+  capmed?: unknown;
+  capmat?: unknown;
+  capart?: unknown;
+  capeau_effectif?: unknown;
+  capnrt_effectif?: unknown;
+  capmed_effectif?: unknown;
+  capmat_effectif?: unknown;
+  capart_effectif?: unknown;
+  poids_total?: unknown;
+  poidsmax?: unknown;
+  poidsmax_effectif?: unknown;
+  cmd?: unknown;
+  combat?: unknown;
+  combat_effectif?: unknown;
+  equipped_arme_id?: unknown;
+  equipped_sac_id?: unknown;
+  group_id?: unknown;
+  att?: unknown;
+  degats?: unknown;
+  fiabilite?: unknown;
+  pvm?: unknown;
+  poids?: unknown;
+  quantity?: unknown;
+  specialite?: unknown;
+  bonus?: unknown;
+  capacite?: unknown;
+  perso_id?: unknown;
+  arme_id?: unknown;
+  equipee?: unknown;
+  outil_id?: unknown;
+  sac_id?: unknown;
+  equipe?: unknown;
+  lune_id?: unknown;
+  eau?: unknown;
+  nrt?: unknown;
+  med?: unknown;
+  mat?: unknown;
+  tache?: unknown;
+  drogue?: unknown;
+  construction_id?: unknown;
+  data?: unknown;
+  constructions?: unknown;
+  meteo?: unknown;
+  meteo_eau?: unknown;
+  meteo_nrt?: unknown;
+  meteo_med?: unknown;
+  meteo_mat?: unknown;
+} & Record<string, unknown>;
+
+type GenericInput = {
+  id?: unknown;
+  name?: unknown;
+  chef?: unknown;
+  group_id?: unknown;
+  cmd?: unknown;
+  nom?: unknown;
+} & Record<string, unknown>;
+
+type WeatherSource = {
+  eau?: unknown;
+  nrt?: unknown;
+  med?: unknown;
+  mat?: unknown;
+  meteo_eau?: unknown;
+  meteo_nrt?: unknown;
+  meteo_med?: unknown;
+  meteo_mat?: unknown;
+} & Record<string, unknown>;
+
 type LuneRationPayload = {
   eau: boolean;
   nrt: boolean;
@@ -172,7 +249,7 @@ const normalizeWeatherCoefficient = (value: unknown, fallback = 1): number => {
 };
 
 const normalizeWeatherCoefficients = (
-  value: Record<string, unknown> | number | string = {},
+  value: WeatherSource | number | string = {},
 ) => {
   if (typeof value === "number" || typeof value === "string") {
     const coefficient = normalizeWeatherCoefficient(value, 1);
@@ -184,7 +261,7 @@ const normalizeWeatherCoefficients = (
     };
   }
 
-  const source = value && typeof value === "object" ? value : {};
+  const source: WeatherSource = value && typeof value === "object" ? value : {};
   return {
     eau: normalizeWeatherCoefficient(
       source.eau ?? source.meteo_eau,

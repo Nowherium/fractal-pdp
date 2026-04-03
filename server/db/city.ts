@@ -8,6 +8,13 @@ import {
   pool,
 } from "./shared";
 
+type CityMultiplierInput = {
+  eau?: unknown;
+  nrt?: unknown;
+  med?: unknown;
+  mat?: unknown;
+} & Record<string, unknown>;
+
 const updateStocks = async (stocks: Record<string, unknown>) => {
   const payload = buildStocksPayload(stocks);
 
@@ -31,7 +38,7 @@ const updateStock = async (code: string, quantity: string | number) => {
 };
 
 const updateCityMultipliers = async (
-  cityMultipliers: Record<string, unknown> = {},
+  cityMultipliers: CityMultiplierInput = {},
 ) => {
   const payload = {
     eau: normalizeMultiplier(cityMultipliers.eau, defaultCityMultipliers.eau),

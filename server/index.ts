@@ -34,7 +34,7 @@ import {
 
 type DbAction = () => Promise<void>;
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env["PORT"]) || 3000;
 const app = express();
 
 app.use(cors());
@@ -113,7 +113,7 @@ app.put("/api/state", async (req, res) => {
 });
 
 registerPartialRoute("/api/stocks/:code", async (req, res) => {
-  const stockCode = ensureStockCode(res, req.params.code);
+  const stockCode = ensureStockCode(res, req.params["code"]);
   if (stockCode === null) return;
 
   await runDbAction(
@@ -148,7 +148,7 @@ registerPartialRoute("/api/constructions", async (req, res) => {
 });
 
 registerPartialRoute("/api/resources/:id", async (req, res) => {
-  const resourceId = ensureNumericId(res, req.params.id);
+  const resourceId = ensureNumericId(res, req.params["id"]);
   if (resourceId === null) return;
 
   await runDbAction(
@@ -159,7 +159,7 @@ registerPartialRoute("/api/resources/:id", async (req, res) => {
 });
 
 app.delete("/api/resources/:id", async (req, res) => {
-  const resourceId = ensureNumericId(res, req.params.id);
+  const resourceId = ensureNumericId(res, req.params["id"]);
   if (resourceId === null) return;
 
   await runDbAction(
@@ -170,7 +170,7 @@ app.delete("/api/resources/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -181,7 +181,7 @@ registerPartialRoute("/api/persos/:id", async (req, res) => {
 });
 
 app.delete("/api/persos/:id", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -192,7 +192,7 @@ app.delete("/api/persos/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id/resources", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -203,7 +203,7 @@ registerPartialRoute("/api/persos/:id/resources", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id/armes", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -214,7 +214,7 @@ registerPartialRoute("/api/persos/:id/armes", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id/outils", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -225,7 +225,7 @@ registerPartialRoute("/api/persos/:id/outils", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id/sacs", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -236,7 +236,7 @@ registerPartialRoute("/api/persos/:id/sacs", async (req, res) => {
 });
 
 registerPartialRoute("/api/groups/:id", async (req, res) => {
-  const groupId = ensureNumericId(res, req.params.id);
+  const groupId = ensureNumericId(res, req.params["id"]);
   if (groupId === null) return;
 
   await runDbAction(
@@ -247,7 +247,7 @@ registerPartialRoute("/api/groups/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/groups/:id/members", async (req, res) => {
-  const groupId = ensureNumericId(res, req.params.id);
+  const groupId = ensureNumericId(res, req.params["id"]);
   if (groupId === null) return;
 
   await runDbAction(
@@ -258,7 +258,7 @@ registerPartialRoute("/api/groups/:id/members", async (req, res) => {
 });
 
 registerPartialRoute("/api/lunes/:id", async (req, res) => {
-  const luneId = ensureNumericId(res, req.params.id);
+  const luneId = ensureNumericId(res, req.params["id"]);
   if (luneId === null) return;
 
   await runDbAction(
@@ -269,7 +269,7 @@ registerPartialRoute("/api/lunes/:id", async (req, res) => {
 });
 
 app.delete("/api/lunes/:id", async (req, res) => {
-  const luneId = ensureNumericId(res, req.params.id);
+  const luneId = ensureNumericId(res, req.params["id"]);
   if (luneId === null) return;
 
   await runDbAction(
@@ -280,7 +280,7 @@ app.delete("/api/lunes/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/armes/:id", async (req, res) => {
-  const armeId = ensureNumericId(res, req.params.id);
+  const armeId = ensureNumericId(res, req.params["id"]);
   if (armeId === null) return;
 
   await runDbAction(
@@ -291,7 +291,7 @@ registerPartialRoute("/api/armes/:id", async (req, res) => {
 });
 
 app.delete("/api/armes/:id", async (req, res) => {
-  const armeId = ensureNumericId(res, req.params.id);
+  const armeId = ensureNumericId(res, req.params["id"]);
   if (armeId === null) return;
 
   await runDbAction(
@@ -302,7 +302,7 @@ app.delete("/api/armes/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/outils/:id", async (req, res) => {
-  const outilId = ensureNumericId(res, req.params.id);
+  const outilId = ensureNumericId(res, req.params["id"]);
   if (outilId === null) return;
 
   await runDbAction(
@@ -313,7 +313,7 @@ registerPartialRoute("/api/outils/:id", async (req, res) => {
 });
 
 app.delete("/api/outils/:id", async (req, res) => {
-  const outilId = ensureNumericId(res, req.params.id);
+  const outilId = ensureNumericId(res, req.params["id"]);
   if (outilId === null) return;
 
   await runDbAction(
@@ -324,7 +324,7 @@ app.delete("/api/outils/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/sacs/:id", async (req, res) => {
-  const sacId = ensureNumericId(res, req.params.id);
+  const sacId = ensureNumericId(res, req.params["id"]);
   if (sacId === null) return;
 
   await runDbAction(
@@ -335,7 +335,7 @@ registerPartialRoute("/api/sacs/:id", async (req, res) => {
 });
 
 app.delete("/api/sacs/:id", async (req, res) => {
-  const sacId = ensureNumericId(res, req.params.id);
+  const sacId = ensureNumericId(res, req.params["id"]);
   if (sacId === null) return;
 
   await runDbAction(

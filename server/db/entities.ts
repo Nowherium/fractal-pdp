@@ -20,7 +20,56 @@ import {
   withTransaction,
 } from "./shared";
 
-type EntityInput = Record<string, unknown>;
+type EntityInput = {
+  id?: unknown;
+  code?: unknown;
+  name?: unknown;
+  nom?: unknown;
+  present?: unknown;
+  pvmax?: unknown;
+  pv?: unknown;
+  poidsMax?: unknown;
+  capEau?: unknown;
+  capNrt?: unknown;
+  capMed?: unknown;
+  capMat?: unknown;
+  capart?: unknown;
+  cmd?: unknown;
+  combat?: unknown;
+  groupId?: unknown;
+  chef?: unknown;
+  resource_id?: unknown;
+  quantity?: unknown;
+  arme_id?: unknown;
+  equipee?: unknown;
+  outil_id?: unknown;
+  sac_id?: unknown;
+  equipe?: unknown;
+  specialite?: unknown;
+  bonus?: unknown;
+  pvm?: unknown;
+  poids?: unknown;
+  capacite?: unknown;
+  fiabilite?: unknown;
+  degats?: unknown;
+  att?: unknown;
+} & Record<string, unknown>;
+
+const buildUniqueEntriesById = <T>(
+  entries: EntityInput[] = [],
+  getEntryId: (entry: EntityInput) => number,
+  buildValue: (entry: EntityInput, entryId: number) => T,
+): T[] => {
+  const entriesById = new Map<number, T>();
+
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const entryId = getEntryId(entry);
+    if (!Number.isFinite(entryId)) continue;
+    entriesById.set(entryId, buildValue(entry, entryId));
+  }
+
+  return Array.from(entriesById.values());
+};
 
 const upsertResource = async (resource: EntityInput | null | undefined) => {
   const id = Number(resource?.id);
@@ -278,18 +327,15 @@ const replacePersoArmes = async (
   await withTransaction(async (client) => {
     await ensurePersoExists(client, persoId);
 
-    const byArmeId = new Map();
-    for (const entry of Array.isArray(persoArmes) ? persoArmes : []) {
-      const armeId = Number(entry.arme_id);
-      if (!Number.isFinite(armeId)) continue;
-      byArmeId.set(armeId, {
+    const payload = buildUniqueEntriesById(
+      persoArmes,
+      (entry) => Number(entry.arme_id),
+      (entry, armeId) => ({
         perso_id: persoId,
         arme_id: armeId,
         equipee: Boolean(entry.equipee),
-      });
-    }
-
-    const payload = Array.from(byArmeId.values());
+      }),
+    );
     const equippedCount = payload.filter((entry) => entry.equipee).length;
     if (equippedCount > 1) {
       throw new Error(
@@ -348,17 +394,14 @@ const replacePersoOutils = async (
   await withTransaction(async (client) => {
     await ensurePersoExists(client, persoId);
 
-    const byOutilId = new Map();
-    for (const entry of Array.isArray(persoOutils) ? persoOutils : []) {
-      const outilId = Number(entry.outil_id);
-      if (!Number.isFinite(outilId)) continue;
-      byOutilId.set(outilId, {
+    const payload = buildUniqueEntriesById(
+      persoOutils,
+      (entry) => Number(entry.outil_id),
+      (_entry, outilId) => ({
         perso_id: persoId,
         outil_id: outilId,
-      });
-    }
-
-    const payload = Array.from(byOutilId.values());
+      }),
+    );
 
     for (const entry of payload) {
       const { rows: itemRows } = await client.query(
@@ -410,18 +453,15 @@ const replacePersoSacs = async (
   await withTransaction(async (client) => {
     await ensurePersoExists(client, persoId);
 
-    const bySacId = new Map();
-    for (const entry of Array.isArray(persoSacs) ? persoSacs : []) {
-      const sacId = Number(entry.sac_id);
-      if (!Number.isFinite(sacId)) continue;
-      bySacId.set(sacId, {
+    const payload = buildUniqueEntriesById(
+      persoSacs,
+      (entry) => Number(entry.sac_id),
+      (entry, sacId) => ({
         perso_id: persoId,
         sac_id: sacId,
         equipe: Boolean(entry.equipe),
-      });
-    }
-
-    const payload = Array.from(bySacId.values());
+      }),
+    );
     const equippedCount = payload.filter((entry) => entry.equipe).length;
     if (equippedCount > 1) {
       throw new Error(

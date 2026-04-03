@@ -5,6 +5,21 @@ import {
   getGroupMembers,
 } from "../utils/groupUtils";
 
+const panelClassName =
+  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
+const formGridClassName =
+  "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
+const fieldCardClassName =
+  "flex flex-col gap-2 rounded-[10px] border border-border-main bg-[#141414] p-[14px]";
+const fieldLabelClassName = "text-[0.92em] tracking-[0.02em] text-accent-blue";
+const fieldInputClassName =
+  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-[#f1f1f1]";
+const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
+const sectionClassName = "mt-6 space-y-2.5";
+const memberListClassName = "flex flex-col gap-2";
+const memberItemClassName =
+  "flex items-center gap-2 rounded-lg border border-border-soft bg-soft-bg px-3 py-2";
+
 function GroupEditPage({
   group,
   persos,
@@ -12,7 +27,7 @@ function GroupEditPage({
   handleGroupMembersUpdate,
   closePage,
 }: {
-  group?: Group;
+  group?: Group | undefined;
   persos: Perso[];
   handleGroupUpdate: (
     groupId: number,
@@ -22,14 +37,14 @@ function GroupEditPage({
   ) => void;
   handleGroupMembersUpdate: (
     groupId: number,
-    selectedMemberIds: number[],
+    selectedMemberIds: Array<number | string>,
   ) => void;
   closePage: () => void;
 }) {
   if (!group) {
     return (
-      <div className='panel'>
-        <button type='button' onClick={closePage}>
+      <div className={panelClassName}>
+        <button className='mt-0' type='button' onClick={closePage}>
           ← Retour aux Groupes
         </button>
         <h2>Groupe introuvable</h2>
@@ -52,17 +67,17 @@ function GroupEditPage({
   };
 
   return (
-    <div className='panel'>
-      <button type='button' onClick={closePage}>
+    <div className={panelClassName}>
+      <button className='mt-0' type='button' onClick={closePage}>
         ← Retour aux Groupes
       </button>
       <h2>Modifier {group.name || "le groupe"}</h2>
 
-      <div className='perso-form'>
-        <label className='perso-field'>
-          <span className='perso-field-label'>Nom du groupe</span>
+      <div className={formGridClassName}>
+        <label className={fieldCardClassName}>
+          <span className={fieldLabelClassName}>Nom du groupe</span>
           <input
-            className='perso-field-input'
+            className={fieldInputClassName}
             type='text'
             value={group.name}
             onChange={(event) =>
@@ -78,10 +93,10 @@ function GroupEditPage({
           />
         </label>
 
-        <label className='perso-field'>
-          <span className='perso-field-label'>Chef du groupe</span>
+        <label className={fieldCardClassName}>
+          <span className={fieldLabelClassName}>Chef du groupe</span>
           <select
-            className='perso-field-input'
+            className={fieldInputClassName}
             value={group.chef ?? ""}
             onChange={(event) =>
               handleGroupUpdate(
@@ -105,9 +120,9 @@ function GroupEditPage({
         </label>
       </div>
 
-      <div className='perso-form-section'>
+      <div className={sectionClassName}>
         <h3>Membres du groupe</h3>
-        <p className='info-text'>
+        <p className={infoTextClassName}>
           Coche un perso pour l'ajouter à ce groupe. Le décocher le retire du
           groupe et le laisse sans groupe.
           <br />
@@ -118,14 +133,15 @@ function GroupEditPage({
         {persos.length === 0 ? (
           <p>Aucun perso disponible.</p>
         ) : (
-          <div className='group-members-list'>
+          <div className={memberListClassName}>
             {persos.map((perso) => {
               const isMember = memberIds.includes(perso.id);
               const disableCheck = !isMember && isAtCapacity;
               return (
-                <label key={perso.id} className='group-member-item'>
+                <label key={perso.id} className={memberItemClassName}>
                   <input
                     type='checkbox'
+                    className='h-4 w-4 cursor-pointer accent-green-500'
                     checked={isMember}
                     disabled={disableCheck}
                     onChange={(event) =>

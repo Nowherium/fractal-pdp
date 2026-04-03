@@ -140,7 +140,7 @@ export const useInventoryActions = ({
               equippedWeaponId: normalizedEquippedWeaponId,
               combatEffectif:
                 normalizedEquippedWeaponId === null
-                  ? perso.combat
+                  ? Number(perso.combat ?? 0)
                   : (() => {
                       const equippedArme = armes.find(
                         (arme) => arme.id === normalizedEquippedWeaponId,
