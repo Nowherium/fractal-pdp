@@ -1,12 +1,13 @@
 import type { Resource } from "../types";
+import { confirmAction } from "../utils/confirmAction";
 import { compareResources } from "../utils/resourceOrder";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 const toInputValue = (value: unknown, fallback = "") =>
   typeof value === "string" || typeof value === "number" ? value : fallback;
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const inputClassName =
   "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 
@@ -36,16 +37,16 @@ function ResourcesPage({
     .sort((left, right) => compareResources(left.resource, right.resource));
 
   return (
-    <div className={panelClassName}>
+    <Panel>
       <h2>8. Administration des ressources</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         Gère ici la table `resources` : code interne + nom affiché.
         <br />
         Les quantités de stock restent éditables dans la page Réserve centrale.
         <br />
         La suppression est bloquée si la ressource est protégée, encore stockée,
         portée, ou planifiée comme drogue.
-      </p>
+      </InfoText>
 
       {resources.length === 0 ? (
         <p>Aucune ressource définie pour le moment.</p>
@@ -101,19 +102,25 @@ function ResourcesPage({
                     />
                   </td>
                   <td>
-                    <button
-                      className='btn-del mt-0'
-                      type='button'
-                      onClick={() => removeResource(index)}
+                    <Button
+                      className='mt-0'
+                      size='sm'
+                      variant='danger'
+                      onClick={() =>
+                        confirmAction(
+                          `Supprimer la ressource ${resource.name || resource.code?.toUpperCase() || "sélectionnée"} ?`,
+                          () => removeResource(index),
+                        )
+                      }
                       disabled={!deleteGuard.canDelete}
                       title={deleteGuard.reason}
                     >
                       Supprimer
-                    </button>
+                    </Button>
                     {!deleteGuard.canDelete ? (
-                      <div className='mt-[0.35rem] text-[0.75rem] italic text-[#888]'>
+                      <InfoText className='mt-[0.35rem] text-[0.75rem] [margin-bottom:0]'>
                         {deleteGuard.reason}
-                      </div>
+                      </InfoText>
                     ) : null}
                   </td>
                 </tr>
@@ -123,10 +130,10 @@ function ResourcesPage({
         </table>
       )}
 
-      <button className='btn-add mt-3' type='button' onClick={addResource}>
+      <Button className='mt-3' variant='success' onClick={addResource}>
         + Ajouter une ressource
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 

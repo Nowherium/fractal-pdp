@@ -1,4 +1,9 @@
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
+
 import type { Perso } from "../types";
+import { confirmAction } from "../utils/confirmAction";
 import {
   getPersoCapacityValue,
   getPersoCombatValue,
@@ -14,9 +19,6 @@ const formatCombat = (value: number | string | null | undefined) => {
     : numericValue.toFixed(2);
 };
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const highlightCellClassName = "bg-[#2a2a2a]";
 const headerHintClassName = "text-[0.7em] text-[#4caf50]";
 const actionGroupClassName = "flex flex-wrap gap-2";
@@ -43,12 +45,12 @@ function EffectifPage({
   updatePersoPresence: (persoId: number, isPresent: boolean) => void;
 }) {
   return (
-    <div className={panelClassName}>
+    <Panel>
       <h2>2. L'Effectif & Potentiel de base</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         Indiquez la capacité originelle. Les modifications au fil du temps se
         feront directement dans les blocs Lunes via le bouton ⚙️.
-      </p>
+      </InfoText>
       <table>
         <thead>
           <tr>
@@ -103,30 +105,36 @@ function EffectifPage({
               </td>
               <td>
                 <div className={actionGroupClassName}>
-                  <button
+                  <Button
                     className='mt-0'
-                    type='button'
+                    size='sm'
                     onClick={() => openPersoPage(p.id)}
                   >
                     Modifier
-                  </button>
-                  <button
-                    className='btn-del mt-0'
-                    type='button'
-                    onClick={() => removePerso(index)}
+                  </Button>
+                  <Button
+                    className='mt-0'
+                    size='sm'
+                    variant='danger'
+                    onClick={() =>
+                      confirmAction(
+                        `Renvoyer ${p.nom || "ce personnage"} ? Cette action le supprimera définitivement.`,
+                        () => removePerso(index),
+                      )
+                    }
                   >
                     Renvoyer
-                  </button>
+                  </Button>
                 </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button className='btn-add mt-3' type='button' onClick={addPerso}>
+      <Button className='mt-3' variant='success' onClick={addPerso}>
         + Recruter un membre
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 

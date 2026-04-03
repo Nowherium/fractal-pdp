@@ -4,17 +4,15 @@ import {
   getGroupLeader,
   getGroupMembers,
 } from "../utils/groupUtils";
+import Button from "./ui/Button";
+import Field from "./ui/Field";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
 const formGridClassName =
   "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
-const fieldCardClassName =
-  "flex flex-col gap-2 rounded-[10px] border border-border-main bg-[#141414] p-[14px]";
-const fieldLabelClassName = "text-[0.92em] tracking-[0.02em] text-accent-blue";
 const fieldInputClassName =
   "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-[#f1f1f1]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const sectionClassName = "mt-6 space-y-2.5";
 const memberListClassName = "flex flex-col gap-2";
 const memberItemClassName =
@@ -43,13 +41,13 @@ function GroupEditPage({
 }) {
   if (!group) {
     return (
-      <div className={panelClassName}>
-        <button className='mt-0' type='button' onClick={closePage}>
+      <Panel>
+        <Button className='mt-0' variant='muted' onClick={closePage}>
           ← Retour aux Groupes
-        </button>
+        </Button>
         <h2>Groupe introuvable</h2>
         <p>Le groupe sélectionné n'existe plus ou a été supprimé.</p>
-      </div>
+      </Panel>
     );
   }
 
@@ -67,15 +65,14 @@ function GroupEditPage({
   };
 
   return (
-    <div className={panelClassName}>
-      <button className='mt-0' type='button' onClick={closePage}>
+    <Panel>
+      <Button className='mt-0' variant='muted' onClick={closePage}>
         ← Retour aux Groupes
-      </button>
+      </Button>
       <h2>Modifier {group.name || "le groupe"}</h2>
 
       <div className={formGridClassName}>
-        <label className={fieldCardClassName}>
-          <span className={fieldLabelClassName}>Nom du groupe</span>
+        <Field label='Nom du groupe'>
           <input
             className={fieldInputClassName}
             type='text'
@@ -91,10 +88,9 @@ function GroupEditPage({
               })
             }
           />
-        </label>
+        </Field>
 
-        <label className={fieldCardClassName}>
-          <span className={fieldLabelClassName}>Chef du groupe</span>
+        <Field label='Chef du groupe'>
           <select
             className={fieldInputClassName}
             value={group.chef ?? ""}
@@ -117,18 +113,18 @@ function GroupEditPage({
               );
             })}
           </select>
-        </label>
+        </Field>
       </div>
 
       <div className={sectionClassName}>
         <h3>Membres du groupe</h3>
-        <p className={infoTextClassName}>
+        <InfoText>
           Coche un perso pour l'ajouter à ce groupe. Le décocher le retire du
           groupe et le laisse sans groupe.
           <br />
-          Capacité actuelle: {memberPersos.length}/{groupCapacity} membres
-          (`cmd` du leader + 1).
-        </p>
+          Capacité actuelle: {memberPersos.length}/{groupCapacity} membres (
+          <code className='font-mono'>cmd</code> du leader + 1).
+        </InfoText>
 
         {persos.length === 0 ? (
           <p>Aucun perso disponible.</p>
@@ -157,7 +153,7 @@ function GroupEditPage({
           </div>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 

@@ -10,18 +10,18 @@ import {
   getPersoWeightValue,
   isPersoOverweight,
 } from "../utils/groupUtils";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 const formatNumber = (value: number | string | null | undefined) =>
   Number(value ?? 0).toFixed(2);
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
 const statGridClassName =
   "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
 const statCardClassName =
   "flex flex-col gap-2 rounded-[10px] border border-border-main bg-[#141414] p-[14px]";
 const statLabelClassName = "text-[0.92em] tracking-[0.02em] text-accent-blue";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 
 function GroupViewPage({
   group,
@@ -36,13 +36,13 @@ function GroupViewPage({
 }) {
   if (!group) {
     return (
-      <div className={panelClassName}>
-        <button className='mt-0' type='button' onClick={closePage}>
+      <Panel>
+        <Button className='mt-0' variant='muted' onClick={closePage}>
           ← Retour aux Groupes
-        </button>
+        </Button>
         <h2>Groupe introuvable</h2>
         <p>Le groupe sélectionné n'existe plus ou a été supprimé.</p>
-      </div>
+      </Panel>
     );
   }
 
@@ -52,28 +52,24 @@ function GroupViewPage({
   const groupCapacity = getGroupCapacity(leader);
 
   return (
-    <div className={panelClassName}>
+    <Panel>
       <div className='flex flex-wrap gap-2'>
-        <button className='mt-0' type='button' onClick={closePage}>
+        <Button className='mt-0' variant='muted' onClick={closePage}>
           ← Retour aux Groupes
-        </button>
-        <button
-          className='mt-0'
-          type='button'
-          onClick={() => openEditPage(group.id)}
-        >
+        </Button>
+        <Button className='mt-0' onClick={() => openEditPage(group.id)}>
           Modifier ce groupe
-        </button>
+        </Button>
       </div>
 
       <h2>Récapitulatif de {group.name || "ce groupe"}</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         Chef: <strong>{leader?.nom || "Aucun"}</strong> • Membres:{" "}
         {memberPersos.length} • Capacité max du groupe:{" "}
         <strong>
           {memberPersos.length} / {groupCapacity}
         </strong>
-      </p>
+      </InfoText>
 
       {memberPersos.length === 0 ? (
         <p>Ce groupe ne contient actuellement aucun membre.</p>
@@ -165,7 +161,7 @@ function GroupViewPage({
           </div>
         </>
       )}
-    </div>
+    </Panel>
   );
 }
 

@@ -1,4 +1,8 @@
 import type { Arme } from "../types";
+import { confirmAction } from "../utils/confirmAction";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 const weaponFields: Array<{
   key: string;
@@ -19,9 +23,6 @@ const weaponFields: Array<{
 const toInputValue = (value: unknown, fallback: string | number = "") =>
   typeof value === "string" || typeof value === "number" ? value : fallback;
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const inputClassName =
   "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 
@@ -42,11 +43,11 @@ function WeaponsPage({
   removeArme: (index: number) => void;
 }) {
   return (
-    <div className={panelClassName}>
+    <Panel>
       <h2>5. Administration des armes</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         Gère ici le catalogue des armes disponibles pour les personnages.
-      </p>
+      </InfoText>
 
       {armes.length === 0 ? (
         <p>Aucune arme définie pour le moment.</p>
@@ -98,13 +99,19 @@ function WeaponsPage({
                   </td>
                 ))}
                 <td>
-                  <button
-                    className='btn-del mt-0'
-                    type='button'
-                    onClick={() => removeArme(index)}
+                  <Button
+                    className='mt-0'
+                    size='sm'
+                    variant='danger'
+                    onClick={() =>
+                      confirmAction(
+                        `Supprimer l'arme ${arme.name || "sélectionnée"} ?`,
+                        () => removeArme(index),
+                      )
+                    }
                   >
                     Supprimer
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -112,10 +119,10 @@ function WeaponsPage({
         </table>
       )}
 
-      <button className='btn-add mt-3' type='button' onClick={addArme}>
+      <Button className='mt-3' variant='success' onClick={addArme}>
         + Ajouter une arme
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 

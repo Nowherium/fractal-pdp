@@ -1,8 +1,11 @@
 import TimelineConstructionList from "./TimelineConstructionList";
 import TimelineRowEditor from "./TimelineRowEditor";
 import TimelineStockSummary from "./TimelineStockSummary";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
 
 import type { LuneConstruction, Resource } from "../types";
+import { confirmAction } from "../utils/confirmAction";
 import { getPlacedConstructionIdsForLune } from "../utils/stateUtils";
 import type { TimelineSegment } from "../utils/timelineTypes";
 
@@ -69,13 +72,13 @@ function TimelinePage({
   return (
     <>
       <h2>5. Ligne du Temps & Assignations</h2>
-      <p className='info-text'>
+      <InfoText>
         Chaque perso peut consommer <strong>une seule drogue par lune</strong>.
         L'effet n'est appliqué que si la ressource est bien portée en quantité
         suffisante. La <strong>météo</strong> de chaque lune définit
         <strong> 4 coefficients</strong> distincts pour `eau`, `nrt`, `med` et
         `mat`, chacun entre <strong>0</strong> et <strong>1</strong>.
-      </p>
+      </InfoText>
       <div id='timeline'>
         {timelineData.map((segment, luneIndex) => {
           const actualLuneIndex = segment.actualIndex ?? luneIndex;
@@ -96,19 +99,25 @@ function TimelinePage({
                   LUNE {Number(segment.lune.id)}
                   {isPastLune ? " • passée (lecture seule)" : ""}
                 </h3>
-                <button
-                  className='btn-del mt-0'
-                  type='button'
+                <Button
+                  className='mt-0'
+                  size='sm'
+                  variant='danger'
                   disabled={isLockedLune}
                   title={
                     isLockedLune
                       ? "Les lunes passées et la lune en cours ne peuvent pas être supprimées"
                       : undefined
                   }
-                  onClick={() => removeLune(actualLuneIndex)}
+                  onClick={() =>
+                    confirmAction(
+                      `Supprimer la lune ${Number(segment.lune.id)} ?`,
+                      () => removeLune(actualLuneIndex),
+                    )
+                  }
                 >
                   X Supprimer
-                </button>
+                </Button>
               </div>
 
               <div className='mt-2.5 block rounded-[4px] border-l-[3px] border-l-accent-orange bg-[#2c2c2c] p-2.5'>
@@ -185,14 +194,9 @@ function TimelinePage({
         })}
       </div>
 
-      <button
-        className='btn-add'
-        type='button'
-        onClick={addLune}
-        style={{ fontSize: "1.1em", padding: "10px 20px" }}
-      >
+      <Button className='mt-3' size='sm' variant='success' onClick={addLune}>
         + Ajouter la Lune suivante
-      </button>
+      </Button>
     </>
   );
 }

@@ -1,3 +1,7 @@
+import Field from "./ui/Field";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
+
 import type {
   Arme,
   CityMultipliers,
@@ -25,14 +29,8 @@ const cityBonusFields: Array<{ key: keyof CityMultipliers; label: string }> = [
   { key: "mat", label: "🧱 Mat" },
 ];
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const cardGridClassName =
   "grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3";
-const fieldCardClassName =
-  "flex flex-col gap-2 rounded-[10px] border border-border-main bg-[#141414] p-[14px]";
-const fieldLabelClassName = "text-[0.92em] tracking-[0.02em] text-accent-blue";
 const fieldInputClassName =
   "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-right text-[#f1f1f1]";
 
@@ -185,18 +183,17 @@ function ReservePage({
   );
 
   return (
-    <div className={panelClassName}>
+    <Panel>
       <h2>1. Ville</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         La ville applique ici des <strong>multiplicateurs de production</strong>{" "}
         pour tous les persos. <strong>1</strong> = normal, <strong>1.2</strong>{" "}
         = +20 %, <strong>0</strong> = aucune production.
-      </p>
+      </InfoText>
 
       <div className={`${cardGridClassName} mb-4`}>
         {cityBonusFields.map((field) => (
-          <label key={field.key} className={fieldCardClassName}>
-            <span className={fieldLabelClassName}>Bonus {field.label}</span>
+          <Field key={field.key} label={`Bonus ${field.label}`}>
             <input
               className={fieldInputClassName}
               type='number'
@@ -207,24 +204,28 @@ function ReservePage({
                 handleCityMultiplierChange(field.key, event.target.value)
               }
             />
-          </label>
+          </Field>
         ))}
       </div>
 
       <h3>Réserve centrale</h3>
       <div className={cardGridClassName}>
         {orderedResources.map((resource) => (
-          <label key={resource.code} className={fieldCardClassName}>
-            <span className={fieldLabelClassName}>
-              Stock {resource.code.toUpperCase()}{" "}
-              <span
-                title={getResourceDisplayName(resource)}
-                aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
-                className='ml-1 inline-block h-[1.1rem] w-[1.1rem] cursor-help text-center text-[0.85rem] leading-[1.1rem]'
-              >
-                ❔
-              </span>
-            </span>
+          <Field
+            key={resource.code}
+            label={
+              <>
+                Stock {resource.code.toUpperCase()}{" "}
+                <span
+                  title={getResourceDisplayName(resource)}
+                  aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
+                  className='ml-1 inline-block h-[1.1rem] w-[1.1rem] cursor-help text-center text-[0.85rem] leading-[1.1rem]'
+                >
+                  ❔
+                </span>
+              </>
+            }
+          >
             <input
               className={fieldInputClassName}
               type='number'
@@ -234,11 +235,11 @@ function ReservePage({
                 handleStockChange(resource.code, event.target.value)
               }
             />
-          </label>
+          </Field>
         ))}
       </div>
 
-      <p className={`${infoTextClassName} mt-4`}>
+      <InfoText className='mt-4'>
         <strong>Poids total des ressources :</strong>{" "}
         {formatWeight(totalResourcesWeight)}
         <br />
@@ -247,7 +248,7 @@ function ReservePage({
         <br />
         <strong>Poids total de la réserve centrale :</strong>{" "}
         {formatWeight(totalReserveWeight)}
-      </p>
+      </InfoText>
 
       {renderReserveItems(
         "Armes en réserve",
@@ -264,7 +265,7 @@ function ReservePage({
         reserveSacs,
         "Aucun sac en réserve.",
       )}
-    </div>
+    </Panel>
   );
 }
 

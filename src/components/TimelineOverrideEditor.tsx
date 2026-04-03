@@ -1,3 +1,5 @@
+import Button from "./ui/Button";
+
 import type { TimelineSegment } from "../utils/timelineTypes";
 
 type OverrideNumberField = {
@@ -97,13 +99,14 @@ function TimelineOverrideEditor({
               <option value='false'>Absent</option>
             </select>
           </div>
-          <button
-            className='btn-del mt-0'
-            type='button'
+          <Button
+            className='mt-0'
+            size='sm'
+            variant='danger'
             onClick={() => clearOverrides(actualLuneIndex, persoId)}
           >
             Effacer
-          </button>
+          </Button>
         </div>
       </td>
     </tr>

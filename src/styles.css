@@ -27,10 +27,14 @@
     @apply text-accent-cyan;
   }
 
-  input[type="number"],
+  input[type="number"] {
+    width: 88px;
+    @apply border border-border-strong bg-input-bg px-2 py-1 text-center text-white;
+  }
+
   input[type="text"] {
-    width: 55px;
-    @apply border border-border-strong bg-input-bg px-1 py-1 text-center text-white;
+    min-width: 14rem;
+    @apply border border-border-strong bg-input-bg px-2 py-1 text-left text-white;
   }
 
   select {
@@ -69,7 +73,7 @@
     color: theme("colors.page");
     border: none;
     border-radius: 3px;
-    @apply mt-[5px] cursor-pointer px-3 py-2 font-bold;
+    @apply mt-[5px] cursor-pointer px-2 py-1 text-[0.9em] font-bold;
   }
 
   button:hover {
@@ -78,36 +82,5 @@
 
   button:disabled {
     @apply cursor-not-allowed opacity-60;
-  }
-
-  .btn-add {
-    background-color: #4caf50;
-    @apply text-white;
-  }
-
-  .btn-add:hover {
-    background-color: #45a049;
-  }
-
-  .btn-del {
-    background-color: #f44336;
-    @apply text-white;
-  }
-
-  .btn-gear {
-    background-color: #555;
-    border-radius: 5px;
-    font-size: 0.9em;
-    @apply px-2 py-1 text-white;
-  }
-
-  .btn-gear:hover {
-    background-color: #777;
-  }
-
-  .info-text {
-    font-size: 0.85em;
-    color: #888;
-    @apply mb-2.5 italic;
   }
 }

@@ -1,4 +1,8 @@
 import type { Outil } from "../types";
+import { confirmAction } from "../utils/confirmAction";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 const specialites: Array<{ value: string; label: string }> = [
   { value: "eau", label: "💧 Eau" },
@@ -25,9 +29,6 @@ const toolFields: Array<{
 const toInputValue = (value: unknown, fallback: string | number = "") =>
   typeof value === "string" || typeof value === "number" ? value : fallback;
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const inputClassName =
   "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 
@@ -48,12 +49,12 @@ function ToolsPage({
   removeOutil: (index: number) => void;
 }) {
   return (
-    <div className={panelClassName}>
+    <Panel>
       <h2>6. Administration des outils</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         Gère ici les outils de production disponibles pour les personnages. Le
         champ bonus est un multiplicateur : par exemple `1.2` signifie x1,2.
-      </p>
+      </InfoText>
 
       {outils.length === 0 ? (
         <p>Aucun outil défini pour le moment.</p>
@@ -134,13 +135,19 @@ function ToolsPage({
                   </td>
                 ))}
                 <td>
-                  <button
-                    className='btn-del mt-0'
-                    type='button'
-                    onClick={() => removeOutil(index)}
+                  <Button
+                    className='mt-0'
+                    size='sm'
+                    variant='danger'
+                    onClick={() =>
+                      confirmAction(
+                        `Supprimer l'outil ${outil.name || "sélectionné"} ?`,
+                        () => removeOutil(index),
+                      )
+                    }
                   >
                     Supprimer
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -148,10 +155,10 @@ function ToolsPage({
         </table>
       )}
 
-      <button className='btn-add mt-3' type='button' onClick={addOutil}>
+      <Button className='mt-3' variant='success' onClick={addOutil}>
         + Ajouter un outil
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 

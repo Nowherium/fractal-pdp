@@ -1,5 +1,9 @@
 import AssignmentChecklist from "./shared/AssignmentChecklist";
 import OptionalItemSelect from "./shared/OptionalItemSelect";
+import Button from "./ui/Button";
+import Field from "./ui/Field";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 import type {
   Arme,
@@ -75,14 +79,8 @@ const getAssignmentAvailability = (
   };
 };
 
-const panelClassName =
-  "rounded-lg border border-border-strong bg-panel p-[15px]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const formGridClassName =
   "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
-const fieldCardClassName =
-  "flex flex-col gap-2 rounded-[10px] border border-border-main bg-[#141414] p-[14px]";
-const fieldLabelClassName = "text-[0.92em] tracking-[0.02em] text-accent-blue";
 const fieldInputClassName =
   "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 const sectionClassName = "mt-6 space-y-2.5";
@@ -141,13 +139,13 @@ function PersoPage({
 }) {
   if (!perso) {
     return (
-      <div className={panelClassName}>
-        <button className='mt-0' type='button' onClick={closePage}>
+      <Panel>
+        <Button className='mt-0' variant='muted' onClick={closePage}>
           ← Retour à l'Effectif
-        </button>
+        </Button>
         <h2>Personnage introuvable</h2>
         <p>Ce personnage a probablement été supprimé ou n'existe plus.</p>
-      </div>
+      </Panel>
     );
   }
 
@@ -283,12 +281,12 @@ function PersoPage({
   });
 
   return (
-    <div className={panelClassName}>
-      <button className='mt-0' type='button' onClick={closePage}>
+    <Panel>
+      <Button className='mt-0' variant='muted' onClick={closePage}>
         ← Retour à l'Effectif
-      </button>
+      </Button>
       <h2>Modifier {perso.nom || "le personnage"}</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         Poids total porté :{" "}
         <strong
           className={isOverweight ? "font-bold text-accent-red" : undefined}
@@ -300,7 +298,7 @@ function PersoPage({
           ? ` — sac équipé : ${equippedBag.name} (+${Number(equippedBag.capacite ?? 0).toFixed(2)})`
           : ""}
         {isOverweight ? " — surcharge, déplacement impossible" : ""}
-      </p>
+      </InfoText>
       <div className={formGridClassName}>
         {persoFields.map((field) => {
           const value = perso[field.key];
@@ -309,8 +307,7 @@ function PersoPage({
             : field.step;
 
           return (
-            <label key={field.key} className={fieldCardClassName}>
-              <span className={fieldLabelClassName}>{field.label}</span>
+            <Field key={field.key} label={field.label}>
               <input
                 className={`${fieldInputClassName} ${field.type === "number" ? "text-right" : ""}`}
                 type={field.type}
@@ -343,11 +340,10 @@ function PersoPage({
                     : undefined
                 }
               />
-            </label>
+            </Field>
           );
         })}
-        <label className={fieldCardClassName}>
-          <span className={fieldLabelClassName}>Groupe</span>
+        <Field label='Groupe'>
           <select
             className={fieldInputClassName}
             value={perso.groupId ?? ""}
@@ -366,33 +362,38 @@ function PersoPage({
               </option>
             ))}
           </select>
-        </label>
+        </Field>
       </div>
 
       <div className={sectionClassName}>
         <h3>Ressources portées</h3>
-        <p className={infoTextClassName}>
+        <InfoText>
           Chaque ressource portée ajoute son équivalent en poids, sauf `crd` qui
           a un poids nul : 1 ressource = 1 de poids, 0,1 ressource = 0,1 de
           poids, mais `crd` = 0.
-        </p>
+        </InfoText>
 
         {resources.length === 0 ? (
           <p>Aucune ressource disponible pour le moment.</p>
         ) : (
           <div className='grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3'>
             {orderedResources.map((resource) => (
-              <label key={resource.id} className={fieldCardClassName}>
-                <span className={fieldLabelClassName}>
-                  {resource.code?.toUpperCase() || "Ressource"}
-                  <span
-                    title={getResourceDisplayName(resource)}
-                    aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
-                    className='ml-1 inline-block h-[1.1rem] w-[1.1rem] cursor-help text-center text-[0.85rem] leading-[1.1rem]'
-                  >
-                    ❔
-                  </span>
-                </span>
+              <Field
+                key={resource.id}
+                className='min-w-0'
+                label={
+                  <>
+                    {resource.code?.toUpperCase() || "Ressource"}
+                    <span
+                      title={getResourceDisplayName(resource)}
+                      aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
+                      className='ml-1 inline-block h-[1.1rem] w-[1.1rem] cursor-help text-center text-[0.85rem] leading-[1.1rem]'
+                    >
+                      ❔
+                    </span>
+                  </>
+                }
+              >
                 <input
                   className={`${fieldInputClassName} text-right`}
                   type='number'
@@ -407,7 +408,7 @@ function PersoPage({
                     )
                   }
                 />
-              </label>
+              </Field>
             ))}
           </div>
         )}
@@ -415,10 +416,10 @@ function PersoPage({
 
       <div className={sectionClassName}>
         <h3>Armes portées</h3>
-        <p className={infoTextClassName}>
+        <InfoText>
           Sélectionne les armes portées par ce perso, puis choisis laquelle est
           équipée.
-        </p>
+        </InfoText>
 
         {armes.length === 0 ? (
           <p>Aucune arme disponible pour le moment.</p>
@@ -447,11 +448,11 @@ function PersoPage({
 
       <div className={sectionClassName}>
         <h3>Sacs portés</h3>
-        <p className={infoTextClassName}>
+        <InfoText>
           Un perso peut porter plusieurs sacs. Un seul sac équipé ajoute sa
           capacité au poids max, mais le poids de tous les sacs portés compte
           dans le poids total, équipés ou non.
-        </p>
+        </InfoText>
 
         {sacs.length === 0 ? (
           <p>Aucun sac disponible pour le moment.</p>
@@ -476,10 +477,10 @@ function PersoPage({
 
       <div className={sectionClassName}>
         <h3>Outils portés</h3>
-        <p className={infoTextClassName}>
+        <InfoText>
           Les bonus des outils s'appliquent automatiquement dès qu'ils sont
           portés par le personnage.
-        </p>
+        </InfoText>
 
         {outils.length === 0 ? (
           <p>Aucun outil disponible pour le moment.</p>
@@ -490,7 +491,7 @@ function PersoPage({
           />
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 

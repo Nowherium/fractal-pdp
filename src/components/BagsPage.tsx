@@ -1,4 +1,8 @@
 import type { Sac } from "../types";
+import { confirmAction } from "../utils/confirmAction";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 const bagFields: Array<{
   key: string;
@@ -17,9 +21,6 @@ const bagFields: Array<{
 const toInputValue = (value: unknown, fallback: string | number = "") =>
   typeof value === "string" || typeof value === "number" ? value : fallback;
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const inputClassName =
   "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 
@@ -40,13 +41,13 @@ function BagsPage({
   removeSac: (index: number) => void;
 }) {
   return (
-    <div className={panelClassName}>
+    <Panel>
       <h2>7. Administration des sacs</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         Gère ici les sacs disponibles pour les personnages. Un perso peut en
         porter plusieurs, un seul sac équipé ajoute sa capacité au poids max, et
         le poids de chaque sac porté compte dans le poids total.
-      </p>
+      </InfoText>
 
       {sacs.length === 0 ? (
         <p>Aucun sac défini pour le moment.</p>
@@ -96,13 +97,19 @@ function BagsPage({
                   </td>
                 ))}
                 <td>
-                  <button
-                    className='btn-del mt-0'
-                    type='button'
-                    onClick={() => removeSac(index)}
+                  <Button
+                    className='mt-0'
+                    size='sm'
+                    variant='danger'
+                    onClick={() =>
+                      confirmAction(
+                        `Supprimer le sac ${sac.name || "sélectionné"} ?`,
+                        () => removeSac(index),
+                      )
+                    }
                   >
                     Supprimer
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -110,10 +117,10 @@ function BagsPage({
         </table>
       )}
 
-      <button className='btn-add mt-3' type='button' onClick={addSac}>
+      <Button className='mt-3' variant='success' onClick={addSac}>
         + Ajouter un sac
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 

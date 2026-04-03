@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 
 import TimelineOverrideEditor from "./TimelineOverrideEditor";
+import Button from "./ui/Button";
 
 import { DRUG_EFFECTS, formatDrugQuantity } from "../utils/drugEffects";
 import type { TimelineRow, TimelineSegment } from "../utils/timelineTypes";
@@ -227,14 +228,15 @@ function TimelineRowEditor({
           {row.mortText}
         </td>
         <td>
-          <button
-            className={`btn-gear ${row.hasOverride ? "danger" : ""}`}
-            type='button'
+          <Button
+            className='mt-0 min-w-[2.1rem]'
+            size='sm'
+            variant={row.hasOverride ? "danger" : "muted"}
             disabled={isPastLune}
             onClick={() => toggleOverrideMenu(actualLuneIndex, row.persoId)}
           >
             ⚙️
-          </button>
+          </Button>
         </td>
       </tr>
       {openOverrides[overrideKey] && (

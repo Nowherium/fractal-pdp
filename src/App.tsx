@@ -4,6 +4,7 @@ import SaveBar from "./components/SaveBar";
 import PageTabs from "./components/PageTabs";
 import ReservePage from "./components/ReservePage";
 import ResourcesPage from "./components/ResourcesPage";
+import Button from "./components/ui/Button";
 import EffectifPage from "./components/EffectifPage";
 import PersoPage from "./components/PersoPage";
 import GroupPage from "./components/GroupPage";
@@ -489,31 +490,34 @@ function App() {
 
       <div className='mb-4 flex flex-wrap items-center justify-center gap-3'>
         <div className='flex flex-wrap gap-2'>
-          <button
-            className='btn-add mt-0'
-            type='button'
+          <Button
+            className='mt-0'
+            size='sm'
+            variant='success'
             disabled={!canShowMorePastLunes}
             onClick={handleShowPastLunes}
           >
             ⏪ Lunes passées
             {visiblePastLunes > 0 ? ` (${visiblePastLunes})` : ""}
-          </button>
-          <button
-            className='btn-add mt-0'
-            type='button'
+          </Button>
+          <Button
+            className='mt-0'
+            size='sm'
+            variant='success'
             disabled={!canShowLessPastLunes}
             onClick={handleHidePastLunes}
           >
             ⏩ Lunes suivantes
-          </button>
-          <button
-            className='btn-add mt-0'
-            type='button'
+          </Button>
+          <Button
+            className='mt-0'
+            size='sm'
+            variant='success'
             disabled={!canShowLessPastLunes}
             onClick={handleBackToCurrentLune}
           >
             🎯 Lune courante
-          </button>
+          </Button>
         </div>
 
         <label className='inline-flex items-center gap-2.5 rounded-lg border border-[#3a3a3a] bg-[#161616] px-[14px] py-2.5 font-bold text-accent-blue'>
@@ -528,13 +532,14 @@ function App() {
           />
         </label>
 
-        <button
-          className='btn-add mt-0'
-          type='button'
+        <Button
+          className='mt-0'
+          size='sm'
+          variant='success'
           onClick={handleAdvanceTurn}
         >
           ⏭️ Passer le tour
-        </button>
+        </Button>
       </div>
 
       <PageTabs pages={pages} currentPage={page} setPage={setPage} />

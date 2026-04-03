@@ -3,7 +3,11 @@ import type {
   LuneConstruction,
   Resource,
 } from "../types";
+import { confirmAction } from "../utils/confirmAction";
 import type { ConstructionState } from "../utils/timelineTypes";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 const rewardOptions: Array<{
   value: LuneConstruction["rewardType"];
@@ -46,9 +50,6 @@ const getStatusClassName = (
   return "text-accent-blue";
 };
 
-const panelClassName =
-  "mb-5 rounded-lg border border-border-strong bg-panel p-[15px]";
-const infoTextClassName = "mb-2.5 text-[0.85em] italic text-[#888]";
 const inputClassName =
   "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 const numberInputClassName = `${inputClassName} text-right`;
@@ -78,15 +79,15 @@ function ChantiersPage({
     resources.length > 0 ? resources : [{ id: 0, code: "mat", name: "MAT" }];
 
   return (
-    <div className={panelClassName}>
+    <Panel>
       <h2>4. Administration des chantiers</h2>
-      <p className={infoTextClassName}>
+      <InfoText>
         Les chantiers sont définis ici une seule fois. Ici,
         <strong> À faire</strong> signifie <strong>posé nulle part</strong>,
         <strong> En cours</strong> pose le chantier à partir de la
         <strong> lune courante</strong>, et <strong>Terminé</strong> le masque
         des lunes suivantes jusqu’à réouverture.
-      </p>
+      </InfoText>
 
       {constructions.length === 0 ? (
         <p>Aucun chantier défini pour le moment.</p>
@@ -223,18 +224,24 @@ function ChantiersPage({
                         progress?.status ?? construction.status,
                       )}
                     </div>
-                    <div className='mt-1 text-[0.85em] italic text-[#888]'>
+                    <InfoText className='mt-1 mb-0'>
                       {state?.statusLabel || "Appliqué à la timeline."}
-                    </div>
+                    </InfoText>
                   </td>
                   <td>
-                    <button
-                      className='btn-del mt-0'
-                      type='button'
-                      onClick={() => removeConstruction(construction.id)}
+                    <Button
+                      className='mt-0'
+                      size='sm'
+                      variant='danger'
+                      onClick={() =>
+                        confirmAction(
+                          `Supprimer le chantier ${construction.name || "sélectionné"} ?`,
+                          () => removeConstruction(construction.id),
+                        )
+                      }
                     >
                       Supprimer
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               );
@@ -243,10 +250,10 @@ function ChantiersPage({
         </table>
       )}
 
-      <button className='btn-add mt-3' type='button' onClick={addConstruction}>
+      <Button className='mt-3' variant='success' onClick={addConstruction}>
         + Ajouter un chantier
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 
