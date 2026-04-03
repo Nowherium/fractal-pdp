@@ -1,4 +1,56 @@
-import React from "react";
+import { Fragment } from "react";
+
+import type { Lune, Ration } from "../types";
+import { DRUG_EFFECTS, formatDrugQuantity } from "../utils/drugEffects";
+
+type TimelineRow = {
+  persoId: number;
+  nom: string;
+  ration: Ration;
+  mortAuDebut: boolean;
+  cDebut: {
+    eau: number;
+    nrt: number;
+    med: number;
+    mat: number;
+    art?: number;
+  };
+  classPv?: string;
+  pvDisplayDebut: string | number;
+  pvDisplayFin: string | number;
+  mortText?: string;
+  hasOverride?: boolean;
+  availableDrugs: Record<string, number>;
+  drugStatus?: string;
+  drugClassName?: string;
+};
+
+type TimelineStats = {
+  classEau: string;
+  stockEau: number;
+  classNrt: string;
+  stockNrt: number;
+  classMed: string;
+  stockMed: number;
+  classMat: string;
+  stockMat: number;
+};
+
+type TimelineSegment = {
+  lune: Lune;
+  rows: TimelineRow[];
+  stats: TimelineStats;
+};
+
+const weatherFields: Array<{
+  key: "eau" | "nrt" | "med" | "mat";
+  label: string;
+}> = [
+  { key: "eau", label: "💧 Eau" },
+  { key: "nrt", label: "🍗 Nrt" },
+  { key: "med", label: "💊 Med" },
+  { key: "mat", label: "🧱 Mat" },
+];
 
 function TimelinePage({
   timelineData,
@@ -10,10 +62,41 @@ function TimelinePage({
   setOverride,
   clearOverrides,
   addLune,
+}: {
+  timelineData: TimelineSegment[];
+  removeLune: (luneIndex: number) => void;
+  updateLuneGlobal: (
+    luneIndex: number,
+    field: string,
+    rawValue: string | number,
+  ) => void;
+  updateRation: (
+    luneIndex: number,
+    persoId: number,
+    field: "tache" | "eau" | "nrt" | "med" | "drogue",
+    value: string | boolean,
+  ) => void;
+  toggleOverrideMenu: (luneIndex: number, persoId: number) => void;
+  openOverrides: Record<string, boolean>;
+  setOverride: (
+    luneIndex: number,
+    persoId: number,
+    field: string,
+    rawValue: string | number,
+  ) => void;
+  clearOverrides: (luneIndex: number, persoId: number) => void;
+  addLune: () => void;
 }) {
   return (
     <>
       <h2>3. Ligne du Temps & Assignations</h2>
+      <p className='info-text'>
+        Chaque perso peut consommer <strong>une seule drogue par lune</strong>.
+        L'effet n'est appliqué que si la ressource est bien portée en quantité
+        suffisante. La <strong>météo</strong> de chaque lune définit
+        <strong> 4 coefficients</strong> distincts pour `eau`, `nrt`, `med` et
+        `mat`, chacun entre <strong>0</strong> et <strong>1</strong>.
+      </p>
       <div id='timeline'>
         {timelineData.map((segment, luneIndex) => (
           <div className='panel lune-panel' key={segment.lune.id}>
@@ -52,6 +135,38 @@ function TimelinePage({
                   }
                 />
               </label>
+              <div
+                style={{
+                  marginTop: "10px",
+                  paddingTop: "10px",
+                  borderTop: "1px solid #333",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                  gap: "8px",
+                  width: "100%",
+                }}
+              >
+                {weatherFields.map((field) => (
+                  <label key={field.key}>
+                    🌦️ {field.label} :
+                    <input
+                      type='number'
+                      className='input-global'
+                      value={segment.lune.meteo?.[field.key] ?? 1}
+                      min='0'
+                      max='1'
+                      step='0.05'
+                      onChange={(event) =>
+                        updateLuneGlobal(
+                          luneIndex,
+                          `meteo.${field.key}`,
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
             </div>
 
             <table>
@@ -60,6 +175,7 @@ function TimelinePage({
                   <th>Nom</th>
                   <th>PV Début</th>
                   <th style={{ backgroundColor: "#113333" }}>TÂCHE</th>
+                  <th>Drogue (1 max)</th>
                   <th>Boit (-1)</th>
                   <th>Mange (-1)</th>
                   <th>Med (-0.5)</th>
@@ -69,7 +185,7 @@ function TimelinePage({
               </thead>
               <tbody>
                 {segment.rows.map((row) => (
-                  <React.Fragment key={`${segment.lune.id}-${row.persoId}`}>
+                  <Fragment key={`${segment.lune.id}-${row.persoId}`}>
                     <tr className={row.mortAuDebut ? "dead" : ""}>
                       <td>{row.nom}</td>
                       <td>{row.pvDisplayDebut}</td>
@@ -100,7 +216,68 @@ function TimelinePage({
                           <option value='mat'>
                             🧱 Mat ({row.cDebut.mat.toFixed(2)})
                           </option>
+                          <option value='construire'>🛠️ Construire</option>
                         </select>
+                      </td>
+                      <td>
+                        <select
+                          value={row.ration.drogue ?? ""}
+                          disabled={row.mortAuDebut}
+                          style={{ width: "100%" }}
+                          onChange={(event) =>
+                            updateRation(
+                              luneIndex,
+                              row.persoId,
+                              "drogue",
+                              event.target.value,
+                            )
+                          }
+                        >
+                          <option value=''>Aucune</option>
+                          {Object.entries(DRUG_EFFECTS).map(
+                            ([code, effect]) => {
+                              const remaining = Number(
+                                row.availableDrugs[code] ?? 0,
+                              );
+                              const required = Number(
+                                effect.consumptionQuantity ?? 1,
+                              );
+                              const requiresResource =
+                                effect.requiresResource !== false;
+                              return (
+                                <option
+                                  key={code}
+                                  value={code}
+                                  disabled={
+                                    requiresResource &&
+                                    remaining < required &&
+                                    row.ration.drogue !== code
+                                  }
+                                >
+                                  {effect.label} (
+                                  {requiresResource
+                                    ? `-${formatDrugQuantity(required)} • ${formatDrugQuantity(remaining)} dispo`
+                                    : "hors inventaire"}
+                                  )
+                                </option>
+                              );
+                            },
+                          )}
+                        </select>
+                        {row.drugStatus ? (
+                          <div
+                            style={{
+                              marginTop: "0.25rem",
+                              fontSize: "0.75rem",
+                              color:
+                                row.drugClassName === "warning"
+                                  ? "#ffb74d"
+                                  : "#69f0ae",
+                            }}
+                          >
+                            {row.drugStatus}
+                          </div>
+                        ) : null}
                       </td>
                       <td>
                         <input
@@ -165,7 +342,7 @@ function TimelinePage({
                     </tr>
                     {openOverrides[`${luneIndex}-${row.persoId}`] && (
                       <tr className='override-row'>
-                        <td colSpan='8'>
+                        <td colSpan={9}>
                           <div
                             style={{
                               color: "#00bcd4",
@@ -266,7 +443,7 @@ function TimelinePage({
                         </td>
                       </tr>
                     )}
-                  </React.Fragment>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

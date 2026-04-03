@@ -1,6 +1,14 @@
-import React from "react";
+import type { AppPage, PageTab } from "../types";
 
-function PageTabs({ pages, currentPage, setPage }) {
+function PageTabs({
+  pages,
+  currentPage,
+  setPage,
+}: {
+  pages: PageTab[];
+  currentPage: AppPage;
+  setPage: (page: AppPage) => void;
+}) {
   return (
     <div
       style={{

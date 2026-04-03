@@ -197,7 +197,7 @@ button:disabled {
   border-radius: 4px;
   border-left: 3px solid #ffb74d;
   margin-top: 10px;
-  display: inline-block;
+  display: block;
 }
 
 .save-bar {
@@ -249,6 +249,42 @@ input[type="file"] {
   padding: 5px 10px;
   border-radius: 4px;
   border: 1px solid #444;
+}
+
+.perso-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.perso-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #333;
+  border-radius: 10px;
+  background: #141414;
+}
+
+.perso-field-label {
+  font-size: 0.92em;
+  color: #81d4fa;
+  letter-spacing: 0.02em;
+}
+
+.perso-field-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: #111;
+  color: #f1f1f1;
+  border: 1px solid #444;
+  border-radius: 8px;
+}
+
+.perso-field-input[type="number"] {
+  text-align: right;
 }
 
 @media (max-width: 900px) {
