@@ -1,13 +1,9 @@
-import type { LuneConstruction, Resource } from "../types";
-
-type ConstructionState = {
-  assignedBuilders?: number;
-  buildersRequired?: number;
-  statusLabel?: string;
-  isCompleted?: boolean;
-  statusCode?: "todo" | "in-progress" | "done";
-  remainingBuilders?: number;
-};
+import type {
+  ConstructionProgressById,
+  LuneConstruction,
+  Resource,
+} from "../types";
+import type { ConstructionState } from "../utils/timelineTypes";
 
 const rewardOptions: Array<{
   value: LuneConstruction["rewardType"];
@@ -53,6 +49,7 @@ const getStatusClassName = (
 function ChantiersPage({
   constructions,
   resources,
+  constructionProgress,
   constructionStates,
   addConstruction,
   updateConstruction,
@@ -60,6 +57,7 @@ function ChantiersPage({
 }: {
   constructions: LuneConstruction[];
   resources: Resource[];
+  constructionProgress: ConstructionProgressById;
   constructionStates: Record<string, ConstructionState>;
   addConstruction: () => void;
   updateConstruction: (
@@ -101,6 +99,7 @@ function ChantiersPage({
           <tbody>
             {constructions.map((construction) => {
               const state = constructionStates?.[construction.id];
+              const progress = constructionProgress?.[construction.id];
 
               return (
                 <tr key={construction.id}>
@@ -191,7 +190,7 @@ function ChantiersPage({
                   <td>
                     <select
                       className='perso-field-input'
-                      value={construction.status ?? "todo"}
+                      value={progress?.status ?? construction.status ?? "todo"}
                       onChange={(event) =>
                         updateConstruction(
                           construction.id,
@@ -207,10 +206,16 @@ function ChantiersPage({
                       ))}
                     </select>
                     <div
-                      className={getStatusClassName(state, construction.status)}
+                      className={getStatusClassName(
+                        state,
+                        progress?.status ?? construction.status,
+                      )}
                       style={{ marginTop: "0.4rem" }}
                     >
-                      {getStatusLabel(state, construction.status)}
+                      {getStatusLabel(
+                        state,
+                        progress?.status ?? construction.status,
+                      )}
                     </div>
                     <div className='info-text' style={{ marginTop: "0.3rem" }}>
                       {state?.statusLabel || "Appliqué à la timeline."}

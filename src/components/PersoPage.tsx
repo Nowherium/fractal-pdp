@@ -87,7 +87,7 @@ function PersoPage({
   handlePersoUpdate: (
     persoId: number,
     field: string,
-    rawValue: string | number | null,
+    rawValue: string | number | boolean | null,
     options?: { persist?: boolean },
   ) => void;
   handlePersoResourceUpdate: (
@@ -507,8 +507,10 @@ function PersoPage({
                   />
                   <span>
                     {outil.name} (x{outil.bonus}{" "}
-                    {specialiteLabels[outil.specialite] || outil.specialite}) •{" "}
-                    {assignedCount}/{maxQuantity} attribué(s)
+                    {specialiteLabels[outil.specialite ?? "eau"] ||
+                      outil.specialite ||
+                      "eau"}
+                    ) • {assignedCount}/{maxQuantity} attribué(s)
                     {isUnavailable ? " — indisponible" : ""}
                   </span>
                 </label>

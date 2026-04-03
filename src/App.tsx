@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import SaveBar from "./components/SaveBar";
 import PageTabs from "./components/PageTabs";
@@ -14,8 +14,16 @@ import TimelinePage from "./components/TimelinePage";
 import WeaponsPage from "./components/WeaponsPage";
 import ToolsPage from "./components/ToolsPage";
 import BagsPage from "./components/BagsPage";
-import { defaultRation, normalizeCurrentLune } from "./utils/stateUtils";
-import { simulateTimeline } from "./utils/timelineUtils";
+import {
+  buildConstructionProgressById,
+  createLune,
+  defaultRation,
+  getPlacedConstructionIdsForLune,
+  normalizeConstructionPlacements,
+  normalizeCurrentLune,
+  syncLuneConstructionPlacements,
+} from "./utils/stateUtils";
+import { simulateTimeline } from "./utils/timelineSimulation";
 import {
   exportStateData,
   importStateFile,
@@ -135,6 +143,41 @@ function App() {
     setPersos,
   });
 
+  const [visiblePastLunes, setVisiblePastLunes] = useState<number>(0);
+
+  useEffect(() => {
+    const targetCurrentLune = Math.max(1, Number(currentLune ?? 1));
+    const maxLuneId = lunes.reduce(
+      (maxValue, lune) => Math.max(maxValue, Number(lune.id) || 0),
+      0,
+    );
+
+    if (maxLuneId >= targetCurrentLune) {
+      return;
+    }
+
+    const nextLunes = [...lunes];
+
+    for (let luneId = maxLuneId + 1; luneId <= targetCurrentLune; luneId += 1) {
+      const inheritedPlacedConstructionIds = getPlacedConstructionIdsForLune(
+        nextLunes[nextLunes.length - 1],
+      ).filter((id) => constructions.some((item) => item.id === id));
+
+      const newLune = syncLuneConstructionPlacements({
+        ...createLune(persos, luneId),
+        constructionPlacements: normalizeConstructionPlacements(
+          inheritedPlacedConstructionIds,
+          luneId,
+        ),
+      });
+
+      nextLunes.push(newLune);
+      saveLuneEntity(newLune);
+    }
+
+    setLunes(nextLunes);
+  }, [currentLune, lunes, persos, constructions, setLunes, saveLuneEntity]);
+
   const handleStockChange = (field: string, rawValue: string | number) => {
     const value = Number(rawValue) || 0;
     setStocks((previous: Record<string, number>) => ({
@@ -160,6 +203,7 @@ function App() {
 
   const handleCurrentLuneChange = (rawValue: string | number) => {
     const nextCurrentLune = normalizeCurrentLune(rawValue);
+    setVisiblePastLunes(0);
     setCurrentLune(nextCurrentLune);
     saveCurrentLuneEntity(nextCurrentLune);
   };
@@ -226,6 +270,7 @@ function App() {
     persos,
     constructions,
     lunes,
+    currentLune,
     setConstructions,
     setLunes,
     setOpenOverrides,
@@ -292,12 +337,18 @@ function App() {
     savePersoSacsEntity,
   });
 
+  const constructionProgress = useMemo(
+    () => buildConstructionProgressById(constructions, lunes, currentLune),
+    [constructions, lunes, currentLune],
+  );
+
   const exportData = () =>
     exportStateData({
       resources,
       persos,
       persoResources,
       constructions,
+      constructionProgress,
       lunes,
       currentLune,
       nextPersoId,
@@ -335,6 +386,8 @@ function App() {
         resources,
         persoResources,
         cityMultipliers,
+        currentLune,
+        constructionProgress,
       ),
     [
       persos,
@@ -344,8 +397,66 @@ function App() {
       resources,
       persoResources,
       cityMultipliers,
+      currentLune,
+      constructionProgress,
     ],
   );
+
+  const currentTimelineSegment = useMemo(
+    () =>
+      timelineData.find(
+        (segment) => Number(segment.lune.id) === Number(currentLune),
+      ) || null,
+    [timelineData, currentLune],
+  );
+
+  const earliestVisibleLune = Math.max(
+    1,
+    Number(currentLune ?? 1) - visiblePastLunes,
+  );
+
+  const visibleTimelineData = useMemo(
+    () =>
+      timelineData
+        .map((segment, actualIndex) => ({ ...segment, actualIndex }))
+        .filter(
+          (segment) => Number(segment.lune.id) >= Number(earliestVisibleLune),
+        ),
+    [timelineData, earliestVisibleLune],
+  );
+
+  const canShowMorePastLunes = visiblePastLunes < Number(currentLune ?? 1) - 1;
+  const canShowLessPastLunes = visiblePastLunes > 0;
+
+  const handleShowPastLunes = () => {
+    setVisiblePastLunes((previous) =>
+      Math.min(Math.max(0, Number(currentLune ?? 1) - 1), previous + 1),
+    );
+  };
+
+  const handleHidePastLunes = () => {
+    setVisiblePastLunes((previous) => Math.max(0, previous - 1));
+  };
+
+  const handleBackToCurrentLune = () => {
+    setVisiblePastLunes(0);
+  };
+
+  const handleAdvanceTurn = () => {
+    const nextCurrentLune = Number(currentLune ?? 1) + 1;
+    const maxLuneId = lunes.reduce(
+      (maxValue, lune) => Math.max(maxValue, Number(lune.id) || 0),
+      0,
+    );
+
+    if (maxLuneId < nextCurrentLune) {
+      addLune();
+    }
+
+    setVisiblePastLunes(0);
+    setCurrentLune(nextCurrentLune);
+    saveCurrentLuneEntity(nextCurrentLune);
+  };
 
   const pages: PageTab[] = [
     { key: "reserve", label: "1. Ville" },
@@ -373,6 +484,34 @@ function App() {
       {loadError ? <div className='info-text'>{loadError}</div> : null}
 
       <div className='current-lune-bar'>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <button
+            className='btn-add current-lune-action'
+            type='button'
+            disabled={!canShowMorePastLunes}
+            onClick={handleShowPastLunes}
+          >
+            ⏪ Lunes passées
+            {visiblePastLunes > 0 ? ` (${visiblePastLunes})` : ""}
+          </button>
+          <button
+            className='btn-add current-lune-action'
+            type='button'
+            disabled={!canShowLessPastLunes}
+            onClick={handleHidePastLunes}
+          >
+            ⏩ Lunes suivantes
+          </button>
+          <button
+            className='btn-add current-lune-action'
+            type='button'
+            disabled={!canShowLessPastLunes}
+            onClick={handleBackToCurrentLune}
+          >
+            🎯 Lune courante
+          </button>
+        </div>
+
         <label className='current-lune-label'>
           🌘 Lune actuelle
           <input
@@ -384,6 +523,14 @@ function App() {
             onChange={(event) => handleCurrentLuneChange(event.target.value)}
           />
         </label>
+
+        <button
+          className='btn-add current-lune-action'
+          type='button'
+          onClick={handleAdvanceTurn}
+        >
+          ⏭️ Passer le tour
+        </button>
       </div>
 
       <PageTabs pages={pages} currentPage={page} setPage={setPage} />
@@ -481,7 +628,8 @@ function App() {
         <ChantiersPage
           constructions={constructions}
           resources={resources}
-          constructionStates={timelineData[0]?.constructionStates || {}}
+          constructionProgress={constructionProgress}
+          constructionStates={currentTimelineSegment?.constructionStates || {}}
           addConstruction={addConstruction}
           updateConstruction={updateConstruction}
           removeConstruction={removeConstruction}
@@ -493,7 +641,7 @@ function App() {
           currentLune={currentLune}
           resources={resources}
           constructions={constructions}
-          timelineData={timelineData}
+          timelineData={visibleTimelineData}
           removeLune={removeLune}
           updateLuneGlobal={updateLuneGlobal}
           updateRation={updateRation}

@@ -1,8 +1,47 @@
+import type { Dispatch, SetStateAction } from "react";
+import type {
+  AppPage,
+  Group,
+  Lune,
+  Perso,
+  PersoResource,
+  Resource,
+  Sac,
+} from "../types";
 import {
   recalculateGroups,
   validateGroupCapacities,
 } from "../utils/groupUtils";
 import { defaultRation, normalizePersoFieldValue } from "../utils/stateUtils";
+
+type PersistOptions = {
+  persist?: boolean;
+};
+
+interface UsePersoActionsParams {
+  persos: Perso[];
+  groups: Group[];
+  resources: Resource[];
+  sacs: Sac[];
+  persoResources: PersoResource[];
+  lunes: Lune[];
+  nextPersoId: number;
+  setPersos: Dispatch<SetStateAction<Perso[]>>;
+  setGroups: Dispatch<SetStateAction<Group[]>>;
+  setPersoResources: Dispatch<SetStateAction<PersoResource[]>>;
+  setLunes: Dispatch<SetStateAction<Lune[]>>;
+  setPage: Dispatch<SetStateAction<AppPage>>;
+  setSelectedPersoId: Dispatch<SetStateAction<number | null>>;
+  setOpenOverrides: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setNextPersoId: Dispatch<SetStateAction<number>>;
+  savePersoEntity: (perso: Perso) => void;
+  deletePersoEntity: (persoId: number) => void;
+  savePersoResourcesEntity: (
+    persoId: number,
+    nextPersoResources: PersoResource[],
+  ) => void;
+  saveLuneEntity: (lune: Lune) => void;
+}
 
 export const usePersoActions = ({
   persos,
@@ -24,8 +63,8 @@ export const usePersoActions = ({
   deletePersoEntity,
   savePersoResourcesEntity,
   saveLuneEntity,
-}) => {
-  const openPersoPage = (persoId) => {
+}: UsePersoActionsParams) => {
+  const openPersoPage = (persoId: number) => {
     setSelectedPersoId(persoId);
     setPage("perso");
   };
@@ -36,10 +75,10 @@ export const usePersoActions = ({
   };
 
   const handlePersoUpdateById = (
-    persoId,
-    field,
-    rawValue,
-    { persist = true } = {},
+    persoId: number,
+    field: string,
+    rawValue: string | number | boolean | null,
+    { persist = true }: PersistOptions = {},
   ) => {
     const nextPersos = persos.map((perso) => {
       if (perso.id !== persoId) {
@@ -80,7 +119,11 @@ export const usePersoActions = ({
     }
   };
 
-  const handlePersoResourceUpdate = (persoId, resourceId, rawValue) => {
+  const handlePersoResourceUpdate = (
+    persoId: number,
+    resourceId: number,
+    rawValue: string | number,
+  ) => {
     const quantity = Math.max(0, Number(rawValue) || 0);
 
     const remainingEntries = persoResources.filter(
@@ -156,7 +199,7 @@ export const usePersoActions = ({
     nextLunes.forEach((lune) => saveLuneEntity(lune));
   };
 
-  const removePerso = (index) => {
+  const removePerso = (index: number) => {
     const persoToRemove = persos[index];
     if (!persoToRemove) return;
 

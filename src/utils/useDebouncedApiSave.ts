@@ -1,16 +1,31 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, type MutableRefObject } from "react";
 import { saveEntity } from "./api";
+
+type SaveStatusSetter = (status: string) => void;
+type HttpMethod = "PATCH" | "PUT" | "DELETE";
+
+interface UseDebouncedApiSaveParams {
+  ready: boolean;
+  isHydratingRef: MutableRefObject<boolean>;
+  setSaveStatus: SaveStatusSetter;
+  delay?: number;
+}
 
 export const useDebouncedApiSave = ({
   ready,
   isHydratingRef,
   setSaveStatus,
   delay = 400,
-}) => {
-  const saveTimers = useRef({});
+}: UseDebouncedApiSaveParams) => {
+  const saveTimers = useRef<Record<string, number>>({});
 
   return useCallback(
-    (key, endpoint, payload, method = "PATCH") => {
+    (
+      key: string,
+      endpoint: string,
+      payload?: unknown,
+      method: HttpMethod = "PATCH",
+    ) => {
       if (!ready || isHydratingRef.current) {
         return undefined;
       }
@@ -31,7 +46,9 @@ export const useDebouncedApiSave = ({
           }, 2000);
         } catch (error) {
           console.error(error);
-          setSaveStatus(error?.message || "Erreur de sauvegarde");
+          setSaveStatus(
+            error instanceof Error ? error.message : "Erreur de sauvegarde",
+          );
         }
       }, delay);
 

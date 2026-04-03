@@ -1,65 +1,96 @@
-import type { LuneConstruction, Ration } from "../types";
+import type { Dispatch, SetStateAction } from "react";
+import type { Lune, LuneConstruction, Perso, Ration } from "../types";
 import {
   createLune,
   defaultRation,
   defaultWeatherCoefficients,
+  getPlacedConstructionIdsForLune,
+  normalizeConstructionPlacements,
   normalizeWeatherCoefficient,
   normalizeWeatherCoefficients,
   syncConstructionStatusesWithLunes,
+  syncLuneConstructionPlacements,
 } from "../utils/stateUtils";
 
-const sanitizeConstructions = (constructions = [], lunes = []) =>
-  syncConstructionStatusesWithLunes(constructions, lunes);
+const sanitizeConstructions = (
+  constructions: Array<Partial<LuneConstruction>> = [],
+  lunes: Lune[] = [],
+  currentLune = 1,
+): LuneConstruction[] =>
+  syncConstructionStatusesWithLunes(constructions, lunes, currentLune);
+
+interface UseTimelineActionsParams {
+  persos: Perso[];
+  constructions: LuneConstruction[];
+  lunes: Lune[];
+  currentLune: number;
+  setConstructions: Dispatch<SetStateAction<LuneConstruction[]>>;
+  setLunes: Dispatch<SetStateAction<Lune[]>>;
+  setOpenOverrides: Dispatch<SetStateAction<Record<string, boolean>>>;
+  saveLuneEntity: (lune: Lune) => void;
+  deleteLuneEntity: (luneId: number) => void;
+  saveConstructionsEntity: (constructions: LuneConstruction[]) => void;
+}
 
 export const useTimelineActions = ({
   persos,
   constructions,
   lunes,
+  currentLune,
   setConstructions,
   setLunes,
   setOpenOverrides,
   saveLuneEntity,
   deleteLuneEntity,
   saveConstructionsEntity,
-}) => {
+}: UseTimelineActionsParams) => {
+  const isPastLuneIndex = (luneIndex: number) =>
+    Number(lunes[luneIndex]?.id ?? 0) < Number(currentLune ?? 1);
+
   const addLune = () => {
     const nextLuneId =
       lunes.reduce(
         (maxLuneId, lune) => Math.max(maxLuneId, Number(lune.id) || 0),
         0,
       ) + 1;
-    const inheritedPlacedConstructionIds = Array.isArray(
-      lunes[lunes.length - 1]?.placedConstructionIds,
-    )
-      ? lunes[lunes.length - 1].placedConstructionIds
-          .map(String)
-          .filter((id) =>
-            (constructions || []).some(
-              (item) => item.id === id && item.status !== "done",
-            ),
-          )
-      : [];
-    const newLune = {
+    const inheritedPlacedConstructionIds = getPlacedConstructionIdsForLune(
+      lunes[lunes.length - 1],
+    ).filter((id) =>
+      (constructions || []).some(
+        (item) => item.id === id && item.status !== "done",
+      ),
+    );
+    const newLune = syncLuneConstructionPlacements({
       ...createLune(persos, nextLuneId),
-      placedConstructionIds: inheritedPlacedConstructionIds,
-    };
+      constructionPlacements: normalizeConstructionPlacements(
+        inheritedPlacedConstructionIds,
+        nextLuneId,
+      ),
+    });
     setLunes((previous) => [...previous, newLune]);
     saveLuneEntity(newLune);
   };
 
-  const removeLune = (index) => {
-    if (index === 0) {
+  const removeLune = (index: number) => {
+    const luneToRemove = lunes[index];
+    if (!luneToRemove || Number(luneToRemove.id) <= Number(currentLune ?? 1)) {
       return;
     }
-
-    const luneToRemove = lunes[index];
-    if (!luneToRemove) return;
 
     setLunes((previous) => previous.filter((_, idx) => idx !== index));
     deleteLuneEntity(luneToRemove.id);
   };
 
-  const updateRation = (luneIndex, persoId, field, value) => {
+  const updateRation = (
+    luneIndex: number,
+    persoId: number,
+    field: "tache" | "eau" | "nrt" | "med" | "drogue" | "constructionId",
+    value: string | boolean,
+  ) => {
+    if (isPastLuneIndex(luneIndex)) {
+      return;
+    }
+
     const nextLunes = lunes.map((lune, idx) => {
       if (idx !== luneIndex) return lune;
       const current = lune.rations[persoId] || defaultRation();
@@ -104,7 +135,9 @@ export const useTimelineActions = ({
   };
 
   const addConstruction = () => {
-    const existingConstructions = Array.isArray(constructions)
+    const existingConstructions: LuneConstruction[] = Array.isArray(
+      constructions,
+    )
       ? constructions
       : [];
     const nextConstructionId =
@@ -128,37 +161,45 @@ export const useTimelineActions = ({
         },
       ],
       lunes,
+      currentLune,
     );
 
     setConstructions(nextConstructions);
     saveConstructionsEntity(nextConstructions);
   };
 
-  const updateConstruction = (constructionId, field, rawValue) => {
+  const updateConstruction = (
+    constructionId: string,
+    field: string,
+    rawValue: string | number,
+  ) => {
     if (field === "status") {
-      const nextStatus =
+      const nextStatus: "todo" | "in-progress" | "done" =
         rawValue === "done" || rawValue === "in-progress" ? rawValue : "todo";
-      const nextLunes = lunes.map((lune, idx) => {
-        const currentIds = Array.isArray(lune.placedConstructionIds)
-          ? lune.placedConstructionIds.map(String)
-          : [];
+      const nextLunes = lunes.map((lune) => {
+        const currentIds = getPlacedConstructionIdsForLune(lune);
 
-        if (nextStatus === "in-progress" && idx >= 0) {
-          return {
+        if (
+          nextStatus === "in-progress" &&
+          Number(lune.id ?? 0) >= Number(currentLune ?? 1)
+        ) {
+          return syncLuneConstructionPlacements({
             ...lune,
-            placedConstructionIds: Array.from(
-              new Set([...currentIds, String(constructionId)]),
+            constructionPlacements: normalizeConstructionPlacements(
+              Array.from(new Set([...currentIds, String(constructionId)])),
+              Number(lune.id ?? currentLune ?? 1),
             ),
-          };
+          });
         }
 
         if (nextStatus === "todo" || nextStatus === "done") {
-          return {
+          return syncLuneConstructionPlacements({
             ...lune,
-            placedConstructionIds: currentIds.filter(
-              (id) => id !== String(constructionId),
+            constructionPlacements: normalizeConstructionPlacements(
+              currentIds.filter((id) => id !== String(constructionId)),
+              Number(lune.id ?? currentLune ?? 1),
             ),
-          };
+          });
         }
 
         return lune;
@@ -171,6 +212,7 @@ export const useTimelineActions = ({
             : { ...construction, status: nextStatus },
         ),
         nextLunes,
+        currentLune,
       ).map((construction) =>
         construction.id === constructionId
           ? { ...construction, status: nextStatus }
@@ -199,13 +241,14 @@ export const useTimelineActions = ({
             },
       ),
       lunes,
+      currentLune,
     );
 
     setConstructions(nextConstructions);
     saveConstructionsEntity(nextConstructions);
   };
 
-  const removeConstruction = (constructionId) => {
+  const removeConstruction = (constructionId: string) => {
     const constructionToRemove = (constructions || []).find(
       (construction) => construction.id === constructionId,
     );
@@ -225,6 +268,7 @@ export const useTimelineActions = ({
         (construction) => construction.id !== constructionId,
       ),
       lunes,
+      currentLune,
     );
 
     const nextLunes = lunes.map((lune) => {
@@ -244,13 +288,16 @@ export const useTimelineActions = ({
         }),
       );
 
-      return {
+      return syncLuneConstructionPlacements({
         ...lune,
         rations: nextRations,
-        placedConstructionIds: Array.isArray(lune.placedConstructionIds)
-          ? lune.placedConstructionIds.filter((id) => id !== constructionId)
-          : [],
-      };
+        constructionPlacements: normalizeConstructionPlacements(
+          getPlacedConstructionIdsForLune(lune).filter(
+            (id) => id !== constructionId,
+          ),
+          Number(lune.id ?? currentLune ?? 1),
+        ),
+      });
     });
 
     setConstructions(nextConstructions);
@@ -259,27 +306,37 @@ export const useTimelineActions = ({
     nextLunes.forEach((lune) => saveLuneEntity(lune));
   };
 
-  const toggleConstructionPlacement = (luneIndex, constructionId, isPlaced) => {
+  const toggleConstructionPlacement = (
+    luneIndex: number,
+    constructionId: string,
+    isPlaced: boolean,
+  ) => {
+    if (isPastLuneIndex(luneIndex)) {
+      return;
+    }
+
     const normalizedConstructionId = String(constructionId);
     const nextLunes = lunes.map((lune, idx) => {
       if (idx < luneIndex) return lune;
 
-      const currentIds = Array.isArray(lune.placedConstructionIds)
-        ? lune.placedConstructionIds.map(String)
-        : [];
+      const currentIds = getPlacedConstructionIdsForLune(lune);
       const nextIds = isPlaced
         ? Array.from(new Set([...currentIds, normalizedConstructionId]))
         : currentIds.filter((id) => id !== normalizedConstructionId);
 
-      return {
+      return syncLuneConstructionPlacements({
         ...lune,
-        placedConstructionIds: nextIds,
-      };
+        constructionPlacements: normalizeConstructionPlacements(
+          nextIds,
+          Number(lune.id ?? currentLune ?? 1),
+        ),
+      });
     });
 
     const nextConstructions = sanitizeConstructions(
       constructions || [],
       nextLunes,
+      currentLune,
     );
 
     setLunes(nextLunes);
@@ -288,7 +345,15 @@ export const useTimelineActions = ({
     nextLunes.slice(luneIndex).forEach((lune) => saveLuneEntity(lune));
   };
 
-  const updateLuneGlobal = (luneIndex, field, rawValue) => {
+  const updateLuneGlobal = (
+    luneIndex: number,
+    field: string,
+    rawValue: string | number,
+  ) => {
+    if (isPastLuneIndex(luneIndex)) {
+      return;
+    }
+
     const nextLunes = lunes.map((lune, idx) => {
       if (idx !== luneIndex) return lune;
 
@@ -321,12 +386,25 @@ export const useTimelineActions = ({
     }
   };
 
-  const toggleOverrideMenu = (luneIndex, persoId) => {
+  const toggleOverrideMenu = (luneIndex: number, persoId: number) => {
+    if (isPastLuneIndex(luneIndex)) {
+      return;
+    }
+
     const key = `${luneIndex}-${persoId}`;
     setOpenOverrides((previous) => ({ ...previous, [key]: !previous[key] }));
   };
 
-  const setOverride = (luneIndex, persoId, field, rawValue) => {
+  const setOverride = (
+    luneIndex: number,
+    persoId: number,
+    field: string,
+    rawValue: string | number | boolean | null,
+  ) => {
+    if (isPastLuneIndex(luneIndex)) {
+      return;
+    }
+
     const nextLunes = lunes.map((lune, idx) => {
       if (idx !== luneIndex) return lune;
       const existing = { ...(lune.overrides || {}) };
@@ -361,7 +439,11 @@ export const useTimelineActions = ({
     }
   };
 
-  const clearOverrides = (luneIndex, persoId) => {
+  const clearOverrides = (luneIndex: number, persoId: number) => {
+    if (isPastLuneIndex(luneIndex)) {
+      return;
+    }
+
     const nextLunes = lunes.map((lune, idx) => {
       if (idx !== luneIndex) return lune;
       const overrides = { ...(lune.overrides || {}) };

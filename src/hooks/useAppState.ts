@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   buildState,
   defaultCityMultipliers,
@@ -159,7 +159,7 @@ export const useAppState = () => {
   const [saveStatus, setSaveStatus] = useState<string>("(Chargement...)");
   const [ready, setReady] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string>("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isHydratingRef = useRef<boolean>(true);
   const hasSyncedRouteRef = useRef<boolean>(false);
 
@@ -197,7 +197,7 @@ export const useAppState = () => {
     }
   }, [page, selectedPersoId, selectedGroupId]);
 
-  const setCompleteState = (rawState: unknown) => {
+  const setCompleteState = useCallback((rawState: unknown) => {
     isHydratingRef.current = true;
     const state = buildState(rawState);
 
@@ -223,7 +223,7 @@ export const useAppState = () => {
     }, 0);
 
     return state;
-  };
+  }, []);
 
   return {
     resources,

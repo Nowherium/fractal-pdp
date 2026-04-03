@@ -1,4 +1,5 @@
 import express from "express";
+import type { RequestHandler, Response } from "express";
 import cors from "cors";
 import {
   initDb,
@@ -29,9 +30,11 @@ import {
   defaultStocks,
   defaultPersos,
   defaultRation,
-} from "./db.js";
+} from "./db";
 
-const PORT = process.env.PORT || 3000;
+type DbAction = () => Promise<void>;
+
+const PORT = Number(process.env.PORT) || 3000;
 const app = express();
 
 app.use(cors());
@@ -53,7 +56,7 @@ app.get("/api/state", async (_req, res) => {
   }
 });
 
-const ensureNumericId = (res, rawId) => {
+const ensureNumericId = (res: Response, rawId: unknown): number | null => {
   const id = Number(rawId);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "Identifiant invalide" });
@@ -62,7 +65,7 @@ const ensureNumericId = (res, rawId) => {
   return id;
 };
 
-const ensureStockCode = (res, rawCode) => {
+const ensureStockCode = (res: Response, rawCode: unknown): string | null => {
   const stockCode = String(rawCode || "")
     .trim()
     .toLowerCase();
@@ -75,19 +78,23 @@ const ensureStockCode = (res, rawCode) => {
   return stockCode;
 };
 
-const runDbAction = async (res, action, fallbackError) => {
+const runDbAction = async (
+  res: Response,
+  action: DbAction,
+  fallbackError: string,
+): Promise<void> => {
   try {
     await action();
     res.json({ ok: true });
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      error: error.message || fallbackError,
+      error: error instanceof Error ? error.message : fallbackError,
     });
   }
 };
 
-const registerPartialRoute = (path, handler) => {
+const registerPartialRoute = (path: string, handler: RequestHandler): void => {
   app.patch(path, handler);
   app.put(path, handler);
 };
@@ -376,7 +383,7 @@ app.post("/api/reset", async (_req, res) => {
   }
 });
 
-const start = async () => {
+const start = async (): Promise<void> => {
   try {
     await initDb();
     app.listen(PORT, () => {

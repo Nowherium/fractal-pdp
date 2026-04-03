@@ -144,17 +144,39 @@ export interface Ration {
   constructionId?: string | null;
 }
 
-export interface LuneConstruction {
+export type ConstructionStatus = "todo" | "in-progress" | "done";
+
+export interface ConstructionDefinition {
   id: string;
   name: string;
   resourceCode: string;
   resourceCost: number;
   buildersRequired: number;
   rewardType: "eau" | "nrt" | "med" | "mat" | "art" | "combat";
-  status?: "todo" | "in-progress" | "done";
+}
+
+export interface ConstructionProgress {
+  constructionId: string;
+  status: ConstructionStatus;
+  costPaid?: boolean;
+  remainingBuilders?: number;
+  startedAtLune?: number | null;
+  completedAtLune?: number | null;
+}
+
+export type ConstructionProgressById = Record<string, ConstructionProgress>;
+
+export interface LuneConstruction extends ConstructionDefinition {
+  status?: ConstructionStatus;
   costPaid?: boolean;
   remainingBuilders?: number;
   carriedOver?: boolean;
+}
+
+export interface LunePlacement {
+  luneId: number;
+  constructionId: string;
+  isPlaced: boolean;
 }
 
 export interface Lune {
@@ -162,6 +184,6 @@ export interface Lune {
   meteo: WeatherCoefficients;
   rations: Record<string, Ration>;
   overrides: Record<string, Record<string, number | boolean>>;
-  placedConstructionIds?: string[];
+  constructionPlacements: LunePlacement[];
   constructions: LuneConstruction[];
 }

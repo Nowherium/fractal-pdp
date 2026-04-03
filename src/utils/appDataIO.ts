@@ -2,7 +2,12 @@ import type { RefObject } from "react";
 import { resetState, saveState } from "./api";
 import { buildFallbackState, buildState } from "./stateUtils";
 
-export const exportStateData = (state) => {
+type ResetAppDataParams = {
+  setCompleteState: (state: unknown) => void;
+  setSaveStatus: (status: string) => void;
+};
+
+export const exportStateData = (state: unknown) => {
   const data = JSON.stringify(state, null, 2);
   const blob = new Blob([data], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -44,7 +49,7 @@ export const importStateFile = (
       const importedState = buildState(parsed);
       setCompleteState(importedState);
       await saveState(importedState);
-    } catch (_error) {
+    } catch {
       window.alert("Fichier invalide ou corrompu !");
     }
   };
@@ -55,7 +60,10 @@ export const importStateFile = (
   }
 };
 
-export const resetAppData = async ({ setCompleteState, setSaveStatus }) => {
+export const resetAppData = async ({
+  setCompleteState,
+  setSaveStatus,
+}: ResetAppDataParams) => {
   if (!window.confirm("Effacer TOUTES les données ?")) return;
 
   try {

@@ -1,7 +1,25 @@
+import type { Dispatch, SetStateAction } from "react";
+import type { AppPage, Group, Perso } from "../types";
 import {
   recalculateGroups,
   validateGroupCapacities,
 } from "../utils/groupUtils";
+
+type PersistOptions = {
+  persist?: boolean;
+};
+
+interface UseGroupActionsParams {
+  groups: Group[];
+  persos: Perso[];
+  setGroups: Dispatch<SetStateAction<Group[]>>;
+  setPersos: Dispatch<SetStateAction<Perso[]>>;
+  setSelectedGroupId: Dispatch<SetStateAction<number | null>>;
+  setPage: Dispatch<SetStateAction<AppPage>>;
+  saveGroupEntity: (group: Group) => void;
+  saveGroupMembersEntity: (groupId: number, memberIds: number[]) => void;
+  savePersoEntity: (perso: Perso) => void;
+}
 
 export const useGroupActions = ({
   groups,
@@ -13,13 +31,13 @@ export const useGroupActions = ({
   saveGroupEntity,
   saveGroupMembersEntity,
   savePersoEntity,
-}) => {
-  const openGroupPage = (groupId) => {
+}: UseGroupActionsParams) => {
+  const openGroupPage = (groupId: number) => {
     setSelectedGroupId(groupId);
     setPage("group");
   };
 
-  const openGroupViewPage = (groupId) => {
+  const openGroupViewPage = (groupId: number) => {
     setSelectedGroupId(groupId);
     setPage("group-view");
   };
@@ -36,7 +54,7 @@ export const useGroupActions = ({
         0,
       ) + 1;
 
-    const newGroup = {
+    const newGroup: Group = {
       id: nextGroupId,
       name: `Nouveau groupe ${nextGroupId}`,
       chef: null,
@@ -49,10 +67,10 @@ export const useGroupActions = ({
   };
 
   const handleGroupUpdate = (
-    groupId,
-    field,
-    rawValue,
-    { persist = true } = {},
+    groupId: number,
+    field: string,
+    rawValue: string | number | boolean | null,
+    { persist = true }: PersistOptions = {},
   ) => {
     const nextGroups = groups.map((group) =>
       group.id !== groupId
@@ -75,7 +93,10 @@ export const useGroupActions = ({
     }
   };
 
-  const handleGroupMembersUpdate = (groupId, selectedMemberIds) => {
+  const handleGroupMembersUpdate = (
+    groupId: number,
+    selectedMemberIds: Array<number | string>,
+  ) => {
     const uniqueIds = Array.from(
       new Set(
         selectedMemberIds
@@ -106,7 +127,7 @@ export const useGroupActions = ({
     saveGroupMembersEntity(groupId, uniqueIds);
   };
 
-  const setGroupPresence = (groupId, isPresent) => {
+  const setGroupPresence = (groupId: number, isPresent: boolean) => {
     const memberIdSet = new Set(
       persos
         .filter((perso) => perso.groupId === groupId)
@@ -136,7 +157,12 @@ export const useGroupActions = ({
       .forEach((perso) => savePersoEntity(perso));
   };
 
-  const handleGroupUpdateSafe = (groupId, field, rawValue, options) => {
+  const handleGroupUpdateSafe = (
+    groupId: number,
+    field: string,
+    rawValue: string | number | boolean | null,
+    options: PersistOptions = {},
+  ) => {
     if (field !== "chef") {
       handleGroupUpdate(groupId, field, rawValue, options);
       return;

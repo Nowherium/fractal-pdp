@@ -11,7 +11,7 @@ function SaveBar({
   exportData: () => void;
   importData: (event: ChangeEvent<HTMLInputElement>) => void;
   resetData: () => void;
-  fileInputRef: RefObject<HTMLInputElement | null>;
+  fileInputRef: RefObject<HTMLInputElement>;
 }) {
   return (
     <div className='save-bar'>

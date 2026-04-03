@@ -159,7 +159,7 @@ export const useResourceActions = ({
           String(resource.code ?? "").toLowerCase() === nextCode,
       )
     ) {
-      window.alert(`Le code ressource \"${nextCode}\" est déjà utilisé.`);
+      window.alert(`Le code ressource "${nextCode}" est déjà utilisé.`);
       return;
     }
 
@@ -205,13 +205,13 @@ export const useResourceActions = ({
 
     if (!guard.canDelete) {
       window.alert(
-        `Impossible de supprimer \"${resourceCode}\" : ${guard.reason}`,
+        `Impossible de supprimer "${resourceCode}" : ${guard.reason}`,
       );
       return;
     }
 
     const confirmed = window.confirm(
-      `Supprimer définitivement la ressource \"${resourceToRemove.name || resourceCode}\" ?`,
+      `Supprimer définitivement la ressource "${resourceToRemove.name || resourceCode}" ?`,
     );
     if (!confirmed) return;
 

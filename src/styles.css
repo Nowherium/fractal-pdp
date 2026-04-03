@@ -363,7 +363,14 @@ button:disabled {
 .current-lune-bar {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.current-lune-action {
+  margin: 0;
 }
 
 .current-lune-label {

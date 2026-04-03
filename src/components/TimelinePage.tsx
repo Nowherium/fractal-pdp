@@ -1,60 +1,9 @@
 import { Fragment } from "react";
 
-import type { Lune, LuneConstruction, Ration, Resource } from "../types";
+import type { LuneConstruction, Resource } from "../types";
 import { DRUG_EFFECTS, formatDrugQuantity } from "../utils/drugEffects";
-
-type TimelineRow = {
-  persoId: number;
-  nom: string;
-  ration: Ration;
-  mortAuDebut: boolean;
-  isAbsent?: boolean;
-  cDebut: {
-    eau: number;
-    nrt: number;
-    med: number;
-    mat: number;
-    art?: number;
-  };
-  classPv?: string;
-  pvDisplayDebut: string | number;
-  pvDisplayFin: string | number;
-  mortText?: string;
-  hasOverride?: boolean;
-  availableDrugs: Record<string, number>;
-  drugStatus?: string;
-  drugClassName?: string;
-};
-
-type TimelineStats = {
-  classEau: string;
-  stockEau: number;
-  classNrt: string;
-  stockNrt: number;
-  classMed: string;
-  stockMed: number;
-  classMat: string;
-  stockMat: number;
-};
-
-type ConstructionState = {
-  assignedBuilders: number;
-  buildersRequired: number;
-  remainingBuilders?: number;
-  resourceCode: string;
-  resourceCost: number;
-  rewardType: string;
-  isCompleted: boolean;
-  statusCode?: "todo" | "in-progress" | "done";
-  statusLabel: string;
-};
-
-type TimelineSegment = {
-  lune: Lune;
-  rows: TimelineRow[];
-  stats: TimelineStats;
-  constructionStates?: Record<string, ConstructionState>;
-};
+import { getPlacedConstructionIdsForLune } from "../utils/stateUtils";
+import type { TimelineSegment } from "../utils/timelineTypes";
 
 const weatherFields: Array<{
   key: "eau" | "nrt" | "med" | "mat";
@@ -90,7 +39,7 @@ const getRewardLabel = (rewardType: LuneConstruction["rewardType"]) =>
 function TimelinePage({
   currentLune,
   resources,
-  constructions,
+  constructions: _constructions,
   timelineData,
   removeLune,
   updateLuneGlobal,
@@ -149,7 +98,13 @@ function TimelinePage({
       </p>
       <div id='timeline'>
         {timelineData.map((segment, luneIndex) => {
-          const isCurrentLune = luneIndex === 0;
+          const actualLuneIndex = segment.actualIndex ?? luneIndex;
+          const isPastLune = Number(segment.lune.id) < Number(currentLune);
+          const isCurrentLune = Number(segment.lune.id) === Number(currentLune);
+          const isLockedLune = isPastLune || isCurrentLune;
+          const placedConstructionIds = getPlacedConstructionIdsForLune(
+            segment.lune,
+          );
 
           return (
             <div className='panel lune-panel' key={segment.lune.id}>
@@ -164,18 +119,19 @@ function TimelinePage({
                 }}
               >
                 <h3 style={{ margin: 0, border: "none", padding: 0 }}>
-                  LUNE {Number(currentLune ?? 1) + luneIndex}
+                  LUNE {Number(segment.lune.id)}
+                  {isPastLune ? " • passée (lecture seule)" : ""}
                 </h3>
                 <button
                   className='btn-del'
                   type='button'
-                  disabled={isCurrentLune}
+                  disabled={isLockedLune}
                   title={
-                    isCurrentLune
-                      ? "La lune en cours ne peut pas être supprimée"
+                    isLockedLune
+                      ? "Les lunes passées et la lune en cours ne peuvent pas être supprimées"
                       : undefined
                   }
-                  onClick={() => removeLune(luneIndex)}
+                  onClick={() => removeLune(actualLuneIndex)}
                 >
                   X Supprimer
                 </button>
@@ -203,9 +159,10 @@ function TimelinePage({
                         min='0'
                         max='1'
                         step='0.05'
+                        disabled={isPastLune}
                         onChange={(event) =>
                           updateLuneGlobal(
-                            luneIndex,
+                            actualLuneIndex,
                             `meteo.${field.key}`,
                             event.target.value,
                           )
@@ -251,9 +208,8 @@ function TimelinePage({
                             : constructionState?.statusCode === "in-progress"
                               ? "warning"
                               : "info";
-                          const isPlacedThisLune = (
-                            segment.lune.placedConstructionIds ?? []
-                          ).includes(construction.id);
+                          const isPlacedThisLune =
+                            placedConstructionIds.includes(construction.id);
                           const isCompleted = Boolean(
                             constructionState?.isCompleted,
                           );
@@ -275,10 +231,10 @@ function TimelinePage({
                                   <input
                                     type='checkbox'
                                     checked={isPlacedThisLune}
-                                    disabled={isCompleted}
+                                    disabled={isPastLune || isCompleted}
                                     onChange={(event) =>
                                       toggleConstructionPlacement(
-                                        luneIndex,
+                                        actualLuneIndex,
                                         construction.id,
                                         event.target.checked,
                                       )
@@ -330,11 +286,13 @@ function TimelinePage({
                           <td style={{ backgroundColor: "#112222" }}>
                             <select
                               value={row.isAbsent ? "" : row.ration.tache}
-                              disabled={row.mortAuDebut || row.isAbsent}
+                              disabled={
+                                row.mortAuDebut || row.isAbsent || isPastLune
+                              }
                               style={{ width: "100%" }}
                               onChange={(event) =>
                                 updateRation(
-                                  luneIndex,
+                                  actualLuneIndex,
                                   row.persoId,
                                   "tache",
                                   event.target.value,
@@ -362,13 +320,14 @@ function TimelinePage({
                                 disabled={
                                   row.mortAuDebut ||
                                   row.isAbsent ||
+                                  isPastLune ||
                                   (segment.lune.constructions?.length ?? 0) ===
                                     0
                                 }
                                 style={{ width: "100%", marginTop: "0.35rem" }}
                                 onChange={(event) =>
                                   updateRation(
-                                    luneIndex,
+                                    actualLuneIndex,
                                     row.persoId,
                                     "constructionId",
                                     event.target.value,
@@ -378,13 +337,10 @@ function TimelinePage({
                                 <option value=''>Choisir un chantier</option>
                                 {(segment.lune.constructions ?? [])
                                   .filter((construction) => {
-                                    const isPlacedThisLune = (
-                                      segment.lune.placedConstructionIds ?? []
-                                    ).includes(construction.id);
-                                    const state =
-                                      segment.constructionStates?.[
-                                        construction.id
-                                      ];
+                                    const isPlacedThisLune =
+                                      placedConstructionIds.includes(
+                                        construction.id,
+                                      );
 
                                     return (
                                       isPlacedThisLune ||
@@ -393,13 +349,10 @@ function TimelinePage({
                                     );
                                   })
                                   .map((construction) => {
-                                    const state =
-                                      segment.constructionStates?.[
-                                        construction.id
-                                      ];
-                                    const isPlacedThisLune = (
-                                      segment.lune.placedConstructionIds ?? []
-                                    ).includes(construction.id);
+                                    const isPlacedThisLune =
+                                      placedConstructionIds.includes(
+                                        construction.id,
+                                      );
 
                                     return (
                                       <option
@@ -421,11 +374,13 @@ function TimelinePage({
                               value={
                                 row.isAbsent ? "" : (row.ration.drogue ?? "")
                               }
-                              disabled={row.mortAuDebut || row.isAbsent}
+                              disabled={
+                                row.mortAuDebut || row.isAbsent || isPastLune
+                              }
                               style={{ width: "100%" }}
                               onChange={(event) =>
                                 updateRation(
-                                  luneIndex,
+                                  actualLuneIndex,
                                   row.persoId,
                                   "drogue",
                                   event.target.value,
@@ -488,10 +443,12 @@ function TimelinePage({
                                 row.ration.eau &&
                                 !row.mortAuDebut
                               }
-                              disabled={row.mortAuDebut || row.isAbsent}
+                              disabled={
+                                row.mortAuDebut || row.isAbsent || isPastLune
+                              }
                               onChange={(event) =>
                                 updateRation(
-                                  luneIndex,
+                                  actualLuneIndex,
                                   row.persoId,
                                   "eau",
                                   event.target.checked,
@@ -507,10 +464,12 @@ function TimelinePage({
                                 row.ration.nrt &&
                                 !row.mortAuDebut
                               }
-                              disabled={row.mortAuDebut || row.isAbsent}
+                              disabled={
+                                row.mortAuDebut || row.isAbsent || isPastLune
+                              }
                               onChange={(event) =>
                                 updateRation(
-                                  luneIndex,
+                                  actualLuneIndex,
                                   row.persoId,
                                   "nrt",
                                   event.target.checked,
@@ -526,10 +485,12 @@ function TimelinePage({
                                 row.ration.med &&
                                 !row.mortAuDebut
                               }
-                              disabled={row.mortAuDebut || row.isAbsent}
+                              disabled={
+                                row.mortAuDebut || row.isAbsent || isPastLune
+                              }
                               onChange={(event) =>
                                 updateRation(
-                                  luneIndex,
+                                  actualLuneIndex,
                                   row.persoId,
                                   "med",
                                   event.target.checked,
@@ -545,15 +506,16 @@ function TimelinePage({
                             <button
                               className={`btn-gear ${row.hasOverride ? "danger" : ""}`}
                               type='button'
+                              disabled={isPastLune}
                               onClick={() =>
-                                toggleOverrideMenu(luneIndex, row.persoId)
+                                toggleOverrideMenu(actualLuneIndex, row.persoId)
                               }
                             >
                               ⚙️
                             </button>
                           </td>
                         </tr>
-                        {openOverrides[`${luneIndex}-${row.persoId}`] && (
+                        {openOverrides[`${actualLuneIndex}-${row.persoId}`] && (
                           <tr className='override-row'>
                             <td colSpan={9}>
                               <div
@@ -586,7 +548,7 @@ function TimelinePage({
                                     }
                                     onChange={(event) =>
                                       setOverride(
-                                        luneIndex,
+                                        actualLuneIndex,
                                         row.persoId,
                                         "pv",
                                         event.target.value,
@@ -609,7 +571,7 @@ function TimelinePage({
                                     }
                                     onChange={(event) =>
                                       setOverride(
-                                        luneIndex,
+                                        actualLuneIndex,
                                         row.persoId,
                                         "present",
                                         event.target.value,
@@ -639,7 +601,7 @@ function TimelinePage({
                                     }
                                     onChange={(event) =>
                                       setOverride(
-                                        luneIndex,
+                                        actualLuneIndex,
                                         row.persoId,
                                         "capEau",
                                         event.target.value,
@@ -665,7 +627,7 @@ function TimelinePage({
                                     }
                                     onChange={(event) =>
                                       setOverride(
-                                        luneIndex,
+                                        actualLuneIndex,
                                         row.persoId,
                                         "capNrt",
                                         event.target.value,
@@ -691,7 +653,7 @@ function TimelinePage({
                                     }
                                     onChange={(event) =>
                                       setOverride(
-                                        luneIndex,
+                                        actualLuneIndex,
                                         row.persoId,
                                         "capMed",
                                         event.target.value,
@@ -703,7 +665,7 @@ function TimelinePage({
                                   className='btn-del'
                                   type='button'
                                   onClick={() =>
-                                    clearOverrides(luneIndex, row.persoId)
+                                    clearOverrides(actualLuneIndex, row.persoId)
                                   }
                                 >
                                   Effacer

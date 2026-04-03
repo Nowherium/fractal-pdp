@@ -1,0 +1,13 @@
+:80 {
+  encode zstd gzip
+  root * /usr/share/caddy
+
+  handle /api/* {
+    reverse_proxy backend:3000
+  }
+
+  handle {
+    try_files {path} /index.html
+    file_server
+  }
+}

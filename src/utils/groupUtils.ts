@@ -1,26 +1,43 @@
-export const getGroupMembers = (persos, groupId) =>
-  persos.filter((perso) => perso.groupId === groupId);
+import type { Group, Perso } from "../types";
 
-export const getGroupLeader = (group, persos) => {
+type PersoCapacityType = "eau" | "nrt" | "med" | "mat" | "art";
+
+export const getGroupMembers = (
+  persos: Perso[] = [],
+  groupId: number | null | undefined,
+): Perso[] => persos.filter((perso) => perso.groupId === groupId);
+
+export const getGroupLeader = (
+  group: Group,
+  persos: Perso[] = [],
+): Perso | null => {
   const members = getGroupMembers(persos, group.id);
   return members.find((perso) => perso.id === group.chef) || members[0] || null;
 };
 
-export const getGroupCapacity = (leader) =>
+export const getGroupCapacity = (leader: Perso | null | undefined): number =>
   Math.max(1, Math.floor(Number(leader?.cmd ?? 0)) + 1);
 
-export const getPersoCombatValue = (perso) =>
-  Number(perso?.combatEffectif ?? perso?.combat ?? 0);
+export const getPersoCombatValue = (
+  perso: Partial<Perso> | null | undefined,
+): number => Number(perso?.combatEffectif ?? perso?.combat ?? 0);
 
-export const getPersoWeightValue = (perso) => Number(perso?.poidsTotal ?? 0);
+export const getPersoWeightValue = (
+  perso: Partial<Perso> | null | undefined,
+): number => Number(perso?.poidsTotal ?? 0);
 
-export const getPersoWeightLimit = (perso) =>
-  Number(perso?.poidsMaxEffectif ?? perso?.poidsMax ?? 20);
+export const getPersoWeightLimit = (
+  perso: Partial<Perso> | null | undefined,
+): number => Number(perso?.poidsMaxEffectif ?? perso?.poidsMax ?? 20);
 
-export const isPersoOverweight = (perso) =>
-  getPersoWeightValue(perso) > getPersoWeightLimit(perso);
+export const isPersoOverweight = (
+  perso: Partial<Perso> | null | undefined,
+): boolean => getPersoWeightValue(perso) > getPersoWeightLimit(perso);
 
-export const getPersoCapacityValue = (perso, type) => {
+export const getPersoCapacityValue = (
+  perso: Partial<Perso> | null | undefined,
+  type: PersoCapacityType,
+): number => {
   switch (type) {
     case "eau":
       return Number(perso?.capEauEffectif ?? perso?.capEau ?? 0);
@@ -37,7 +54,7 @@ export const getPersoCapacityValue = (perso, type) => {
   }
 };
 
-export const calculateGroupTotals = (persos) =>
+export const calculateGroupTotals = (persos: Perso[] = []) =>
   persos.reduce(
     (acc, perso) => ({
       eau: acc.eau + getPersoCapacityValue(perso, "eau"),
@@ -51,15 +68,21 @@ export const calculateGroupTotals = (persos) =>
     { eau: 0, nrt: 0, med: 0, mat: 0, art: 0, poids: 0, combat: 0 },
   );
 
-export const recalculateGroups = (nextPersos, previousGroups) => {
-  const membersByGroup = nextPersos.reduce((acc, perso) => {
-    if (perso.groupId === null || perso.groupId === undefined) {
+export const recalculateGroups = (
+  nextPersos: Perso[] = [],
+  previousGroups: Group[] = [],
+): Group[] => {
+  const membersByGroup = nextPersos.reduce<Record<number, number[]>>(
+    (acc, perso) => {
+      if (perso.groupId === null || perso.groupId === undefined) {
+        return acc;
+      }
+      if (!acc[perso.groupId]) acc[perso.groupId] = [];
+      acc[perso.groupId].push(perso.id);
       return acc;
-    }
-    if (!acc[perso.groupId]) acc[perso.groupId] = [];
-    acc[perso.groupId].push(perso.id);
-    return acc;
-  }, {});
+    },
+    {},
+  );
 
   return previousGroups.map((group) => {
     const members = membersByGroup[group.id] || [];
@@ -76,7 +99,10 @@ export const recalculateGroups = (nextPersos, previousGroups) => {
   });
 };
 
-export const validateGroupCapacities = (candidatePersos, candidateGroups) => {
+export const validateGroupCapacities = (
+  candidatePersos: Perso[] = [],
+  candidateGroups: Group[] = [],
+): string => {
   for (const group of candidateGroups) {
     const members = getGroupMembers(candidatePersos, group.id);
     if (members.length === 0) continue;

@@ -1,4 +1,9 @@
-export const normalizeArmeFieldValue = (field, rawValue) => {
+import type { PersoArme, PersoOutil, PersoSac } from "../types";
+
+export const normalizeArmeFieldValue = (
+  field: string,
+  rawValue: string | number,
+): string | number => {
   if (field === "name") return rawValue;
   const value = Number(rawValue);
   if (!Number.isFinite(value)) return 0;
@@ -7,9 +12,9 @@ export const normalizeArmeFieldValue = (field, rawValue) => {
 };
 
 export const countAssignedWeaponsForArme = (
-  entries,
-  armeId,
-  excludedPersoId = null,
+  entries: PersoArme[] = [],
+  armeId: number,
+  excludedPersoId: number | null = null,
 ) =>
   entries.filter(
     (entry) =>
@@ -17,7 +22,10 @@ export const countAssignedWeaponsForArme = (
       (excludedPersoId === null || entry.perso_id !== excludedPersoId),
   ).length;
 
-export const normalizeOutilFieldValue = (field, rawValue) => {
+export const normalizeOutilFieldValue = (
+  field: string,
+  rawValue: string | number,
+): string | number => {
   if (field === "name" || field === "specialite") return rawValue;
   const value = Number(rawValue);
   if (!Number.isFinite(value)) return 0;
@@ -29,9 +37,9 @@ export const normalizeOutilFieldValue = (field, rawValue) => {
 };
 
 export const countAssignedToolsForOutil = (
-  entries,
-  outilId,
-  excludedPersoId = null,
+  entries: PersoOutil[] = [],
+  outilId: number,
+  excludedPersoId: number | null = null,
 ) =>
   entries.filter(
     (entry) =>
@@ -39,7 +47,10 @@ export const countAssignedToolsForOutil = (
       (excludedPersoId === null || entry.perso_id !== excludedPersoId),
   ).length;
 
-export const normalizeSacFieldValue = (field, rawValue) => {
+export const normalizeSacFieldValue = (
+  field: string,
+  rawValue: string | number,
+): string | number => {
   if (field === "name") return rawValue;
   const value = Number(rawValue);
   if (!Number.isFinite(value)) return 0;
@@ -56,9 +67,9 @@ export const normalizeSacFieldValue = (field, rawValue) => {
 };
 
 export const countAssignedBagsForSac = (
-  entries,
-  sacId,
-  excludedPersoId = null,
+  entries: PersoSac[] = [],
+  sacId: number,
+  excludedPersoId: number | null = null,
 ) =>
   entries.filter(
     (entry) =>

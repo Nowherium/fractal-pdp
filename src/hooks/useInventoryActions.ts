@@ -1,3 +1,13 @@
+import type { Dispatch, SetStateAction } from "react";
+import type {
+  Arme,
+  Outil,
+  Perso,
+  PersoArme,
+  PersoOutil,
+  PersoSac,
+  Sac,
+} from "../types";
 import {
   countAssignedBagsForSac,
   countAssignedToolsForOutil,
@@ -6,6 +16,38 @@ import {
   normalizeOutilFieldValue,
   normalizeSacFieldValue,
 } from "../utils/inventoryUtils";
+
+type PersistOptions = {
+  persist?: boolean;
+};
+
+interface UseInventoryActionsParams {
+  armes: Arme[];
+  setArmes: Dispatch<SetStateAction<Arme[]>>;
+  persoArmes: PersoArme[];
+  setPersoArmes: Dispatch<SetStateAction<PersoArme[]>>;
+  outils: Outil[];
+  setOutils: Dispatch<SetStateAction<Outil[]>>;
+  persoOutils: PersoOutil[];
+  setPersoOutils: Dispatch<SetStateAction<PersoOutil[]>>;
+  sacs: Sac[];
+  setSacs: Dispatch<SetStateAction<Sac[]>>;
+  persoSacs: PersoSac[];
+  setPersoSacs: Dispatch<SetStateAction<PersoSac[]>>;
+  setPersos: Dispatch<SetStateAction<Perso[]>>;
+  saveArmeEntity: (arme: Arme) => void;
+  deleteArmeEntity: (armeId: number) => void;
+  savePersoArmesEntity: (persoId: number, nextPersoArmes: PersoArme[]) => void;
+  saveOutilEntity: (outil: Outil) => void;
+  deleteOutilEntity: (outilId: number) => void;
+  savePersoOutilsEntity: (
+    persoId: number,
+    nextPersoOutils: PersoOutil[],
+  ) => void;
+  saveSacEntity: (sac: Sac) => void;
+  deleteSacEntity: (sacId: number) => void;
+  savePersoSacsEntity: (persoId: number, nextPersoSacs: PersoSac[]) => void;
+}
 
 export const useInventoryActions = ({
   armes,
@@ -30,11 +72,11 @@ export const useInventoryActions = ({
   saveSacEntity,
   deleteSacEntity,
   savePersoSacsEntity,
-}) => {
+}: UseInventoryActionsParams) => {
   const handlePersoWeaponsUpdate = (
-    persoId,
-    carriedWeaponIds,
-    equippedWeaponId,
+    persoId: number,
+    carriedWeaponIds: Array<number | string>,
+    equippedWeaponId: number | string | null,
   ) => {
     const uniqueWeaponIds = Array.from(
       new Set(
@@ -115,7 +157,10 @@ export const useInventoryActions = ({
     savePersoArmesEntity(persoId, nextEntries);
   };
 
-  const handlePersoToolsUpdate = (persoId, carriedToolIds) => {
+  const handlePersoToolsUpdate = (
+    persoId: number,
+    carriedToolIds: Array<number | string>,
+  ) => {
     const uniqueToolIds = Array.from(
       new Set(
         carriedToolIds
@@ -156,7 +201,11 @@ export const useInventoryActions = ({
     savePersoOutilsEntity(persoId, nextEntries);
   };
 
-  const handlePersoBagsUpdate = (persoId, carriedBagIds, equippedBagId) => {
+  const handlePersoBagsUpdate = (
+    persoId: number,
+    carriedBagIds: Array<number | string>,
+    equippedBagId: number | string | null,
+  ) => {
     const uniqueBagIds = Array.from(
       new Set(
         carriedBagIds
@@ -251,7 +300,12 @@ export const useInventoryActions = ({
     saveArmeEntity(newArme);
   };
 
-  const updateArme = (index, field, rawValue, { persist = true } = {}) => {
+  const updateArme = (
+    index: number,
+    field: string,
+    rawValue: string | number,
+    { persist = true }: PersistOptions = {},
+  ) => {
     const armeToUpdate = armes[index];
     if (!armeToUpdate) return;
 
@@ -262,7 +316,7 @@ export const useInventoryActions = ({
         armeToUpdate.id,
       );
 
-      if (nextValue < assignedCount) {
+      if (Number(nextValue) < assignedCount) {
         window.alert(
           `Impossible de définir une quantité inférieure aux ${assignedCount} arme(s) déjà attribuée(s).`,
         );
@@ -285,7 +339,7 @@ export const useInventoryActions = ({
     }
   };
 
-  const removeArme = (index) => {
+  const removeArme = (index: number) => {
     const armeToRemove = armes[index];
     if (!armeToRemove) return;
 
@@ -331,7 +385,12 @@ export const useInventoryActions = ({
     saveOutilEntity(newOutil);
   };
 
-  const updateOutil = (index, field, rawValue, { persist = true } = {}) => {
+  const updateOutil = (
+    index: number,
+    field: string,
+    rawValue: string | number,
+    { persist = true }: PersistOptions = {},
+  ) => {
     const outilToUpdate = outils[index];
     if (!outilToUpdate) return;
 
@@ -342,7 +401,7 @@ export const useInventoryActions = ({
         outilToUpdate.id,
       );
 
-      if (nextValue < assignedCount) {
+      if (Number(nextValue) < assignedCount) {
         window.alert(
           `Impossible de définir une quantité inférieure aux ${assignedCount} outil(s) déjà attribué(s).`,
         );
@@ -365,7 +424,7 @@ export const useInventoryActions = ({
     }
   };
 
-  const removeOutil = (index) => {
+  const removeOutil = (index: number) => {
     const outilToRemove = outils[index];
     if (!outilToRemove) return;
 
@@ -396,7 +455,12 @@ export const useInventoryActions = ({
     saveSacEntity(newSac);
   };
 
-  const updateSac = (index, field, rawValue, { persist = true } = {}) => {
+  const updateSac = (
+    index: number,
+    field: string,
+    rawValue: string | number,
+    { persist = true }: PersistOptions = {},
+  ) => {
     const sacToUpdate = sacs[index];
     if (!sacToUpdate) return;
 
@@ -404,7 +468,7 @@ export const useInventoryActions = ({
     if (field === "quantity") {
       const assignedCount = countAssignedBagsForSac(persoSacs, sacToUpdate.id);
 
-      if (nextValue < assignedCount) {
+      if (Number(nextValue) < assignedCount) {
         window.alert(
           `Impossible de définir une quantité inférieure aux ${assignedCount} sac(s) déjà attribué(s).`,
         );
@@ -427,7 +491,7 @@ export const useInventoryActions = ({
     }
   };
 
-  const removeSac = (index) => {
+  const removeSac = (index: number) => {
     const sacToRemove = sacs[index];
     if (!sacToRemove) return;
 

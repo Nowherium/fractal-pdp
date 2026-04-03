@@ -63,7 +63,7 @@ export const apiRequest = async (
 
 export const loadState = () => apiRequest("/api/state", { retries: 1 });
 
-export const saveState = (state) =>
+export const saveState = (state: unknown) =>
   apiRequest("/api/state", {
     method: "PUT",
     body: state,
@@ -76,7 +76,11 @@ export const resetState = () =>
     retries: 0,
   });
 
-export const saveEntity = (endpoint, payload, method = "PATCH") =>
+export const saveEntity = (
+  endpoint: string,
+  payload: unknown,
+  method = "PATCH",
+) =>
   apiRequest(endpoint, {
     method,
     body: payload,
