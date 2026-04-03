@@ -581,6 +581,28 @@ const replaceGroupMembers = async (
   });
 };
 
+const deleteGroup = async (groupId: number) => {
+  const normalizedGroupId = Number(groupId);
+  if (!Number.isFinite(normalizedGroupId)) {
+    throw new Error("Identifiant de groupe invalide.");
+  }
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `UPDATE persos
+       SET group_id = NULL
+       WHERE group_id = $1`,
+      [normalizedGroupId],
+    );
+
+    await client.query("DELETE FROM groups WHERE group_id = $1", [
+      normalizedGroupId,
+    ]);
+
+    await syncAndValidateGroups(client);
+  });
+};
+
 const upsertArme = async (arme: EntityInput | null | undefined) => {
   const id = Number(arme?.id);
   if (!Number.isFinite(id)) {
@@ -793,6 +815,7 @@ export {
   replacePersoSacs,
   upsertGroup,
   replaceGroupMembers,
+  deleteGroup,
   upsertArme,
   deleteArme,
   upsertOutil,

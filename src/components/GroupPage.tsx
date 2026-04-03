@@ -1,4 +1,5 @@
 import type { Group, Perso } from "../types";
+import { confirmAction } from "../utils/confirmAction";
 import { calculateGroupTotals, getGroupMembers } from "../utils/groupUtils";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
@@ -17,6 +18,7 @@ function GroupPage({
   openGroupPage,
   openGroupViewPage,
   addGroup,
+  removeGroup,
   setGroupPresence,
 }: {
   groups: Group[];
@@ -24,6 +26,7 @@ function GroupPage({
   openGroupPage: (groupId: number) => void;
   openGroupViewPage: (groupId: number) => void;
   addGroup: () => void;
+  removeGroup: (groupId: number) => void;
   setGroupPresence: (groupId: number, isPresent: boolean) => void;
 }) {
   const getChefLabel = (chefId: number | null | undefined) => {
@@ -119,6 +122,19 @@ function GroupPage({
                         onClick={() => openGroupPage(group.id)}
                       >
                         Modifier
+                      </Button>
+                      <Button
+                        className='mt-0'
+                        size='sm'
+                        variant='danger'
+                        onClick={() =>
+                          confirmAction(
+                            `Supprimer le groupe ${group.name || "sélectionné"} ? Les personnages resteront actifs et seront simplement retirés de ce groupe.`,
+                            () => removeGroup(group.id),
+                          )
+                        }
+                      >
+                        Supprimer
                       </Button>
                     </div>
                   </td>

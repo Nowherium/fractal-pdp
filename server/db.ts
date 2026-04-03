@@ -19,6 +19,7 @@ export {
   replacePersoSacs,
   upsertGroup,
   replaceGroupMembers,
+  deleteGroup,
   upsertArme,
   deleteArme,
   upsertOutil,

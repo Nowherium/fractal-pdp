@@ -121,6 +121,13 @@ export const useAppEntitySaves = ({
       ),
     saveGroupEntity: (group: Group) =>
       queueSave(`group-${group.id}`, `/api/groups/${group.id}`, { group }),
+    deleteGroupEntity: (groupId: number) =>
+      queueSave(
+        `group-${groupId}`,
+        `/api/groups/${groupId}`,
+        undefined,
+        "DELETE",
+      ),
     saveGroupMembersEntity: (groupId: number, memberIds: number[]) =>
       queueSave(`group-members-${groupId}`, `/api/groups/${groupId}/members`, {
         memberIds,

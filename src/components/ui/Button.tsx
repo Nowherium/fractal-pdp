@@ -11,12 +11,13 @@ type ButtonVariant =
 type ButtonSize = "sm" | "md";
 
 const variantClassNames: Record<ButtonVariant, string> = {
-  primary: "bg-accent-cyan text-page hover:bg-accent-cyan-dark",
-  success: "bg-[#4caf50] text-white hover:bg-[#45a049]",
-  danger: "bg-[#f44336] text-white hover:bg-[#d32f2f]",
-  muted: "bg-[#555] text-white hover:bg-[#777]",
-  tab: "border border-border-strong bg-table-bg text-white hover:bg-input-bg",
-  "tab-active": "border border-border-strong bg-accent-cyan text-black",
+  primary: "border-none bg-accent-cyan text-page hover:bg-accent-cyan-dark",
+  success: "border-none bg-[#4caf50] text-white hover:bg-[#45a049]",
+  danger: "border-none bg-[#f44336] text-white hover:bg-[#d32f2f]",
+  muted: "border-none bg-[#555] text-white hover:bg-[#777]",
+  tab: "border border-solid border-border-softest bg-table-bg text-white hover:bg-input-bg",
+  "tab-active":
+    "border border-solid border-border-softest bg-accent-cyan text-black",
 };
 
 const sizeClassNames: Record<ButtonSize, string> = {
@@ -40,7 +41,7 @@ function Button({
     <button
       type={type}
       className={[
-        "mt-[5px] cursor-pointer rounded-[3px] border-none font-bold disabled:cursor-not-allowed disabled:opacity-60",
+        "mt-[5px] cursor-pointer rounded-[3px] font-bold disabled:cursor-not-allowed disabled:opacity-60",
         sizeClassNames[size],
         variantClassNames[variant],
         className,

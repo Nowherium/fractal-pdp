@@ -17,6 +17,7 @@ interface UseGroupActionsParams {
   setSelectedGroupId: Dispatch<SetStateAction<number | null>>;
   setPage: Dispatch<SetStateAction<AppPage>>;
   saveGroupEntity: (group: Group) => void;
+  deleteGroupEntity: (groupId: number) => void;
   saveGroupMembersEntity: (groupId: number, memberIds: number[]) => void;
   savePersoEntity: (perso: Perso) => void;
 }
@@ -29,6 +30,7 @@ export const useGroupActions = ({
   setSelectedGroupId,
   setPage,
   saveGroupEntity,
+  deleteGroupEntity,
   saveGroupMembersEntity,
   savePersoEntity,
 }: UseGroupActionsParams) => {
@@ -64,6 +66,33 @@ export const useGroupActions = ({
     setSelectedGroupId(newGroup.id);
     setPage("group");
     saveGroupEntity(newGroup);
+  };
+
+  const removeGroup = (groupId: number) => {
+    const nextGroups = groups.filter((group) => group.id !== groupId);
+    const updatedPersos = persos.map((perso) =>
+      perso.groupId === groupId ? { ...perso, groupId: null } : perso,
+    );
+
+    setGroups(nextGroups);
+    setPersos(updatedPersos);
+    setSelectedGroupId((current) => (current === groupId ? null : current));
+    setPage("groupes");
+
+    updatedPersos
+      .filter((perso) => perso.groupId === null)
+      .forEach((perso) => {
+        if (
+          persos.some(
+            (currentPerso) =>
+              currentPerso.id === perso.id && currentPerso.groupId === groupId,
+          )
+        ) {
+          savePersoEntity(perso);
+        }
+      });
+
+    deleteGroupEntity(groupId);
   };
 
   const handleGroupUpdate = (
@@ -208,6 +237,7 @@ export const useGroupActions = ({
     openGroupViewPage,
     closeGroupPage,
     addGroup,
+    removeGroup,
     handleGroupMembersUpdate,
     handleGroupUpdateSafe,
     setGroupPresence,

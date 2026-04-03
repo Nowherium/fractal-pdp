@@ -26,6 +26,7 @@ module.exports = {
         "border-main": "#333333",
         "border-strong": "#444444",
         "border-soft": "#3b3b3b",
+        "border-softest": "#2c2c2c",
         "accent-cyan": "#00bcd4",
         "accent-cyan-dark": "#008ba3",
         "accent-blue": "#81d4fa",

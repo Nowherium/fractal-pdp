@@ -26,9 +26,11 @@ export const importStateFile = (
   {
     fileInputRef,
     setCompleteState,
+    onSuccess,
   }: {
     fileInputRef: RefObject<HTMLInputElement>;
     setCompleteState: (state: unknown) => void;
+    onSuccess?: () => void;
   },
 ) => {
   const file = event.target.files?.[0];
@@ -49,6 +51,7 @@ export const importStateFile = (
       const importedState = buildState(parsed);
       setCompleteState(importedState);
       await saveState(importedState);
+      onSuccess?.();
     } catch {
       window.alert("Fichier invalide ou corrompu !");
     }
@@ -64,8 +67,6 @@ export const resetAppData = async ({
   setCompleteState,
   setSaveStatus,
 }: ResetAppDataParams) => {
-  if (!window.confirm("Effacer TOUTES les données ?")) return;
-
   try {
     const data = await resetState();
     setCompleteState(data);

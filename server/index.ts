@@ -21,6 +21,7 @@ import {
   replacePersoSacs,
   upsertGroup,
   replaceGroupMembers,
+  deleteGroup,
   upsertArme,
   deleteArme,
   upsertOutil,
@@ -243,6 +244,17 @@ registerPartialRoute("/api/groups/:id", async (req, res) => {
     res,
     () => upsertGroup({ ...(req.body?.group || {}), id: groupId }),
     "Impossible de sauvegarder le groupe",
+  );
+});
+
+app.delete("/api/groups/:id", async (req, res) => {
+  const groupId = ensureNumericId(res, req.params["id"]);
+  if (groupId === null) return;
+
+  await runDbAction(
+    res,
+    () => deleteGroup(groupId),
+    "Impossible de supprimer le groupe",
   );
 });
 

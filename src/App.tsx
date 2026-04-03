@@ -5,6 +5,7 @@ import PageTabs from "./components/PageTabs";
 import ReservePage from "./components/ReservePage";
 import ResourcesPage from "./components/ResourcesPage";
 import Button from "./components/ui/Button";
+import ToastViewport from "./components/ui/ToastViewport";
 import EffectifPage from "./components/EffectifPage";
 import PersoPage from "./components/PersoPage";
 import GroupPage from "./components/GroupPage";
@@ -113,6 +114,7 @@ function App() {
     deletePersoEntity,
     savePersoResourcesEntity,
     saveGroupEntity,
+    deleteGroupEntity,
     saveGroupMembersEntity,
     saveArmeEntity,
     deleteArmeEntity,
@@ -145,6 +147,17 @@ function App() {
   });
 
   const [visiblePastLunes, setVisiblePastLunes] = useState<number>(0);
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string }>>(
+    [],
+  );
+
+  const showToast = (message: string) => {
+    const id = Date.now() + Math.random();
+    setToasts((previous) => [...previous, { id, message }]);
+    window.setTimeout(() => {
+      setToasts((previous) => previous.filter((toast) => toast.id !== id));
+    }, 2600);
+  };
 
   useEffect(() => {
     const targetCurrentLune = Math.max(1, Number(currentLune ?? 1));
@@ -285,6 +298,7 @@ function App() {
     openGroupViewPage,
     closeGroupPage,
     addGroup,
+    removeGroup,
     handleGroupMembersUpdate,
     handleGroupUpdateSafe,
     setGroupPresence,
@@ -296,6 +310,7 @@ function App() {
     setSelectedGroupId,
     setPage,
     saveGroupEntity,
+    deleteGroupEntity,
     saveGroupMembersEntity,
     savePersoEntity,
   });
@@ -343,7 +358,7 @@ function App() {
     [constructions, lunes, currentLune],
   );
 
-  const exportData = () =>
+  const exportData = () => {
     exportStateData({
       resources,
       persos,
@@ -363,18 +378,23 @@ function App() {
       sacs,
       persoSacs,
     });
+    showToast("Export réussi.");
+  };
 
   const importData = (event: ChangeEvent<HTMLInputElement>) =>
     importStateFile(event, {
       fileInputRef,
       setCompleteState,
+      onSuccess: () => showToast("Import réussi."),
     });
 
-  const resetData = () =>
-    resetAppData({
+  const resetData = async () => {
+    await resetAppData({
       setCompleteState,
       setSaveStatus,
     });
+    showToast("Données réinitialisées.");
+  };
 
   const timelineData = useMemo(
     () =>
@@ -426,6 +446,98 @@ function App() {
     [timelineData, earliestVisibleLune],
   );
 
+  const handleAddResource = () => {
+    addResource();
+    showToast("Ressource ajoutée.");
+  };
+
+  const handleRemoveResource = (index: number) => {
+    const resource = resources[index];
+    removeResource(index);
+    showToast(
+      `Ressource ${resource?.name || resource?.code?.toUpperCase() || "supprimée"}.`,
+    );
+  };
+
+  const handleAddPerso = () => {
+    addPerso();
+    showToast("Membre recruté.");
+  };
+
+  const handleRemovePerso = (index: number) => {
+    const perso = persos[index];
+    removePerso(index);
+    showToast(`${perso?.nom || "Le personnage"} a été renvoyé.`);
+  };
+
+  const handleAddGroup = () => {
+    addGroup();
+    showToast("Groupe créé.");
+  };
+
+  const handleRemoveGroup = (groupId: number) => {
+    const group = groups.find((item) => item.id === groupId);
+    removeGroup(groupId);
+    showToast(`${group?.name || "Le groupe"} a été supprimé.`);
+  };
+
+  const handleAddConstruction = () => {
+    addConstruction();
+    showToast("Chantier ajouté.");
+  };
+
+  const handleRemoveConstruction = (constructionId: string) => {
+    const construction = constructions.find(
+      (item) => item.id === constructionId,
+    );
+    removeConstruction(constructionId);
+    showToast(`${construction?.name || "Le chantier"} a été supprimé.`);
+  };
+
+  const handleAddLune = () => {
+    addLune();
+    showToast("Nouvelle lune ajoutée.");
+  };
+
+  const handleRemoveLune = (luneIndex: number) => {
+    const luneId = Number(lunes[luneIndex]?.id ?? luneIndex + 1);
+    removeLune(luneIndex);
+    showToast(`Lune ${luneId} supprimée.`);
+  };
+
+  const handleAddArme = () => {
+    addArme();
+    showToast("Arme ajoutée.");
+  };
+
+  const handleRemoveArme = (index: number) => {
+    const arme = armes[index];
+    removeArme(index);
+    showToast(`${arme?.name || "L'arme"} a été supprimée.`);
+  };
+
+  const handleAddOutil = () => {
+    addOutil();
+    showToast("Outil ajouté.");
+  };
+
+  const handleRemoveOutil = (index: number) => {
+    const outil = outils[index];
+    removeOutil(index);
+    showToast(`${outil?.name || "L'outil"} a été supprimé.`);
+  };
+
+  const handleAddSac = () => {
+    addSac();
+    showToast("Sac ajouté.");
+  };
+
+  const handleRemoveSac = (index: number) => {
+    const sac = sacs[index];
+    removeSac(index);
+    showToast(`${sac?.name || "Le sac"} a été supprimé.`);
+  };
+
   const canShowMorePastLunes = visiblePastLunes < Number(currentLune ?? 1) - 1;
   const canShowLessPastLunes = visiblePastLunes > 0;
 
@@ -457,6 +569,7 @@ function App() {
     setVisiblePastLunes(0);
     setCurrentLune(nextCurrentLune);
     saveCurrentLuneEntity(nextCurrentLune);
+    showToast(`Passage à la lune ${nextCurrentLune}.`);
   };
 
   const pages: PageTab[] = [
@@ -473,6 +586,7 @@ function App() {
 
   return (
     <>
+      <ToastViewport toasts={toasts} />
       <h1>Fractal - Planificateur de Faction (V9)</h1>
       <SaveBar
         saveStatus={saveStatus}
@@ -563,9 +677,9 @@ function App() {
       {page === "resources" && (
         <ResourcesPage
           resources={resources}
-          addResource={addResource}
+          addResource={handleAddResource}
           updateResource={updateResource}
-          removeResource={removeResource}
+          removeResource={handleRemoveResource}
           getResourceDeleteGuard={getResourceDeleteGuard}
         />
       )}
@@ -573,8 +687,8 @@ function App() {
       {page === "effectif" && (
         <EffectifPage
           persos={persos}
-          removePerso={removePerso}
-          addPerso={addPerso}
+          removePerso={handleRemovePerso}
+          addPerso={handleAddPerso}
           openPersoPage={openPersoPage}
           updatePersoPresence={(persoId, isPresent) =>
             handlePersoUpdateById(persoId, "present", isPresent)
@@ -588,7 +702,8 @@ function App() {
           persos={persos}
           openGroupPage={openGroupPage}
           openGroupViewPage={openGroupViewPage}
-          addGroup={addGroup}
+          addGroup={handleAddGroup}
+          removeGroup={handleRemoveGroup}
           setGroupPresence={setGroupPresence}
         />
       )}
@@ -639,9 +754,9 @@ function App() {
           resources={resources}
           constructionProgress={constructionProgress}
           constructionStates={currentTimelineSegment?.constructionStates || {}}
-          addConstruction={addConstruction}
+          addConstruction={handleAddConstruction}
           updateConstruction={updateConstruction}
-          removeConstruction={removeConstruction}
+          removeConstruction={handleRemoveConstruction}
         />
       )}
 
@@ -651,7 +766,7 @@ function App() {
           resources={resources}
           constructions={constructions}
           timelineData={visibleTimelineData}
-          removeLune={removeLune}
+          removeLune={handleRemoveLune}
           updateLuneGlobal={updateLuneGlobal}
           updateRation={updateRation}
           toggleConstructionPlacement={toggleConstructionPlacement}
@@ -659,34 +774,34 @@ function App() {
           openOverrides={openOverrides}
           setOverride={setOverride}
           clearOverrides={clearOverrides}
-          addLune={addLune}
+          addLune={handleAddLune}
         />
       )}
 
       {page === "armes" && (
         <WeaponsPage
           armes={armes}
-          addArme={addArme}
+          addArme={handleAddArme}
           updateArme={updateArme}
-          removeArme={removeArme}
+          removeArme={handleRemoveArme}
         />
       )}
 
       {page === "outils" && (
         <ToolsPage
           outils={outils}
-          addOutil={addOutil}
+          addOutil={handleAddOutil}
           updateOutil={updateOutil}
-          removeOutil={removeOutil}
+          removeOutil={handleRemoveOutil}
         />
       )}
 
       {page === "sacs" && (
         <BagsPage
           sacs={sacs}
-          addSac={addSac}
+          addSac={handleAddSac}
           updateSac={updateSac}
-          removeSac={removeSac}
+          removeSac={handleRemoveSac}
         />
       )}
     </>
