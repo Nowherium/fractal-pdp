@@ -1,0 +1,17 @@
+{
+  "cSpell.configFile": "${workspaceFolder}/cspell.json",
+  "cSpell.language": "en,fr",
+  "cSpell.allowCompoundWords": true,
+  "cSpell.enabledLanguageIds": [
+    "typescript",
+    "typescriptreact",
+    "javascript",
+    "javascriptreact",
+    "json",
+    "jsonc",
+    "markdown",
+    "yaml",
+    "html",
+    "css"
+  ]
+}
