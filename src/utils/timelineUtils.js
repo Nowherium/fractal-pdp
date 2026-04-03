@@ -6,6 +6,7 @@ import {
   getDrugSummary,
   normalizeDrugCode,
 } from "./drugEffects.js";
+import { normalizeLuneConstructions } from "./stateUtils.js";
 
 const computeIncrement = (cap) => (cap < 4 ? 0.1 : cap <= 6 ? 0.05 : 0.01);
 
@@ -52,6 +53,24 @@ const normalizeWeatherCoefficients = (value) => {
   };
 };
 
+const normalizePresenceValue = (value, fallback = true) => {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["false", "0", "off", "no", "non"].includes(normalized)) {
+      return false;
+    }
+    if (["true", "1", "on", "yes", "oui"].includes(normalized)) {
+      return true;
+    }
+  }
+
+  return Boolean(value);
+};
+
 const buildDrugStocksByPerso = (resources = [], persoResources = []) => {
   const resourceCodesById = new Map(
     resources.map((resource) => [
@@ -87,6 +106,50 @@ const buildAvailableDrugsMap = (remainingStocks = {}) =>
     ]),
   );
 
+const mergeConstructionCarryOver = (
+  currentConstructions = [],
+  pendingConstructionsById = {},
+) => {
+  const merged = new Map();
+
+  Object.values(pendingConstructionsById || {}).forEach((construction) => {
+    merged.set(construction.id, {
+      ...construction,
+      carriedOver: true,
+      costPaid: Boolean(construction.costPaid),
+      buildersRequired: Math.max(
+        1,
+        Math.floor(Number(construction.buildersRequired ?? 1) || 1),
+      ),
+      resourceCost: Math.max(0, Number(construction.resourceCost ?? 0) || 0),
+    });
+  });
+
+  normalizeLuneConstructions(currentConstructions).forEach((construction) => {
+    const pendingConstruction = merged.get(construction.id);
+    merged.set(construction.id, {
+      ...pendingConstruction,
+      ...construction,
+      buildersRequired: pendingConstruction
+        ? Math.max(
+            1,
+            Math.floor(
+              Number(
+                pendingConstruction.buildersRequired ??
+                  construction.buildersRequired ??
+                  1,
+              ) || 1,
+            ),
+          )
+        : construction.buildersRequired,
+      costPaid: Boolean(pendingConstruction?.costPaid),
+      carriedOver: Boolean(pendingConstruction),
+    });
+  });
+
+  return Array.from(merged.values());
+};
+
 export const simulateTimeline = (
   persos,
   lunes,
@@ -99,14 +162,23 @@ export const simulateTimeline = (
   const timeline = [];
   const pvCourants = {};
   const capCourantes = {};
+  const combatCourants = {};
+  const presenceCourante = {};
   const productionMultipliers = normalizeProductionMultipliers(cityMultipliers);
   const remainingDrugStocksByPerso = buildDrugStocksByPerso(
     resources,
     persoResources,
   );
+  const resourceStocks = Object.fromEntries(
+    Object.entries(stocks || {}).map(([code, value]) => [
+      code,
+      Number(value ?? 0),
+    ]),
+  );
 
   persos.forEach((perso) => {
     pvCourants[perso.id] = Math.max(0, Number(perso.pv ?? perso.pvmax ?? 0));
+    presenceCourante[perso.id] = normalizePresenceValue(perso.present, true);
     capCourantes[perso.id] = {
       eau: Number(perso.capEauEffectif ?? perso.capEau ?? 0),
       nrt: Number(perso.capNrtEffectif ?? perso.capNrt ?? 0),
@@ -114,24 +186,38 @@ export const simulateTimeline = (
       mat: Number(perso.capMatEffectif ?? perso.capMat ?? 0),
       art: Number(perso.capArtEffectif ?? perso.capart ?? 0),
     };
+    combatCourants[perso.id] = Number(perso.combat ?? 0);
     remainingDrugStocksByPerso[perso.id] =
       remainingDrugStocksByPerso[perso.id] || {};
   });
 
-  let stockEau = stocks.eau ?? 0;
-  let stockNrt = stocks.nrt ?? 0;
-  let stockMed = stocks.med ?? 0;
-  let stockMat = stocks.mat ?? 0;
+  let stockEau = Number(resourceStocks.eau ?? 0);
+  let stockNrt = Number(resourceStocks.nrt ?? 0);
+  let stockMed = Number(resourceStocks.med ?? 0);
+  let stockMat = Number(resourceStocks.mat ?? 0);
+  let pendingConstructionsById = {};
 
   lunes.forEach((lune) => {
     const overrides = lune.overrides || {};
+    const constructions = mergeConstructionCarryOver(
+      lune.constructions,
+      pendingConstructionsById,
+    );
     const weatherCoefficients = normalizeWeatherCoefficients(lune.meteo);
 
     persos.forEach((perso) => {
       const override = overrides[perso.id];
       if (!override) return;
-      if (override.pv !== undefined)
+
+      if (override.present !== undefined) {
+        presenceCourante[perso.id] = normalizePresenceValue(
+          override.present,
+          presenceCourante[perso.id],
+        );
+      }
+      if (override.pv !== undefined) {
         pvCourants[perso.id] = Math.max(0, Number(override.pv) || 0);
+      }
       if (override.capEau !== undefined)
         capCourantes[perso.id].eau = override.capEau;
       if (override.capNrt !== undefined)
@@ -142,9 +228,13 @@ export const simulateTimeline = (
         capCourantes[perso.id].mat = override.capMat;
       if (override.capArt !== undefined)
         capCourantes[perso.id].art = override.capArt;
+      if (override.combat !== undefined) {
+        combatCourants[perso.id] = Number(override.combat) || 0;
+      }
     });
 
     const rows = [];
+    const constructionAssignments = [];
     let luneProdEau = 0;
     let luneProdNrt = 0;
     let luneProdMed = 0;
@@ -158,6 +248,7 @@ export const simulateTimeline = (
       const ration = { ...defaultRation(), ...(lune.rations[perso.id] || {}) };
       const override = overrides[perso.id] || {};
       const hasOverride = Object.keys(override).length > 0;
+      const isAbsent = presenceCourante[perso.id] === false;
       const mortAuDebut = basePvDebut <= 0;
       const selectedDrugCode = normalizeDrugCode(ration.drogue);
       const availableDrugs = buildAvailableDrugsMap(
@@ -165,6 +256,7 @@ export const simulateTimeline = (
       );
 
       const baseCapsAtStart = { ...capCourantes[perso.id] };
+      const baseCombatAtStart = Number(combatCourants[perso.id] ?? 0);
       let cDebut = {
         eau:
           baseCapsAtStart.eau *
@@ -192,6 +284,32 @@ export const simulateTimeline = (
       let drugClassName = "";
       let temporaryPvBonus = 0;
 
+      if (isAbsent) {
+        mortText = " (ABSENT)";
+        drugStatus = "Absent — ignoré dans les calculs";
+        drugClassName = "inactive";
+
+        rows.push({
+          persoId: perso.id,
+          nom: perso.nom,
+          pvDebut,
+          pvFin,
+          pvDisplayDebut: pvDebut > 0 ? formatDisplayValue(pvDebut) : 0,
+          pvDisplayFin: pvFin > 0 ? formatDisplayValue(pvFin) : 0,
+          cDebut,
+          ration,
+          mortAuDebut,
+          isAbsent,
+          classPv,
+          mortText,
+          hasOverride,
+          availableDrugs,
+          drugStatus,
+          drugClassName,
+        });
+        return;
+      }
+
       if (selectedDrugCode && mortAuDebut) {
         drugStatus = "⚠️ Impossible à consommer sur un cadavre";
         drugClassName = "warning";
@@ -215,7 +333,7 @@ export const simulateTimeline = (
             );
           }
 
-          if (drugEffect.combatMultiplier) {
+          if (drugEffect.combatMultiplier || drugEffect.productionMultiplier) {
             drugStatus = `${getDrugLabel(selectedDrugCode)} — ${getDrugSummary(selectedDrugCode)}`;
           }
 
@@ -227,7 +345,6 @@ export const simulateTimeline = (
               mat: cDebut.mat * drugEffect.productionMultiplier,
               art: cDebut.art * drugEffect.productionMultiplier,
             };
-            drugStatus = `${getDrugLabel(selectedDrugCode)} — ${getDrugSummary(selectedDrugCode)}`;
           }
 
           if (drugEffect.instantPvBonus) {
@@ -261,6 +378,14 @@ export const simulateTimeline = (
           capCourantes[perso.id].mat =
             baseCapsAtStart.mat + computeIncrement(baseCapsAtStart.mat);
         }
+        if (ration.tache === "construire" && ration.constructionId) {
+          constructionAssignments.push({
+            persoId: perso.id,
+            constructionId: String(ration.constructionId),
+            baseCapsAtStart,
+            baseCombatAtStart,
+          });
+        }
 
         if (ration.eau) luneConsoEau += 1;
         if (ration.nrt) luneConsoNrt += 1;
@@ -289,6 +414,7 @@ export const simulateTimeline = (
         cDebut,
         ration,
         mortAuDebut,
+        isAbsent,
         classPv,
         mortText,
         hasOverride,
@@ -298,14 +424,134 @@ export const simulateTimeline = (
       });
     });
 
-    stockEau = stockEau + luneProdEau - luneConsoEau;
-    stockNrt = stockNrt + luneProdNrt - luneConsoNrt;
-    stockMed = stockMed + luneProdMed - luneConsoMed;
-    stockMat = stockMat + luneProdMat - (lune.coutMat || 0);
+    const projectedStocks = {
+      ...resourceStocks,
+      eau: Number(resourceStocks.eau ?? 0) + luneProdEau - luneConsoEau,
+      nrt: Number(resourceStocks.nrt ?? 0) + luneProdNrt - luneConsoNrt,
+      med: Number(resourceStocks.med ?? 0) + luneProdMed - luneConsoMed,
+      mat: Number(resourceStocks.mat ?? 0) + luneProdMat,
+    };
+
+    const assignmentsByConstructionId = constructionAssignments.reduce(
+      (acc, assignment) => {
+        acc[assignment.constructionId] = acc[assignment.constructionId] || [];
+        acc[assignment.constructionId].push(assignment);
+        return acc;
+      },
+      {},
+    );
+
+    const constructionStates = {};
+    const nextPendingConstructionsById = {};
+
+    constructions.forEach((construction) => {
+      const resourceCode = String(construction.resourceCode ?? "mat")
+        .trim()
+        .toLowerCase();
+      const resourceCost = Math.max(0, Number(construction.resourceCost ?? 0));
+      const buildersRequired = Math.max(
+        1,
+        Math.floor(Number(construction.buildersRequired ?? 1) || 1),
+      );
+      const assignedList = assignmentsByConstructionId[construction.id] || [];
+      const assignedBuilders = assignedList.length;
+      let availableResource = Number(projectedStocks[resourceCode] ?? 0);
+      let costPaid = Boolean(construction.costPaid);
+      const canStartWithResources =
+        costPaid || resourceCost <= 0 || availableResource >= resourceCost;
+
+      if (!costPaid && assignedBuilders > 0 && canStartWithResources) {
+        projectedStocks[resourceCode] = availableResource - resourceCost;
+        availableResource = Number(projectedStocks[resourceCode] ?? 0);
+        costPaid = true;
+      }
+
+      const effectiveBuilders = costPaid
+        ? Math.min(assignedBuilders, buildersRequired)
+        : 0;
+
+      assignedList
+        .slice(0, effectiveBuilders)
+        .forEach(({ persoId, baseCapsAtStart, baseCombatAtStart }) => {
+          if (construction.rewardType === "combat") {
+            combatCourants[persoId] =
+              baseCombatAtStart + computeIncrement(baseCombatAtStart);
+          } else {
+            const currentValue = Number(
+              baseCapsAtStart[construction.rewardType] ?? 0,
+            );
+            capCourantes[persoId][construction.rewardType] =
+              currentValue + computeIncrement(currentValue);
+          }
+        });
+
+      const remainingBuilders = Math.max(
+        0,
+        buildersRequired - effectiveBuilders,
+      );
+      const isCompleted = costPaid && remainingBuilders === 0;
+
+      const statusParts = [
+        `${assignedBuilders}/${buildersRequired} bâtisseur(s)`,
+      ];
+      if (resourceCost > 0) {
+        statusParts.push(
+          costPaid
+            ? `coût payé (${resourceCost} ${resourceCode.toUpperCase()})`
+            : `coût ${resourceCost} ${resourceCode.toUpperCase()}`,
+        );
+      }
+
+      if (!costPaid && assignedBuilders > 0 && !canStartWithResources) {
+        statusParts.push("ressource insuffisante");
+      } else if (isCompleted) {
+        statusParts.push("terminé");
+      } else if (effectiveBuilders > 0) {
+        statusParts.push(`en cours • ${remainingBuilders} restant(s)`);
+      } else if (construction.carriedOver) {
+        statusParts.push("reporté");
+      } else {
+        statusParts.push("en attente");
+      }
+
+      constructionStates[construction.id] = {
+        assignedBuilders,
+        buildersRequired,
+        resourceCode,
+        resourceCost,
+        rewardType: construction.rewardType,
+        isCompleted,
+        statusLabel: statusParts.join(" • "),
+      };
+
+      if (!isCompleted) {
+        nextPendingConstructionsById[construction.id] = {
+          ...construction,
+          resourceCode,
+          resourceCost,
+          buildersRequired:
+            remainingBuilders > 0 ? remainingBuilders : buildersRequired,
+          costPaid,
+          carriedOver: true,
+        };
+      }
+    });
+
+    pendingConstructionsById = nextPendingConstructionsById;
+
+    Object.assign(resourceStocks, projectedStocks);
+    stockEau = Number(projectedStocks.eau ?? 0);
+    stockNrt = Number(projectedStocks.nrt ?? 0);
+    stockMed = Number(projectedStocks.med ?? 0);
+    stockMat = Number(projectedStocks.mat ?? 0);
 
     timeline.push({
-      lune,
+      lune: {
+        ...lune,
+        constructions,
+      },
       rows,
+      constructionStates,
       stats: {
         stockEau,
         stockNrt,

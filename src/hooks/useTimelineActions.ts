@@ -1,3 +1,4 @@
+import type { Ration } from "../types";
 import {
   createLune,
   defaultRation,
@@ -15,12 +16,21 @@ export const useTimelineActions = ({
   deleteLuneEntity,
 }) => {
   const addLune = () => {
-    const newLune = createLune(persos);
+    const nextLuneId =
+      lunes.reduce(
+        (maxLuneId, lune) => Math.max(maxLuneId, Number(lune.id) || 0),
+        0,
+      ) + 1;
+    const newLune = createLune(persos, nextLuneId);
     setLunes((previous) => [...previous, newLune]);
     saveLuneEntity(newLune);
   };
 
   const removeLune = (index) => {
+    if (index === 0) {
+      return;
+    }
+
     const luneToRemove = lunes[index];
     if (!luneToRemove) return;
 
@@ -41,11 +51,130 @@ export const useTimelineActions = ({
               ? value === "" || value === null || value === undefined
                 ? null
                 : String(value).toLowerCase()
-              : Boolean(value),
+              : field === "constructionId"
+                ? value === "" || value === null || value === undefined
+                  ? null
+                  : String(value)
+                : Boolean(value),
       };
+
+      if (field === "tache" && value !== "construire") {
+        nextRation.constructionId = null;
+      }
+
+      if (
+        field === "tache" &&
+        value === "construire" &&
+        !nextRation.constructionId
+      ) {
+        nextRation.constructionId = lune.constructions?.[0]?.id ?? null;
+      }
+
       return {
         ...lune,
         rations: { ...lune.rations, [persoId]: nextRation },
+      };
+    });
+
+    setLunes(nextLunes);
+    if (nextLunes[luneIndex]) {
+      saveLuneEntity(nextLunes[luneIndex]);
+    }
+  };
+
+  const addConstruction = (luneIndex) => {
+    const nextLunes = lunes.map((lune, idx) => {
+      if (idx !== luneIndex) return lune;
+
+      const existingConstructions = Array.isArray(lune.constructions)
+        ? lune.constructions
+        : [];
+      const nextConstructionId =
+        existingConstructions.reduce((maxId, construction) => {
+          const numericId = Number(
+            String(construction.id || "").replace(/[^0-9]/g, ""),
+          );
+          return Number.isFinite(numericId)
+            ? Math.max(maxId, numericId)
+            : maxId;
+        }, 0) + 1;
+
+      return {
+        ...lune,
+        constructions: [
+          ...existingConstructions,
+          {
+            id: `lune-${Number(lune.id) || luneIndex + 1}-construction-${nextConstructionId}`,
+            name: `Chantier ${nextConstructionId}`,
+            resourceCode: "mat",
+            resourceCost: 1,
+            buildersRequired: 1,
+            rewardType: "mat",
+          },
+        ],
+      };
+    });
+
+    setLunes(nextLunes);
+    if (nextLunes[luneIndex]) {
+      saveLuneEntity(nextLunes[luneIndex]);
+    }
+  };
+
+  const updateConstruction = (luneIndex, constructionId, field, rawValue) => {
+    const nextLunes = lunes.map((lune, idx) => {
+      if (idx !== luneIndex) return lune;
+
+      return {
+        ...lune,
+        constructions: (lune.constructions || []).map((construction) =>
+          construction.id !== constructionId
+            ? construction
+            : {
+                ...construction,
+                [field]:
+                  field === "resourceCost"
+                    ? Math.max(0, Number(rawValue) || 0)
+                    : field === "buildersRequired"
+                      ? Math.max(1, Math.floor(Number(rawValue) || 1))
+                      : String(rawValue ?? ""),
+              },
+        ),
+      };
+    });
+
+    setLunes(nextLunes);
+    if (nextLunes[luneIndex]) {
+      saveLuneEntity(nextLunes[luneIndex]);
+    }
+  };
+
+  const removeConstruction = (luneIndex, constructionId) => {
+    const nextLunes = lunes.map((lune, idx) => {
+      if (idx !== luneIndex) return lune;
+
+      const nextRations = Object.fromEntries(
+        Object.entries(lune.rations || {}).map(([persoId, ration]) => {
+          const currentRation: Ration =
+            ration && typeof ration === "object"
+              ? (ration as Ration)
+              : defaultRation();
+
+          return [
+            persoId,
+            currentRation.constructionId === constructionId
+              ? { ...currentRation, constructionId: null, tache: "" }
+              : currentRation,
+          ];
+        }),
+      );
+
+      return {
+        ...lune,
+        constructions: (lune.constructions || []).filter(
+          (construction) => construction.id !== constructionId,
+        ),
+        rations: nextRations,
       };
     });
 
@@ -111,9 +240,11 @@ export const useTimelineActions = ({
         existing[persoId] = {
           ...current,
           [field]:
-            field === "pv"
-              ? Math.max(0, Number.isFinite(numericValue) ? numericValue : 0)
-              : numericValue,
+            field === "present"
+              ? rawValue === true || rawValue === "true"
+              : field === "pv"
+                ? Math.max(0, Number.isFinite(numericValue) ? numericValue : 0)
+                : numericValue,
         };
       }
 
@@ -151,6 +282,9 @@ export const useTimelineActions = ({
     addLune,
     removeLune,
     updateRation,
+    addConstruction,
+    updateConstruction,
+    removeConstruction,
     updateLuneGlobal,
     toggleOverrideMenu,
     setOverride,

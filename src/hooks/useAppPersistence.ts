@@ -43,6 +43,10 @@ export const useAppEntitySaves = ({ ready, isHydratingRef, setSaveStatus }) => {
       queueSave(`city-multipliers`, `/api/city-multipliers`, {
         cityMultipliers,
       }),
+    saveCurrentLuneEntity: (currentLune) =>
+      queueSave(`current-lune`, `/api/current-lune`, {
+        currentLune,
+      }),
     saveResourceEntity: (resource) =>
       queueSave(`resource-${resource.id}`, `/api/resources/${resource.id}`, {
         resource,

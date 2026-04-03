@@ -140,6 +140,7 @@ export const useAppState = () => {
   const initialRouteState = getRouteStateFromLocation();
 
   const [nextPersoId, setNextPersoId] = useState<number>(2);
+  const [currentLune, setCurrentLune] = useState<number>(1);
   const [page, setPage] = useState<AppPage>(initialRouteState.page);
   const [selectedPersoId, setSelectedPersoId] = useState<number | null>(
     initialRouteState.selectedPersoId,
@@ -209,10 +210,13 @@ export const useAppState = () => {
     setSacs(state.sacs);
     setPersoSacs(state.persoSacs);
     setNextPersoId(state.nextPersoId);
+    setCurrentLune(state.currentLune);
 
     window.setTimeout(() => {
       isHydratingRef.current = false;
     }, 0);
+
+    return state;
   };
 
   return {
@@ -244,6 +248,8 @@ export const useAppState = () => {
     setPersoSacs,
     nextPersoId,
     setNextPersoId,
+    currentLune,
+    setCurrentLune,
     page,
     setPage,
     selectedPersoId,

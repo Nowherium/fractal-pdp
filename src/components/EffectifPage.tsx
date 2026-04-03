@@ -19,11 +19,13 @@ function EffectifPage({
   removePerso,
   addPerso,
   openPersoPage,
+  updatePersoPresence,
 }: {
   persos: Perso[];
   removePerso: (index: number) => void;
   addPerso: () => void;
   openPersoPage: (persoId: number) => void;
+  updatePersoPresence: (persoId: number, isPresent: boolean) => void;
 }) {
   return (
     <div className='panel'>
@@ -76,6 +78,7 @@ function EffectifPage({
             <th className='highlight'>CMD</th>
             <th className='highlight'>Combat</th>
             <th className='highlight'>Poids</th>
+            <th className='highlight'>Présent</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -109,6 +112,16 @@ function EffectifPage({
               >
                 {formatCombat(getPersoWeightValue(p))} /{" "}
                 {formatCombat(getPersoWeightLimit(p))}
+              </td>
+              <td className='highlight checkbox-cell'>
+                <input
+                  type='checkbox'
+                  checked={p.present !== false}
+                  aria-label={`Présence de ${p.nom}`}
+                  onChange={(event) =>
+                    updatePersoPresence(p.id, event.target.checked)
+                  }
+                />
               </td>
               <td>
                 <button

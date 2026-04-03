@@ -13,7 +13,7 @@ import TimelinePage from "./components/TimelinePage";
 import WeaponsPage from "./components/WeaponsPage";
 import ToolsPage from "./components/ToolsPage";
 import BagsPage from "./components/BagsPage";
-import { defaultRation } from "./utils/stateUtils";
+import { defaultRation, normalizeCurrentLune } from "./utils/stateUtils";
 import { simulateTimeline } from "./utils/timelineUtils";
 import {
   exportStateData,
@@ -63,6 +63,8 @@ function App() {
     setPersoSacs,
     nextPersoId,
     setNextPersoId,
+    currentLune,
+    setCurrentLune,
     page,
     setPage,
     selectedPersoId,
@@ -91,6 +93,7 @@ function App() {
 
   const {
     saveCityMultipliersEntity,
+    saveCurrentLuneEntity,
     saveResourceEntity,
     deleteResourceEntity,
     savePersoEntity,
@@ -151,6 +154,12 @@ function App() {
     });
   };
 
+  const handleCurrentLuneChange = (rawValue: string | number) => {
+    const nextCurrentLune = normalizeCurrentLune(rawValue);
+    setCurrentLune(nextCurrentLune);
+    saveCurrentLuneEntity(nextCurrentLune);
+  };
+
   const {
     addResource,
     updateResource,
@@ -200,6 +209,9 @@ function App() {
     addLune,
     removeLune,
     updateRation,
+    addConstruction,
+    updateConstruction,
+    removeConstruction,
     updateLuneGlobal,
     toggleOverrideMenu,
     setOverride,
@@ -220,6 +232,7 @@ function App() {
     addGroup,
     handleGroupMembersUpdate,
     handleGroupUpdateSafe,
+    setGroupPresence,
   } = useGroupActions({
     groups,
     persos,
@@ -229,6 +242,7 @@ function App() {
     setPage,
     saveGroupEntity,
     saveGroupMembersEntity,
+    savePersoEntity,
   });
 
   const {
@@ -275,6 +289,7 @@ function App() {
       persos,
       persoResources,
       lunes,
+      currentLune,
       nextPersoId,
       stocks,
       cityMultipliers,
@@ -337,6 +352,20 @@ function App() {
 
       {loadError ? <div className='info-text'>{loadError}</div> : null}
 
+      <div className='current-lune-bar'>
+        <label className='current-lune-label'>
+          🌘 Lune actuelle
+          <input
+            className='current-lune-input'
+            type='number'
+            min='1'
+            step='1'
+            value={currentLune}
+            onChange={(event) => handleCurrentLuneChange(event.target.value)}
+          />
+        </label>
+      </div>
+
       <PageTabs pages={pages} currentPage={page} setPage={setPage} />
 
       {page === "reserve" && (
@@ -371,6 +400,9 @@ function App() {
           removePerso={removePerso}
           addPerso={addPerso}
           openPersoPage={openPersoPage}
+          updatePersoPresence={(persoId, isPresent) =>
+            handlePersoUpdateById(persoId, "present", isPresent)
+          }
         />
       )}
 
@@ -381,6 +413,7 @@ function App() {
           openGroupPage={openGroupPage}
           openGroupViewPage={openGroupViewPage}
           addGroup={addGroup}
+          setGroupPresence={setGroupPresence}
         />
       )}
 
@@ -426,10 +459,15 @@ function App() {
 
       {page === "timeline" && (
         <TimelinePage
+          currentLune={currentLune}
+          resources={resources}
           timelineData={timelineData}
           removeLune={removeLune}
           updateLuneGlobal={updateLuneGlobal}
           updateRation={updateRation}
+          addConstruction={addConstruction}
+          updateConstruction={updateConstruction}
+          removeConstruction={removeConstruction}
           toggleOverrideMenu={toggleOverrideMenu}
           openOverrides={openOverrides}
           setOverride={setOverride}

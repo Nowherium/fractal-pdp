@@ -14,12 +14,14 @@ function GroupPage({
   openGroupPage,
   openGroupViewPage,
   addGroup,
+  setGroupPresence,
 }: {
   groups: Group[];
   persos: Perso[];
   openGroupPage: (groupId: number) => void;
   openGroupViewPage: (groupId: number) => void;
   addGroup: () => void;
+  setGroupPresence: (groupId: number, isPresent: boolean) => void;
 }) {
   const getChefLabel = (chefId: number | null | undefined) => {
     if (chefId === null || chefId === undefined) return "Aucun";
@@ -38,7 +40,8 @@ function GroupPage({
       <h2>3. Groupe</h2>
       <p className='info-text'>
         Liste des groupes connus. Chaque groupe affiche son chef et peut être
-        consulté ou modifié.
+        consulté ou modifié. La colonne <strong>Présents</strong> permet de
+        basculer tout le groupe en présent/absent.
       </p>
       {groups.length === 0 ? (
         <p>Aucun groupe défini pour le moment.</p>
@@ -49,6 +52,7 @@ function GroupPage({
               <th>Groupe</th>
               <th>Chef</th>
               <th>Membres</th>
+              <th>Présents</th>
               <th>💧 Eau</th>
               <th>🍗 Nrt</th>
               <th>💊 Med</th>
@@ -60,15 +64,35 @@ function GroupPage({
           </thead>
           <tbody>
             {groups.map((group) => {
-              const totals = calculateGroupTotals(
-                getGroupMembers(persos, group.id),
-              );
+              const members = getGroupMembers(persos, group.id);
+              const totals = calculateGroupTotals(members);
+              const presentCount = members.filter(
+                (member) => member.present !== false,
+              ).length;
+              const allPresent =
+                members.length > 0 && presentCount === members.length;
 
               return (
                 <tr key={group.id}>
                   <td>{group.name}</td>
                   <td>{getChefLabel(group.chef)}</td>
                   <td>{getMembersLabel(group.id)}</td>
+                  <td>
+                    <label className='group-presence-toggle'>
+                      <input
+                        type='checkbox'
+                        checked={allPresent}
+                        disabled={members.length === 0}
+                        aria-label={`Présence du groupe ${group.name}`}
+                        onChange={(event) =>
+                          setGroupPresence(group.id, event.target.checked)
+                        }
+                      />
+                      <span>
+                        {presentCount}/{members.length}
+                      </span>
+                    </label>
+                  </td>
                   <td>{formatNumber(totals.eau)}</td>
                   <td>{formatNumber(totals.nrt)}</td>
                   <td>{formatNumber(totals.med)}</td>

@@ -74,6 +74,7 @@ const defaultPersos = [
   {
     id: 1,
     nom: "Klostro",
+    present: true,
     pvmax: 18,
     pv: 18,
     capEau: 2.96,
@@ -102,6 +103,7 @@ const defaultWeatherCoefficients = {
   med: 1,
   mat: 1,
 };
+const defaultCurrentLune = 1;
 
 const defaultRation = () => ({
   eau: true,
@@ -109,6 +111,7 @@ const defaultRation = () => ({
   med: true,
   tache: "",
   drogue: null,
+  constructionId: null,
 });
 
 const pool = new Pool({ connectionString: DATABASE_URL });
@@ -134,6 +137,11 @@ const normalizeResourceName = (value, fallback = "Ressource") => {
 
 const normalizeNonNegativeNumber = (value) =>
   Math.max(0, normalizeNumber(value));
+
+const normalizeCurrentLuneValue = (value, fallback = defaultCurrentLune) => {
+  const normalized = Math.floor(Number(value));
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
+};
 
 const normalizeMultiplier = (value, fallback = 1) => {
   const normalized = Number(value);
@@ -192,6 +200,24 @@ const normalizeOptionalId = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const normalized = Number(value);
   return Number.isFinite(normalized) ? normalized : null;
+};
+
+const normalizeBoolean = (value, fallback = false) => {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["false", "0", "off", "no", "non"].includes(normalized)) {
+      return false;
+    }
+    if (["true", "1", "on", "yes", "oui"].includes(normalized)) {
+      return true;
+    }
+  }
+
+  return Boolean(value);
 };
 
 const getGroupCapacity = (cmdValue) =>
@@ -292,6 +318,7 @@ const buildGroupsPayload = (groups, persosPayload) => {
 const normalizePersoRow = (row) => ({
   id: row.id,
   nom: row.nom,
+  present: normalizeBoolean(row.present, true),
   pvmax: normalizeNonNegativeNumber(row.pvmax ?? row.pvbase),
   pv: normalizeNonNegativeNumber(row.pv ?? row.pvmax ?? row.pvbase),
   capEau: normalizeNumber(row.capeau),
@@ -384,6 +411,7 @@ const buildLunes = (luneRows, rationsRows, overridesRows) => {
       med: row.med,
       tache: row.tache,
       drogue: row.drogue || null,
+      constructionId: row.construction_id || null,
     };
   });
 
@@ -396,7 +424,6 @@ const buildLunes = (luneRows, rationsRows, overridesRows) => {
 
   return luneRows.map((row) => ({
     id: Number(row.id),
-    coutMat: normalizeNumber(row.coutmat),
     meteo: normalizeWeatherCoefficients({
       eau: row.meteo_eau ?? row.meteo,
       nrt: row.meteo_nrt ?? row.meteo,
@@ -405,6 +432,7 @@ const buildLunes = (luneRows, rationsRows, overridesRows) => {
     }),
     rations: rationsByLune[Number(row.id)] || {},
     overrides: overridesByLune[Number(row.id)] || {},
+    constructions: Array.isArray(row.constructions) ? row.constructions : [],
   }));
 };
 
@@ -428,7 +456,7 @@ const getState = async () => {
   );
 
   const { rows: cityRows } = await pool.query(
-    "SELECT id, name, mult_eau, mult_nrt, mult_med, mult_mat FROM cities ORDER BY id ASC",
+    "SELECT id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune FROM cities ORDER BY id ASC",
   );
   const cities = cityRows.map((row) => ({
     id: Number(row.id),
@@ -441,6 +469,10 @@ const getState = async () => {
     med: normalizeMultiplier(activeCity?.mult_med, defaultCityMultipliers.med),
     mat: normalizeMultiplier(activeCity?.mult_mat, defaultCityMultipliers.mat),
   };
+  const currentLune = normalizeCurrentLuneValue(
+    activeCity?.current_lune,
+    defaultCurrentLune,
+  );
 
   const { rows: groupRows } = await pool.query(
     "SELECT group_id, name, chef FROM groups ORDER BY group_id ASC",
@@ -521,6 +553,7 @@ const getState = async () => {
     `SELECT
       p.id,
       p.nom,
+      p.present,
       p.pvmax,
       p.pv,
       p.poidsmax,
@@ -619,10 +652,10 @@ const getState = async () => {
   const persos = persoRows.map(normalizePersoRow);
 
   const { rows: luneRows } = await pool.query(
-    "SELECT id, coutMat, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat FROM lunes ORDER BY id ASC",
+    "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions FROM lunes ORDER BY id ASC",
   );
   const { rows: rationsRows } = await pool.query(
-    "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue FROM rations",
+    "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id FROM rations",
   );
   const { rows: overridesRows } = await pool.query(
     "SELECT lune_id, perso_id, data FROM overrides",
@@ -635,6 +668,7 @@ const getState = async () => {
     stocks,
     persos,
     lunes,
+    currentLune,
     nextPersoId,
     resources,
     cities,
@@ -659,6 +693,10 @@ const insertState = async (state) => {
     ? { ...defaultStocks, ...(state.stocks || {}) }
     : null;
   const cityMultipliers = state.cityMultipliers || null;
+  const currentLune = normalizeCurrentLuneValue(
+    state.currentLune,
+    defaultCurrentLune,
+  );
   const groups = Array.isArray(state.groups) ? state.groups : null;
   const armes = Array.isArray(state.armes) ? state.armes : null;
   const persoArmes = Array.isArray(state.persoArmes) ? state.persoArmes : null;
@@ -682,26 +720,28 @@ const insertState = async (state) => {
       ),
     })) || null;
 
-  const cityMultipliersPayload = cityMultipliers
-    ? {
-        eau: normalizeMultiplier(
-          cityMultipliers.eau,
-          defaultCityMultipliers.eau,
-        ),
-        nrt: normalizeMultiplier(
-          cityMultipliers.nrt,
-          defaultCityMultipliers.nrt,
-        ),
-        med: normalizeMultiplier(
-          cityMultipliers.med,
-          defaultCityMultipliers.med,
-        ),
-        mat: normalizeMultiplier(
-          cityMultipliers.mat,
-          defaultCityMultipliers.mat,
-        ),
-      }
-    : null;
+  const citySettingsPayload =
+    cityMultipliers || state.currentLune !== undefined
+      ? {
+          eau: normalizeMultiplier(
+            cityMultipliers?.eau,
+            defaultCityMultipliers.eau,
+          ),
+          nrt: normalizeMultiplier(
+            cityMultipliers?.nrt,
+            defaultCityMultipliers.nrt,
+          ),
+          med: normalizeMultiplier(
+            cityMultipliers?.med,
+            defaultCityMultipliers.med,
+          ),
+          mat: normalizeMultiplier(
+            cityMultipliers?.mat,
+            defaultCityMultipliers.mat,
+          ),
+          current_lune: currentLune,
+        }
+      : null;
 
   const persosById = new Map();
   for (const p of persos || []) {
@@ -710,6 +750,7 @@ const insertState = async (state) => {
     persosById.set(id, {
       id,
       nom: p.nom,
+      present: normalizeBoolean(p.present, true),
       pvmax: normalizeNonNegativeNumber(p.pvmax ?? p.pvBase),
       pv: normalizeNonNegativeNumber(p.pv ?? p.pvmax ?? p.pvBase),
       poidsmax: normalizeNonNegativeNumber(p.poidsMax ?? 20),
@@ -735,11 +776,13 @@ const insertState = async (state) => {
     const meteo = normalizeWeatherCoefficients(lune.meteo);
     lunesById.set(luneId, {
       id: luneId,
-      coutmat: normalizeNumber(lune.coutMat),
       meteo_eau: meteo.eau,
       meteo_nrt: meteo.nrt,
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
+      constructions: Array.isArray(lune.constructions)
+        ? lune.constructions
+        : [],
     });
 
     const rations = lune.rations || {};
@@ -754,6 +797,7 @@ const insertState = async (state) => {
         med: ration?.med ?? true,
         tache: ration?.tache || "",
         drogue: ration?.drogue || null,
+        construction_id: ration?.constructionId || null,
       });
     }
 
@@ -951,24 +995,26 @@ const insertState = async (state) => {
       );
     }
 
-    if (cityMultipliersPayload !== null) {
+    if (citySettingsPayload !== null) {
       await client.query(
-        `INSERT INTO cities (id, name, mult_eau, mult_nrt, mult_med, mult_mat)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO cities (id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id)
          DO UPDATE SET
            name = EXCLUDED.name,
            mult_eau = EXCLUDED.mult_eau,
            mult_nrt = EXCLUDED.mult_nrt,
            mult_med = EXCLUDED.mult_med,
-           mult_mat = EXCLUDED.mult_mat`,
+           mult_mat = EXCLUDED.mult_mat,
+           current_lune = EXCLUDED.current_lune`,
         [
           defaultCity.id,
           defaultCity.name,
-          cityMultipliersPayload.eau,
-          cityMultipliersPayload.nrt,
-          cityMultipliersPayload.med,
-          cityMultipliersPayload.mat,
+          citySettingsPayload.eau,
+          citySettingsPayload.nrt,
+          citySettingsPayload.med,
+          citySettingsPayload.mat,
+          citySettingsPayload.current_lune,
         ],
       );
     }
@@ -1100,11 +1146,12 @@ const insertState = async (state) => {
     if (persosPayload !== null) {
       if (persosPayload.length > 0) {
         await client.query(
-          `INSERT INTO persos (id, nom, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
-           SELECT id, nom, pvmax, pv, poidsmax, capeau, capnrt, capmed, capmat, capart, cmd, combat, group_id
+          `INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
+           SELECT id, nom, present, pvmax, pv, poidsmax, capeau, capnrt, capmed, capmat, capart, cmd, combat, group_id
            FROM json_to_recordset($1::json) AS incoming(
              id integer,
              nom text,
+             present boolean,
              pvmax numeric,
              pv numeric,
              poidsmax numeric,
@@ -1120,6 +1167,7 @@ const insertState = async (state) => {
            ON CONFLICT (id)
            DO UPDATE SET
              nom = EXCLUDED.nom,
+             present = EXCLUDED.present,
              pvmax = EXCLUDED.pvmax,
              pv = EXCLUDED.pv,
              poidsmax = EXCLUDED.poidsmax,
@@ -1252,23 +1300,23 @@ const insertState = async (state) => {
     if (lunesPayload !== null) {
       if (lunesPayload.length > 0) {
         await client.query(
-          `INSERT INTO lunes (id, coutMat, meteo_eau, meteo_nrt, meteo_med, meteo_mat)
-           SELECT id, coutmat, meteo_eau, meteo_nrt, meteo_med, meteo_mat
+          `INSERT INTO lunes (id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions)
+           SELECT id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions
            FROM json_to_recordset($1::json) AS incoming(
              id bigint,
-             coutmat numeric,
              meteo_eau numeric,
              meteo_nrt numeric,
              meteo_med numeric,
-             meteo_mat numeric
+             meteo_mat numeric,
+             constructions jsonb
            )
            ON CONFLICT (id)
            DO UPDATE SET
-             coutMat = EXCLUDED.coutMat,
              meteo_eau = EXCLUDED.meteo_eau,
              meteo_nrt = EXCLUDED.meteo_nrt,
              meteo_med = EXCLUDED.meteo_med,
-             meteo_mat = EXCLUDED.meteo_mat`,
+             meteo_mat = EXCLUDED.meteo_mat,
+             constructions = EXCLUDED.constructions`,
           [JSON.stringify(lunesPayload)],
         );
         await client.query(
@@ -1281,8 +1329,8 @@ const insertState = async (state) => {
 
       if (rationsPayload.length > 0) {
         await client.query(
-          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue)
-           SELECT lune_id, perso_id, eau, nrt, med, tache, drogue
+          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id)
+           SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id
            FROM json_to_recordset($1::json) AS incoming(
              lune_id bigint,
              perso_id integer,
@@ -1290,7 +1338,8 @@ const insertState = async (state) => {
              nrt boolean,
              med boolean,
              tache text,
-             drogue text
+             drogue text,
+             construction_id text
            )
            ON CONFLICT (lune_id, perso_id)
            DO UPDATE SET
@@ -1298,7 +1347,8 @@ const insertState = async (state) => {
              nrt = EXCLUDED.nrt,
              med = EXCLUDED.med,
              tache = EXCLUDED.tache,
-             drogue = EXCLUDED.drogue`,
+             drogue = EXCLUDED.drogue,
+             construction_id = EXCLUDED.construction_id`,
           [JSON.stringify(rationsPayload)],
         );
         await client.query(
@@ -1634,6 +1684,20 @@ const updateCityMultipliers = async (cityMultipliers = {}) => {
   );
 };
 
+const updateCurrentLune = async (currentLune) => {
+  const payload = normalizeCurrentLuneValue(currentLune, defaultCurrentLune);
+
+  await pool.query(
+    `INSERT INTO cities (id, name, current_lune)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (id)
+     DO UPDATE SET
+       name = EXCLUDED.name,
+       current_lune = EXCLUDED.current_lune`,
+    [defaultCity.id, defaultCity.name, payload],
+  );
+};
+
 const buildLunesWritePayload = (lunes) => {
   const lunesById = new Map();
   const rationsPayload = [];
@@ -1646,11 +1710,13 @@ const buildLunesWritePayload = (lunes) => {
     const meteo = normalizeWeatherCoefficients(lune.meteo);
     lunesById.set(luneId, {
       id: luneId,
-      coutmat: normalizeNumber(lune.coutMat),
       meteo_eau: meteo.eau,
       meteo_nrt: meteo.nrt,
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
+      constructions: Array.isArray(lune.constructions)
+        ? lune.constructions
+        : [],
     });
 
     const rations = lune.rations || {};
@@ -1665,6 +1731,7 @@ const buildLunesWritePayload = (lunes) => {
         med: ration?.med ?? true,
         tache: ration?.tache || "",
         drogue: ration?.drogue || null,
+        construction_id: ration?.constructionId || null,
       });
     }
 
@@ -1687,9 +1754,105 @@ const buildLunesWritePayload = (lunes) => {
   };
 };
 
+const normalizeExistingLuneIds = async () => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { rows: luneRows } = await client.query(
+      "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions FROM lunes ORDER BY id ASC",
+    );
+
+    const alreadySequential = luneRows.every(
+      (row, index) => Number(row.id) === index + 1,
+    );
+
+    if (luneRows.length === 0 || alreadySequential) {
+      await client.query("COMMIT");
+      return;
+    }
+
+    const { rows: rationRows } = await client.query(
+      "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id FROM rations ORDER BY lune_id, perso_id ASC",
+    );
+    const { rows: overrideRows } = await client.query(
+      "SELECT lune_id, perso_id, data FROM overrides ORDER BY lune_id, perso_id ASC",
+    );
+
+    const normalizedLunes = buildLunes(luneRows, rationRows, overrideRows).map(
+      (lune, index) => ({
+        ...lune,
+        id: index + 1,
+      }),
+    );
+
+    const { lunesPayload, rationsPayload, overridesPayload } =
+      buildLunesWritePayload(normalizedLunes);
+
+    await client.query("DELETE FROM overrides");
+    await client.query("DELETE FROM rations");
+    await client.query("DELETE FROM lunes");
+
+    if (lunesPayload.length > 0) {
+      await client.query(
+        `INSERT INTO lunes (id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions)
+         SELECT id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions
+         FROM json_to_recordset($1::json) AS incoming(
+           id bigint,
+           meteo_eau numeric,
+           meteo_nrt numeric,
+           meteo_med numeric,
+           meteo_mat numeric,
+           constructions jsonb
+         )`,
+        [JSON.stringify(lunesPayload)],
+      );
+    }
+
+    if (rationsPayload.length > 0) {
+      await client.query(
+        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id)
+         SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id
+         FROM json_to_recordset($1::json) AS incoming(
+           lune_id bigint,
+           perso_id integer,
+           eau boolean,
+           nrt boolean,
+           med boolean,
+           tache text,
+           drogue text,
+           construction_id text
+         )`,
+        [JSON.stringify(rationsPayload)],
+      );
+    }
+
+    if (overridesPayload.length > 0) {
+      await client.query(
+        `INSERT INTO overrides (lune_id, perso_id, data)
+         SELECT lune_id, perso_id, data
+         FROM json_to_recordset($1::json) AS incoming(
+           lune_id bigint,
+           perso_id integer,
+           data jsonb
+         )`,
+        [JSON.stringify(overridesPayload)],
+      );
+    }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 const getLuneById = async (client, luneId) => {
   const { rows: luneRows } = await client.query(
-    "SELECT id, coutMat, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat FROM lunes WHERE id = $1 LIMIT 1",
+    "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions FROM lunes WHERE id = $1 LIMIT 1",
     [luneId],
   );
 
@@ -1698,7 +1861,7 @@ const getLuneById = async (client, luneId) => {
   }
 
   const { rows: rationRows } = await client.query(
-    "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue FROM rations WHERE lune_id = $1",
+    "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id FROM rations WHERE lune_id = $1",
     [luneId],
   );
   const { rows: overrideRows } = await client.query(
@@ -1721,7 +1884,6 @@ const upsertLune = async (lune) => {
       ...(existingLune || {}),
       ...(lune || {}),
       id: luneId,
-      coutMat: normalizeNumber(lune?.coutMat ?? existingLune?.coutMat),
       meteo: normalizeWeatherCoefficients(lune?.meteo ?? existingLune?.meteo),
       rations:
         lune && Object.prototype.hasOwnProperty.call(lune, "rations")
@@ -1737,31 +1899,31 @@ const upsertLune = async (lune) => {
       buildLunesWritePayload([mergedLune]);
 
     await client.query(
-      `INSERT INTO lunes (id, coutMat, meteo_eau, meteo_nrt, meteo_med, meteo_mat)
-       SELECT id, coutmat, meteo_eau, meteo_nrt, meteo_med, meteo_mat
+      `INSERT INTO lunes (id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions)
+       SELECT id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions
        FROM json_to_recordset($1::json) AS incoming(
          id bigint,
-         coutmat numeric,
          meteo_eau numeric,
          meteo_nrt numeric,
          meteo_med numeric,
-         meteo_mat numeric
+         meteo_mat numeric,
+         constructions jsonb
        )
        ON CONFLICT (id)
        DO UPDATE SET
-         coutMat = EXCLUDED.coutMat,
          meteo_eau = EXCLUDED.meteo_eau,
          meteo_nrt = EXCLUDED.meteo_nrt,
          meteo_med = EXCLUDED.meteo_med,
-         meteo_mat = EXCLUDED.meteo_mat`,
+         meteo_mat = EXCLUDED.meteo_mat,
+         constructions = EXCLUDED.constructions`,
       [JSON.stringify(lunesPayload)],
     );
 
     await client.query("DELETE FROM rations WHERE lune_id = $1", [luneId]);
     if (rationsPayload.length > 0) {
       await client.query(
-        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue)
-         SELECT lune_id, perso_id, eau, nrt, med, tache, drogue
+        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id)
+         SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id
          FROM json_to_recordset($1::json) AS incoming(
            lune_id bigint,
            perso_id integer,
@@ -1769,7 +1931,8 @@ const upsertLune = async (lune) => {
            nrt boolean,
            med boolean,
            tache text,
-           drogue text
+           drogue text,
+           construction_id text
          )`,
         [JSON.stringify(rationsPayload)],
       );
@@ -1942,6 +2105,7 @@ const upsertPerso = async (perso) => {
     const payload = {
       id,
       nom: mergedPerso.nom || `Perso ${id}`,
+      present: normalizeBoolean(mergedPerso.present, true),
       pvmax: normalizeNonNegativeNumber(
         mergedPerso.pvmax ?? mergedPerso.pvBase,
       ),
@@ -1960,11 +2124,12 @@ const upsertPerso = async (perso) => {
     };
     await ensureGroupExists(client, payload.group_id);
     await client.query(
-      `INSERT INTO persos (id, nom, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (id)
        DO UPDATE SET
          nom = EXCLUDED.nom,
+         present = EXCLUDED.present,
          pvmax = EXCLUDED.pvmax,
          pv = EXCLUDED.pv,
          poidsmax = EXCLUDED.poidsmax,
@@ -1979,6 +2144,7 @@ const upsertPerso = async (perso) => {
       [
         payload.id,
         payload.nom,
+        payload.present,
         payload.pvmax,
         payload.pv,
         payload.poidsmax,
@@ -2517,7 +2683,8 @@ const initDb = async () => {
 
     CREATE TABLE IF NOT EXISTS cities (
       id serial PRIMARY KEY,
-      name text UNIQUE NOT NULL
+      name text UNIQUE NOT NULL,
+      current_lune integer NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS city_resources (
@@ -2530,6 +2697,7 @@ const initDb = async () => {
     CREATE TABLE IF NOT EXISTS persos (
       id integer PRIMARY KEY,
       nom text NOT NULL,
+      present boolean NOT NULL DEFAULT true,
       pvmax numeric NOT NULL DEFAULT 0,
       pv numeric NOT NULL DEFAULT 0,
       poidsmax numeric NOT NULL DEFAULT 20,
@@ -2605,12 +2773,12 @@ const initDb = async () => {
 
     CREATE TABLE IF NOT EXISTS lunes (
       id bigint PRIMARY KEY,
-      coutMat numeric NOT NULL DEFAULT 0,
       meteo numeric NOT NULL DEFAULT 1,
       meteo_eau numeric NOT NULL DEFAULT 1,
       meteo_nrt numeric NOT NULL DEFAULT 1,
       meteo_med numeric NOT NULL DEFAULT 1,
-      meteo_mat numeric NOT NULL DEFAULT 1
+      meteo_mat numeric NOT NULL DEFAULT 1,
+      constructions jsonb NOT NULL DEFAULT '[]'::jsonb
     );
 
     CREATE TABLE IF NOT EXISTS rations (
@@ -2621,6 +2789,7 @@ const initDb = async () => {
       med boolean NOT NULL,
       tache text NOT NULL,
       drogue text,
+      construction_id text,
       PRIMARY KEY (lune_id, perso_id)
     );
 
@@ -2637,6 +2806,9 @@ const initDb = async () => {
   );
 
   await pool.query(`ALTER TABLE rations ADD COLUMN IF NOT EXISTS drogue text`);
+  await pool.query(
+    `ALTER TABLE rations ADD COLUMN IF NOT EXISTS construction_id text`,
+  );
 
   await pool.query(
     `ALTER TABLE lunes ADD COLUMN IF NOT EXISTS meteo numeric NOT NULL DEFAULT 1`,
@@ -2647,7 +2819,8 @@ const initDb = async () => {
        ADD COLUMN IF NOT EXISTS meteo_eau numeric NOT NULL DEFAULT 1,
        ADD COLUMN IF NOT EXISTS meteo_nrt numeric NOT NULL DEFAULT 1,
        ADD COLUMN IF NOT EXISTS meteo_med numeric NOT NULL DEFAULT 1,
-       ADD COLUMN IF NOT EXISTS meteo_mat numeric NOT NULL DEFAULT 1`,
+       ADD COLUMN IF NOT EXISTS meteo_mat numeric NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS constructions jsonb NOT NULL DEFAULT '[]'::jsonb`,
   );
 
   await pool.query(
@@ -2656,7 +2829,8 @@ const initDb = async () => {
          meteo_eau = LEAST(1, GREATEST(COALESCE(meteo_eau, meteo, 1), 0)),
          meteo_nrt = LEAST(1, GREATEST(COALESCE(meteo_nrt, meteo, 1), 0)),
          meteo_med = LEAST(1, GREATEST(COALESCE(meteo_med, meteo, 1), 0)),
-         meteo_mat = LEAST(1, GREATEST(COALESCE(meteo_mat, meteo, 1), 0))`,
+         meteo_mat = LEAST(1, GREATEST(COALESCE(meteo_mat, meteo, 1), 0)),
+         constructions = COALESCE(constructions, '[]'::jsonb)`,
   );
 
   await pool.query(
@@ -2664,7 +2838,8 @@ const initDb = async () => {
        ADD COLUMN IF NOT EXISTS mult_eau numeric NOT NULL DEFAULT 1,
        ADD COLUMN IF NOT EXISTS mult_nrt numeric NOT NULL DEFAULT 1,
        ADD COLUMN IF NOT EXISTS mult_med numeric NOT NULL DEFAULT 1,
-       ADD COLUMN IF NOT EXISTS mult_mat numeric NOT NULL DEFAULT 1`,
+       ADD COLUMN IF NOT EXISTS mult_mat numeric NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS current_lune integer NOT NULL DEFAULT 1`,
   );
 
   await pool.query(
@@ -2672,8 +2847,11 @@ const initDb = async () => {
      SET mult_eau = COALESCE(mult_eau, 1),
          mult_nrt = COALESCE(mult_nrt, 1),
          mult_med = COALESCE(mult_med, 1),
-         mult_mat = COALESCE(mult_mat, 1)`,
+         mult_mat = COALESCE(mult_mat, 1),
+         current_lune = GREATEST(COALESCE(current_lune, 1), 1)`,
   );
+
+  await normalizeExistingLuneIds();
 
   const { rows: legacyPvBaseColumn } = await pool.query(
     `SELECT column_name
@@ -2909,6 +3087,12 @@ const initDb = async () => {
     `ALTER TABLE persos ADD COLUMN IF NOT EXISTS combat numeric NOT NULL DEFAULT 0`,
   );
 
+  await pool.query(
+    `ALTER TABLE persos ADD COLUMN IF NOT EXISTS present boolean NOT NULL DEFAULT true`,
+  );
+
+  await pool.query(`UPDATE persos SET present = true WHERE present IS NULL`);
+
   await pool.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS chef integer`);
 
   const { rows: existingConstraint } = await pool.query(
@@ -2948,12 +3132,13 @@ const initDb = async () => {
     "SELECT id FROM persos LIMIT 1",
   );
   if (persoRowsExisting.length === 0) {
-    const defaultLuneId = Date.now();
+    const defaultLuneId = 1;
     await pool.query(
-      "INSERT INTO persos (id, nom, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
+      "INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
       [
         defaultPersos[0].id,
         defaultPersos[0].nom,
+        defaultPersos[0].present,
         defaultPersos[0].pvmax,
         defaultPersos[0].pv,
         defaultPersos[0].poidsMax,
@@ -2968,13 +3153,10 @@ const initDb = async () => {
       ],
     );
 
-    await pool.query("INSERT INTO lunes (id, coutMat) VALUES ($1, $2)", [
-      defaultLuneId,
-      0,
-    ]);
+    await pool.query("INSERT INTO lunes (id) VALUES ($1)", [defaultLuneId]);
     await pool.query(
-      "INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      [defaultLuneId, defaultPersos[0].id, true, true, true, "", null],
+      "INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+      [defaultLuneId, defaultPersos[0].id, true, true, true, "", null, null],
     );
   }
 
@@ -3079,6 +3261,7 @@ export {
   insertState,
   updateStock,
   updateCityMultipliers,
+  updateCurrentLune,
   upsertResource,
   deleteResource,
   upsertLune,

@@ -6,6 +6,7 @@ import {
   insertState,
   updateStock,
   updateCityMultipliers,
+  updateCurrentLune,
   upsertResource,
   deleteResource,
   upsertLune,
@@ -119,6 +120,14 @@ registerPartialRoute("/api/city-multipliers", async (req, res) => {
     res,
     () => updateCityMultipliers(req.body?.cityMultipliers || {}),
     "Impossible de sauvegarder les bonus de la ville",
+  );
+});
+
+registerPartialRoute("/api/current-lune", async (req, res) => {
+  await runDbAction(
+    res,
+    () => updateCurrentLune(req.body?.currentLune),
+    "Impossible de sauvegarder la lune courante",
   );
 });
 
@@ -322,9 +331,10 @@ app.delete("/api/sacs/:id", async (req, res) => {
 
 app.post("/api/reset", async (_req, res) => {
   try {
-    const defaultLuneId = Date.now();
+    const defaultLuneId = 1;
     const defaultState = {
       stocks: defaultStocks,
+      currentLune: 1,
       persos: defaultPersos,
       persoResources: [],
       armes: [],
@@ -336,11 +346,11 @@ app.post("/api/reset", async (_req, res) => {
       lunes: [
         {
           id: defaultLuneId,
-          coutMat: 0,
           rations: Object.fromEntries(
             defaultPersos.map((p) => [p.id, defaultRation()]),
           ),
           overrides: {},
+          constructions: [],
         },
       ],
     };

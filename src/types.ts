@@ -43,6 +43,7 @@ export interface Resource {
 export interface Perso {
   id: number;
   nom: string;
+  present?: boolean;
   pvmax?: number;
   pv?: number;
   capEau?: number;
@@ -139,12 +140,22 @@ export interface Ration {
   med: boolean;
   tache: string;
   drogue: string | null;
+  constructionId?: string | null;
+}
+
+export interface LuneConstruction {
+  id: string;
+  name: string;
+  resourceCode: string;
+  resourceCost: number;
+  buildersRequired: number;
+  rewardType: "eau" | "nrt" | "med" | "mat" | "art" | "combat";
 }
 
 export interface Lune {
   id: number;
-  coutMat: number;
   meteo: WeatherCoefficients;
   rations: Record<string, Ration>;
-  overrides: Record<string, Record<string, number>>;
+  overrides: Record<string, Record<string, number | boolean>>;
+  constructions: LuneConstruction[];
 }

@@ -12,6 +12,7 @@ export const useGroupActions = ({
   setPage,
   saveGroupEntity,
   saveGroupMembersEntity,
+  savePersoEntity,
 }) => {
   const openGroupPage = (groupId) => {
     setSelectedGroupId(groupId);
@@ -105,6 +106,36 @@ export const useGroupActions = ({
     saveGroupMembersEntity(groupId, uniqueIds);
   };
 
+  const setGroupPresence = (groupId, isPresent) => {
+    const memberIdSet = new Set(
+      persos
+        .filter((perso) => perso.groupId === groupId)
+        .map((perso) => perso.id),
+    );
+
+    if (memberIdSet.size === 0) {
+      return;
+    }
+
+    const changedPersos = persos.filter(
+      (perso) =>
+        memberIdSet.has(perso.id) && (perso.present !== false) !== isPresent,
+    );
+
+    if (changedPersos.length === 0) {
+      return;
+    }
+
+    const nextPersos = persos.map((perso) =>
+      memberIdSet.has(perso.id) ? { ...perso, present: isPresent } : perso,
+    );
+
+    setPersos(nextPersos);
+    nextPersos
+      .filter((perso) => memberIdSet.has(perso.id))
+      .forEach((perso) => savePersoEntity(perso));
+  };
+
   const handleGroupUpdateSafe = (groupId, field, rawValue, options) => {
     if (field !== "chef") {
       handleGroupUpdate(groupId, field, rawValue, options);
@@ -153,5 +184,6 @@ export const useGroupActions = ({
     addGroup,
     handleGroupMembersUpdate,
     handleGroupUpdateSafe,
+    setGroupPresence,
   };
 };

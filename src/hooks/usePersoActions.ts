@@ -115,6 +115,7 @@ export const usePersoActions = ({
     const newPerso = {
       id: nextPersoId,
       nom: "Nouveau",
+      present: true,
       pvmax: 10,
       pv: 10,
       capEau: 1,

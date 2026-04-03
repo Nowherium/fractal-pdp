@@ -59,7 +59,41 @@ export const defaultRation = () => ({
   med: true,
   tache: "",
   drogue: null,
+  constructionId: null,
 });
+
+const constructionRewardTypes = new Set([
+  "eau",
+  "nrt",
+  "med",
+  "mat",
+  "art",
+  "combat",
+]);
+
+export const normalizeLuneConstructions = (constructions = []) =>
+  (Array.isArray(constructions) ? constructions : []).map(
+    (construction, index) => ({
+      id: String(construction?.id ?? `construction-${index + 1}`),
+      name: String(construction?.name ?? `Construction ${index + 1}`),
+      resourceCode: String(construction?.resourceCode ?? "mat")
+        .trim()
+        .toLowerCase(),
+      resourceCost: Math.max(0, Number(construction?.resourceCost ?? 0) || 0),
+      buildersRequired: Math.max(
+        1,
+        Math.floor(Number(construction?.buildersRequired ?? 1) || 1),
+      ),
+      rewardType: constructionRewardTypes.has(construction?.rewardType)
+        ? construction.rewardType
+        : "mat",
+    }),
+  );
+
+export const normalizeCurrentLune = (value) => {
+  const numericValue = Math.floor(Number(value));
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 1;
+};
 
 export const normalizeOptionalGroupId = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -69,6 +103,7 @@ export const normalizeOptionalGroupId = (value) => {
 
 export const normalizePersoFieldValue = (field, rawValue) => {
   if (field === "nom") return rawValue;
+  if (field === "present") return Boolean(rawValue);
   if (field === "groupId") return normalizeOptionalGroupId(rawValue);
 
   const numericValue = Number(rawValue);
@@ -107,6 +142,7 @@ export const normalizePersos = (persos = []) =>
     return {
       id: Number(perso.id),
       nom: perso.nom || "Nouveau",
+      present: perso.present !== false,
       pvmax,
       pv,
       poidsMax,
@@ -146,36 +182,38 @@ export const normalizeGroups = (groups) => {
 };
 
 export const normalizeLunes = (lunes = [], persos = []) =>
-  lunes.map((lune) => {
-    const existingRations = lune.rations || {};
-    const rations = Object.fromEntries(
-      Object.entries(existingRations).map(([persoId, ration]) => [
-        persoId,
-        { ...defaultRation(), ...(ration || {}) },
-      ]),
-    );
+  [...lunes]
+    .sort((left, right) => Number(left?.id ?? 0) - Number(right?.id ?? 0))
+    .map((lune, index) => {
+      const existingRations = lune.rations || {};
+      const rations = Object.fromEntries(
+        Object.entries(existingRations).map(([persoId, ration]) => [
+          persoId,
+          { ...defaultRation(), ...(ration || {}) },
+        ]),
+      );
 
-    persos.forEach((perso) => {
-      if (!rations[perso.id]) rations[perso.id] = defaultRation();
+      persos.forEach((perso) => {
+        if (!rations[perso.id]) rations[perso.id] = defaultRation();
+      });
+
+      return {
+        id: index + 1,
+        meteo: normalizeWeatherCoefficients(lune.meteo),
+        rations,
+        overrides: lune.overrides || {},
+        constructions: normalizeLuneConstructions(lune.constructions),
+      };
     });
 
-    return {
-      id: lune.id || Date.now(),
-      coutMat: Number(lune.coutMat ?? 0),
-      meteo: normalizeWeatherCoefficients(lune.meteo),
-      rations,
-      overrides: lune.overrides || {},
-    };
-  });
-
-export const createLune = (persos = []) => ({
-  id: Date.now(),
-  coutMat: 0,
+export const createLune = (persos = [], luneId = 1) => ({
+  id: Math.max(1, Math.floor(Number(luneId) || 1)),
   meteo: { ...defaultWeatherCoefficients },
   rations: Object.fromEntries(
     persos.map((perso) => [perso.id, defaultRation()]),
   ),
   overrides: {},
+  constructions: [],
 });
 
 export const normalizeArmes = (armes = []) =>
@@ -273,7 +311,8 @@ export const buildFallbackState = () => {
     resources: [],
     persos,
     persoResources: [],
-    lunes: [createLune(persos)],
+    lunes: [createLune(persos, 1)],
+    currentLune: 1,
     stocks: defaultStocks,
     cityMultipliers: defaultCityMultipliers,
     nextPersoId: 1,
@@ -294,12 +333,14 @@ export const buildState = (rawState = {}) => {
       : [];
   const persos = normalizePersos(rawState.persos || []);
   const lunes = normalizeLunes(rawState.lunes || [], persos);
+  const currentLune = normalizeCurrentLune(rawState.currentLune);
 
   return {
     resources,
     persos,
     persoResources: normalizePersoResources(rawState.persoResources || []),
-    lunes: lunes.length > 0 ? lunes : [createLune(persos)],
+    lunes: lunes.length > 0 ? lunes : [createLune(persos, 1)],
+    currentLune,
     stocks: { ...buildStocks(resources), ...(rawState.stocks || {}) },
     cityMultipliers: normalizeCityMultipliers(rawState.cityMultipliers || {}),
     nextPersoId:
