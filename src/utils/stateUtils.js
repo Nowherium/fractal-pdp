@@ -87,8 +87,79 @@ export const normalizeLuneConstructions = (constructions = []) =>
       rewardType: constructionRewardTypes.has(construction?.rewardType)
         ? construction.rewardType
         : "mat",
+      status:
+        construction?.status === "done" ||
+        construction?.status === "in-progress" ||
+        construction?.status === "todo"
+          ? construction.status
+          : "todo",
     }),
   );
+
+export const syncConstructionStatusesWithLunes = (
+  constructions = [],
+  lunes = [],
+) => {
+  const placedConstructionIds = new Set(
+    (Array.isArray(lunes) ? lunes : []).flatMap((lune) =>
+      (Array.isArray(lune?.placedConstructionIds)
+        ? lune.placedConstructionIds
+        : []
+      )
+        .map((constructionId) => String(constructionId))
+        .filter(Boolean),
+    ),
+  );
+
+  return normalizeLuneConstructions(constructions).map((construction) => {
+    if (construction.status === "done") {
+      return construction;
+    }
+
+    return {
+      ...construction,
+      status: placedConstructionIds.has(construction.id)
+        ? "in-progress"
+        : "todo",
+    };
+  });
+};
+
+const normalizeConstructionIdList = (value = []) =>
+  (Array.isArray(value) ? value : [])
+    .map((entry) => {
+      if (typeof entry === "string" || typeof entry === "number") {
+        return String(entry);
+      }
+      if (entry && typeof entry === "object" && entry.id !== undefined) {
+        return String(entry.id);
+      }
+      return "";
+    })
+    .filter(Boolean);
+
+const deriveLegacyConstructions = (lunes = []) => {
+  const constructionsById = new Map();
+
+  (Array.isArray(lunes) ? lunes : []).forEach((lune) => {
+    const legacyEntries = Array.isArray(lune?.constructions)
+      ? lune.constructions.filter(
+          (construction) =>
+            construction &&
+            typeof construction === "object" &&
+            (construction.resourceCode || construction.rewardType),
+        )
+      : [];
+
+    normalizeLuneConstructions(legacyEntries).forEach((construction) => {
+      if (!constructionsById.has(construction.id)) {
+        constructionsById.set(construction.id, construction);
+      }
+    });
+  });
+
+  return Array.from(constructionsById.values());
+};
 
 export const normalizeCurrentLune = (value) => {
   const numericValue = Math.floor(Number(value));
@@ -202,7 +273,10 @@ export const normalizeLunes = (lunes = [], persos = []) =>
         meteo: normalizeWeatherCoefficients(lune.meteo),
         rations,
         overrides: lune.overrides || {},
-        constructions: normalizeLuneConstructions(lune.constructions),
+        placedConstructionIds: normalizeConstructionIdList(
+          lune.placedConstructionIds ?? lune.constructions,
+        ),
+        constructions: [],
       };
     });
 
@@ -213,6 +287,7 @@ export const createLune = (persos = [], luneId = 1) => ({
     persos.map((perso) => [perso.id, defaultRation()]),
   ),
   overrides: {},
+  placedConstructionIds: [],
   constructions: [],
 });
 
@@ -311,6 +386,7 @@ export const buildFallbackState = () => {
     resources: [],
     persos,
     persoResources: [],
+    constructions: [],
     lunes: [createLune(persos, 1)],
     currentLune: 1,
     stocks: defaultStocks,
@@ -333,12 +409,17 @@ export const buildState = (rawState = {}) => {
       : [];
   const persos = normalizePersos(rawState.persos || []);
   const lunes = normalizeLunes(rawState.lunes || [], persos);
+  const constructions = syncConstructionStatusesWithLunes(
+    rawState.constructions || deriveLegacyConstructions(rawState.lunes || []),
+    lunes,
+  );
   const currentLune = normalizeCurrentLune(rawState.currentLune);
 
   return {
     resources,
     persos,
     persoResources: normalizePersoResources(rawState.persoResources || []),
+    constructions,
     lunes: lunes.length > 0 ? lunes : [createLune(persos, 1)],
     currentLune,
     stocks: { ...buildStocks(resources), ...(rawState.stocks || {}) },

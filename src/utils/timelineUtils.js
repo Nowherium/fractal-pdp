@@ -106,55 +106,33 @@ const buildAvailableDrugsMap = (remainingStocks = {}) =>
     ]),
   );
 
-const mergeConstructionCarryOver = (
-  currentConstructions = [],
-  pendingConstructionsById = {},
-) => {
-  const merged = new Map();
+const buildInitialConstructionProgress = (constructions = []) =>
+  Object.fromEntries(
+    normalizeLuneConstructions(constructions).map((construction) => {
+      const buildersRequired = Math.max(
+        0,
+        Number(construction.buildersRequired ?? 0) || 0,
+      );
+      const initialStatus = construction.status ?? "todo";
 
-  Object.values(pendingConstructionsById || {}).forEach((construction) => {
-    merged.set(construction.id, {
-      ...construction,
-      carriedOver: true,
-      costPaid: Boolean(construction.costPaid),
-      buildersRequired: Math.max(
-        1,
-        Math.floor(Number(construction.buildersRequired ?? 1) || 1),
-      ),
-      resourceCost: Math.max(0, Number(construction.resourceCost ?? 0) || 0),
-    });
-  });
-
-  normalizeLuneConstructions(currentConstructions).forEach((construction) => {
-    const pendingConstruction = merged.get(construction.id);
-    merged.set(construction.id, {
-      ...pendingConstruction,
-      ...construction,
-      buildersRequired: pendingConstruction
-        ? Math.max(
-            1,
-            Math.floor(
-              Number(
-                pendingConstruction.buildersRequired ??
-                  construction.buildersRequired ??
-                  1,
-              ) || 1,
-            ),
-          )
-        : construction.buildersRequired,
-      costPaid: Boolean(pendingConstruction?.costPaid),
-      carriedOver: Boolean(pendingConstruction),
-    });
-  });
-
-  return Array.from(merged.values());
-};
+      return [
+        construction.id,
+        {
+          remainingBuilders: initialStatus === "done" ? 0 : buildersRequired,
+          costPaid: initialStatus === "done",
+          completed: initialStatus === "done",
+          started: initialStatus === "done",
+        },
+      ];
+    }),
+  );
 
 export const simulateTimeline = (
   persos,
   lunes,
   stocks,
   defaultRation,
+  constructions = [],
   resources = [],
   persoResources = [],
   cityMultipliers = {},
@@ -195,13 +173,48 @@ export const simulateTimeline = (
   let stockNrt = Number(resourceStocks.nrt ?? 0);
   let stockMed = Number(resourceStocks.med ?? 0);
   let stockMat = Number(resourceStocks.mat ?? 0);
-  let pendingConstructionsById = {};
+  const normalizedConstructions = normalizeLuneConstructions(constructions);
+  const constructionProgressById = buildInitialConstructionProgress(
+    normalizedConstructions,
+  );
 
   lunes.forEach((lune) => {
     const overrides = lune.overrides || {};
-    const constructions = mergeConstructionCarryOver(
-      lune.constructions,
-      pendingConstructionsById,
+    const placedConstructionIds = new Set(
+      (Array.isArray(lune.placedConstructionIds)
+        ? lune.placedConstructionIds
+        : []
+      )
+        .map((constructionId) => String(constructionId))
+        .filter(Boolean),
+    );
+    const constructionsForLune = normalizedConstructions.map((construction) => {
+      const progress = constructionProgressById[construction.id] || {};
+      const remainingBuilders = progress.completed
+        ? 0
+        : Math.max(
+            0,
+            Number(
+              progress.remainingBuilders ?? construction.buildersRequired ?? 0,
+            ) || 0,
+          );
+      const isStarted =
+        Boolean(progress.started) || placedConstructionIds.has(construction.id);
+
+      return {
+        ...construction,
+        costPaid: Boolean(progress.costPaid),
+        carriedOver: Boolean(progress.started),
+        remainingBuilders,
+        status: progress.completed
+          ? "done"
+          : isStarted
+            ? "in-progress"
+            : "todo",
+      };
+    });
+    const activeConstructionsForLune = constructionsForLune.filter(
+      (construction) => construction.status !== "done",
     );
     const weatherCoefficients = normalizeWeatherCoefficients(lune.meteo);
 
@@ -442,33 +455,59 @@ export const simulateTimeline = (
     );
 
     const constructionStates = {};
-    const nextPendingConstructionsById = {};
 
-    constructions.forEach((construction) => {
+    constructionsForLune.forEach((construction) => {
       const resourceCode = String(construction.resourceCode ?? "mat")
         .trim()
         .toLowerCase();
       const resourceCost = Math.max(0, Number(construction.resourceCost ?? 0));
-      const buildersRequired = Math.max(
+      const totalBuildersRequired = Math.max(
         1,
         Math.floor(Number(construction.buildersRequired ?? 1) || 1),
       );
+      const progressState = constructionProgressById[construction.id] || {
+        remainingBuilders: totalBuildersRequired,
+        costPaid: false,
+        completed: false,
+        started: false,
+      };
       const assignedList = assignmentsByConstructionId[construction.id] || [];
       const assignedBuilders = assignedList.length;
+      const remainingBefore = progressState.completed
+        ? 0
+        : Math.max(
+            0,
+            Number(progressState.remainingBuilders ?? totalBuildersRequired) ||
+              0,
+          );
       let availableResource = Number(projectedStocks[resourceCode] ?? 0);
-      let costPaid = Boolean(construction.costPaid);
+      let costPaid = Boolean(progressState.costPaid);
+      const isPlacedThisLune = placedConstructionIds.has(construction.id);
+      let started =
+        Boolean(progressState.started) ||
+        isPlacedThisLune ||
+        costPaid ||
+        remainingBefore < totalBuildersRequired;
       const canStartWithResources =
         costPaid || resourceCost <= 0 || availableResource >= resourceCost;
 
-      if (!costPaid && assignedBuilders > 0 && canStartWithResources) {
+      if (
+        !progressState.completed &&
+        isPlacedThisLune &&
+        !costPaid &&
+        canStartWithResources
+      ) {
         projectedStocks[resourceCode] = availableResource - resourceCost;
         availableResource = Number(projectedStocks[resourceCode] ?? 0);
         costPaid = true;
+        started = true;
       }
 
-      const effectiveBuilders = costPaid
-        ? Math.min(assignedBuilders, buildersRequired)
-        : 0;
+      const effectiveBuilders = progressState.completed
+        ? 0
+        : isPlacedThisLune && costPaid
+          ? Math.min(assignedBuilders, remainingBefore)
+          : 0;
 
       assignedList
         .slice(0, effectiveBuilders)
@@ -485,14 +524,18 @@ export const simulateTimeline = (
           }
         });
 
-      const remainingBuilders = Math.max(
-        0,
-        buildersRequired - effectiveBuilders,
-      );
+      const remainingBuilders = progressState.completed
+        ? 0
+        : Math.max(0, remainingBefore - effectiveBuilders);
       const isCompleted = costPaid && remainingBuilders === 0;
+      const statusCode = isCompleted
+        ? "done"
+        : started || costPaid || remainingBuilders < totalBuildersRequired
+          ? "in-progress"
+          : "todo";
 
       const statusParts = [
-        `${assignedBuilders}/${buildersRequired} bâtisseur(s)`,
+        `${assignedBuilders}/${Math.max(1, remainingBefore)} bâtisseur(s)`,
       ];
       if (resourceCost > 0) {
         statusParts.push(
@@ -502,42 +545,41 @@ export const simulateTimeline = (
         );
       }
 
-      if (!costPaid && assignedBuilders > 0 && !canStartWithResources) {
-        statusParts.push("ressource insuffisante");
+      if (!isPlacedThisLune && statusCode === "in-progress") {
+        statusParts.push(`en pause • ${remainingBuilders} restant(s)`);
+      } else if (!started) {
+        statusParts.push("non posé");
+      } else if (!costPaid && !canStartWithResources) {
+        statusParts.push("ressource insuffisante pour poser");
       } else if (isCompleted) {
         statusParts.push("terminé");
       } else if (effectiveBuilders > 0) {
         statusParts.push(`en cours • ${remainingBuilders} restant(s)`);
-      } else if (construction.carriedOver) {
-        statusParts.push("reporté");
+      } else if (isPlacedThisLune) {
+        statusParts.push(`posé • ${remainingBuilders} restant(s)`);
       } else {
-        statusParts.push("en attente");
+        statusParts.push("à faire");
       }
+
+      constructionProgressById[construction.id] = {
+        remainingBuilders,
+        costPaid,
+        completed: isCompleted,
+        started: started || effectiveBuilders > 0,
+      };
 
       constructionStates[construction.id] = {
         assignedBuilders,
-        buildersRequired,
+        buildersRequired: totalBuildersRequired,
+        remainingBuilders,
         resourceCode,
         resourceCost,
         rewardType: construction.rewardType,
         isCompleted,
+        statusCode,
         statusLabel: statusParts.join(" • "),
       };
-
-      if (!isCompleted) {
-        nextPendingConstructionsById[construction.id] = {
-          ...construction,
-          resourceCode,
-          resourceCost,
-          buildersRequired:
-            remainingBuilders > 0 ? remainingBuilders : buildersRequired,
-          costPaid,
-          carriedOver: true,
-        };
-      }
     });
-
-    pendingConstructionsById = nextPendingConstructionsById;
 
     Object.assign(resourceStocks, projectedStocks);
     stockEau = Number(projectedStocks.eau ?? 0);
@@ -548,7 +590,7 @@ export const simulateTimeline = (
     timeline.push({
       lune: {
         ...lune,
-        constructions,
+        constructions: activeConstructionsForLune,
       },
       rows,
       constructionStates,

@@ -7,6 +7,7 @@ import {
   updateStock,
   updateCityMultipliers,
   updateCurrentLune,
+  updateConstructions,
   upsertResource,
   deleteResource,
   upsertLune,
@@ -128,6 +129,14 @@ registerPartialRoute("/api/current-lune", async (req, res) => {
     res,
     () => updateCurrentLune(req.body?.currentLune),
     "Impossible de sauvegarder la lune courante",
+  );
+});
+
+registerPartialRoute("/api/constructions", async (req, res) => {
+  await runDbAction(
+    res,
+    () => updateConstructions(req.body?.constructions || []),
+    "Impossible de sauvegarder les chantiers",
   );
 });
 
@@ -335,6 +344,7 @@ app.post("/api/reset", async (_req, res) => {
     const defaultState = {
       stocks: defaultStocks,
       currentLune: 1,
+      constructions: [],
       persos: defaultPersos,
       persoResources: [],
       armes: [],

@@ -5,6 +5,7 @@ export type AppPage =
   | "group"
   | "group-view"
   | "perso"
+  | "chantiers"
   | "timeline"
   | "armes"
   | "outils"
@@ -150,6 +151,10 @@ export interface LuneConstruction {
   resourceCost: number;
   buildersRequired: number;
   rewardType: "eau" | "nrt" | "med" | "mat" | "art" | "combat";
+  status?: "todo" | "in-progress" | "done";
+  costPaid?: boolean;
+  remainingBuilders?: number;
+  carriedOver?: boolean;
 }
 
 export interface Lune {
@@ -157,5 +162,6 @@ export interface Lune {
   meteo: WeatherCoefficients;
   rations: Record<string, Ration>;
   overrides: Record<string, Record<string, number | boolean>>;
+  placedConstructionIds?: string[];
   constructions: LuneConstruction[];
 }

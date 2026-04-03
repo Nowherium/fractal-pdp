@@ -47,6 +47,10 @@ export const useAppEntitySaves = ({ ready, isHydratingRef, setSaveStatus }) => {
       queueSave(`current-lune`, `/api/current-lune`, {
         currentLune,
       }),
+    saveConstructionsEntity: (constructions) =>
+      queueSave(`constructions`, `/api/constructions`, {
+        constructions,
+      }),
     saveResourceEntity: (resource) =>
       queueSave(`resource-${resource.id}`, `/api/resources/${resource.id}`, {
         resource,

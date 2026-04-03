@@ -1,6 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 
-import type { Lune, PersoResource, Resource, Stocks } from "../types";
+import type {
+  Lune,
+  LuneConstruction,
+  PersoResource,
+  Resource,
+  Stocks,
+} from "../types";
 
 const normalizeResourceCode = (value: string | number | null | undefined) =>
   String(value ?? "")
@@ -20,6 +26,7 @@ export const useResourceActions = ({
   resources,
   stocks,
   persoResources,
+  constructions,
   lunes,
   setResources,
   setStocks,
@@ -29,6 +36,7 @@ export const useResourceActions = ({
   resources: Resource[];
   stocks: Stocks;
   persoResources: PersoResource[];
+  constructions: LuneConstruction[];
   lunes: Lune[];
   setResources: Dispatch<SetStateAction<Resource[]>>;
   setStocks: Dispatch<SetStateAction<Stocks>>;
@@ -108,6 +116,18 @@ export const useResourceActions = ({
       return {
         canDelete: false,
         reason: "Encore planifiée comme drogue dans la timeline.",
+      };
+    }
+
+    const isUsedByConstruction = constructions.some(
+      (construction) =>
+        String(construction.resourceCode ?? "").toLowerCase() === resourceCode,
+    );
+
+    if (isUsedByConstruction) {
+      return {
+        canDelete: false,
+        reason: "Encore utilisée par un chantier global.",
       };
     }
 

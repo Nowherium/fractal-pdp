@@ -397,6 +397,19 @@ const normalizePersoSacRow = (row) => ({
   equipe: Boolean(row.equipe),
 });
 
+const normalizeConstructionIdList = (value = []) =>
+  (Array.isArray(value) ? value : [])
+    .map((entry) => {
+      if (typeof entry === "string" || typeof entry === "number") {
+        return String(entry);
+      }
+      if (entry && typeof entry === "object" && entry.id !== undefined) {
+        return String(entry.id);
+      }
+      return "";
+    })
+    .filter(Boolean);
+
 const buildLunes = (luneRows, rationsRows, overridesRows) => {
   const rationsByLune = {};
   const overridesByLune = {};
@@ -432,7 +445,8 @@ const buildLunes = (luneRows, rationsRows, overridesRows) => {
     }),
     rations: rationsByLune[Number(row.id)] || {},
     overrides: overridesByLune[Number(row.id)] || {},
-    constructions: Array.isArray(row.constructions) ? row.constructions : [],
+    placedConstructionIds: normalizeConstructionIdList(row.constructions),
+    constructions: [],
   }));
 };
 
@@ -456,7 +470,7 @@ const getState = async () => {
   );
 
   const { rows: cityRows } = await pool.query(
-    "SELECT id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune FROM cities ORDER BY id ASC",
+    "SELECT id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune, constructions FROM cities ORDER BY id ASC",
   );
   const cities = cityRows.map((row) => ({
     id: Number(row.id),
@@ -473,6 +487,9 @@ const getState = async () => {
     activeCity?.current_lune,
     defaultCurrentLune,
   );
+  let constructions = Array.isArray(activeCity?.constructions)
+    ? activeCity.constructions
+    : [];
 
   const { rows: groupRows } = await pool.query(
     "SELECT group_id, name, chef FROM groups ORDER BY group_id ASC",
@@ -662,11 +679,24 @@ const getState = async () => {
   );
 
   const lunes = buildLunes(luneRows, rationsRows, overridesRows);
+  if (constructions.length === 0) {
+    constructions = luneRows.flatMap((row) =>
+      Array.isArray(row.constructions)
+        ? row.constructions.filter(
+            (construction) =>
+              construction &&
+              typeof construction === "object" &&
+              (construction.resourceCode || construction.rewardType),
+          )
+        : [],
+    );
+  }
   const nextPersoId = await getNextPersoId();
 
   return {
     stocks,
     persos,
+    constructions,
     lunes,
     currentLune,
     nextPersoId,
@@ -693,6 +723,9 @@ const insertState = async (state) => {
     ? { ...defaultStocks, ...(state.stocks || {}) }
     : null;
   const cityMultipliers = state.cityMultipliers || null;
+  const constructions = Array.isArray(state.constructions)
+    ? state.constructions
+    : null;
   const currentLune = normalizeCurrentLuneValue(
     state.currentLune,
     defaultCurrentLune,
@@ -721,7 +754,7 @@ const insertState = async (state) => {
     })) || null;
 
   const citySettingsPayload =
-    cityMultipliers || state.currentLune !== undefined
+    cityMultipliers || state.currentLune !== undefined || constructions !== null
       ? {
           eau: normalizeMultiplier(
             cityMultipliers?.eau,
@@ -740,6 +773,7 @@ const insertState = async (state) => {
             defaultCityMultipliers.mat,
           ),
           current_lune: currentLune,
+          constructions: Array.isArray(constructions) ? constructions : [],
         }
       : null;
 
@@ -780,8 +814,8 @@ const insertState = async (state) => {
       meteo_nrt: meteo.nrt,
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
-      constructions: Array.isArray(lune.constructions)
-        ? lune.constructions
+      constructions: Array.isArray(lune.placedConstructionIds)
+        ? lune.placedConstructionIds
         : [],
     });
 
@@ -997,8 +1031,8 @@ const insertState = async (state) => {
 
     if (citySettingsPayload !== null) {
       await client.query(
-        `INSERT INTO cities (id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO cities (id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune, constructions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (id)
          DO UPDATE SET
            name = EXCLUDED.name,
@@ -1006,7 +1040,8 @@ const insertState = async (state) => {
            mult_nrt = EXCLUDED.mult_nrt,
            mult_med = EXCLUDED.mult_med,
            mult_mat = EXCLUDED.mult_mat,
-           current_lune = EXCLUDED.current_lune`,
+           current_lune = EXCLUDED.current_lune,
+           constructions = EXCLUDED.constructions`,
         [
           defaultCity.id,
           defaultCity.name,
@@ -1015,6 +1050,7 @@ const insertState = async (state) => {
           citySettingsPayload.med,
           citySettingsPayload.mat,
           citySettingsPayload.current_lune,
+          JSON.stringify(citySettingsPayload.constructions || []),
         ],
       );
     }
@@ -1698,6 +1734,20 @@ const updateCurrentLune = async (currentLune) => {
   );
 };
 
+const updateConstructions = async (constructions = []) => {
+  const payload = Array.isArray(constructions) ? constructions : [];
+
+  await pool.query(
+    `INSERT INTO cities (id, name, constructions)
+     VALUES ($1, $2, $3::jsonb)
+     ON CONFLICT (id)
+     DO UPDATE SET
+       name = EXCLUDED.name,
+       constructions = EXCLUDED.constructions`,
+    [defaultCity.id, defaultCity.name, JSON.stringify(payload)],
+  );
+};
+
 const buildLunesWritePayload = (lunes) => {
   const lunesById = new Map();
   const rationsPayload = [];
@@ -1714,8 +1764,8 @@ const buildLunesWritePayload = (lunes) => {
       meteo_nrt: meteo.nrt,
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
-      constructions: Array.isArray(lune.constructions)
-        ? lune.constructions
+      constructions: Array.isArray(lune.placedConstructionIds)
+        ? lune.placedConstructionIds
         : [],
     });
 
@@ -2684,7 +2734,8 @@ const initDb = async () => {
     CREATE TABLE IF NOT EXISTS cities (
       id serial PRIMARY KEY,
       name text UNIQUE NOT NULL,
-      current_lune integer NOT NULL DEFAULT 1
+      current_lune integer NOT NULL DEFAULT 1,
+      constructions jsonb NOT NULL DEFAULT '[]'::jsonb
     );
 
     CREATE TABLE IF NOT EXISTS city_resources (
@@ -2839,7 +2890,8 @@ const initDb = async () => {
        ADD COLUMN IF NOT EXISTS mult_nrt numeric NOT NULL DEFAULT 1,
        ADD COLUMN IF NOT EXISTS mult_med numeric NOT NULL DEFAULT 1,
        ADD COLUMN IF NOT EXISTS mult_mat numeric NOT NULL DEFAULT 1,
-       ADD COLUMN IF NOT EXISTS current_lune integer NOT NULL DEFAULT 1`,
+       ADD COLUMN IF NOT EXISTS current_lune integer NOT NULL DEFAULT 1,
+       ADD COLUMN IF NOT EXISTS constructions jsonb NOT NULL DEFAULT '[]'::jsonb`,
   );
 
   await pool.query(
@@ -2848,7 +2900,26 @@ const initDb = async () => {
          mult_nrt = COALESCE(mult_nrt, 1),
          mult_med = COALESCE(mult_med, 1),
          mult_mat = COALESCE(mult_mat, 1),
-         current_lune = GREATEST(COALESCE(current_lune, 1), 1)`,
+         current_lune = GREATEST(COALESCE(current_lune, 1), 1),
+         constructions = COALESCE(constructions, '[]'::jsonb)`,
+  );
+
+  await pool.query(
+    `UPDATE cities AS c
+     SET constructions = legacy.constructions
+     FROM (
+       SELECT COALESCE(jsonb_agg(construction), '[]'::jsonb) AS constructions
+       FROM (
+         SELECT DISTINCT expanded.construction AS construction
+         FROM lunes AS l
+         CROSS JOIN LATERAL jsonb_array_elements(l.constructions) AS expanded(construction)
+         WHERE jsonb_typeof(l.constructions) = 'array'
+       ) AS expanded
+     ) AS legacy
+     WHERE c.id = $1
+       AND c.constructions = '[]'::jsonb
+       AND legacy.constructions <> '[]'::jsonb`,
+    [defaultCity.id],
   );
 
   await normalizeExistingLuneIds();
@@ -3262,6 +3333,7 @@ export {
   updateStock,
   updateCityMultipliers,
   updateCurrentLune,
+  updateConstructions,
   upsertResource,
   deleteResource,
   upsertLune,

@@ -9,6 +9,7 @@ import PersoPage from "./components/PersoPage";
 import GroupPage from "./components/GroupPage";
 import GroupEditPage from "./components/GroupEditPage";
 import GroupViewPage from "./components/GroupViewPage";
+import ChantiersPage from "./components/ChantiersPage";
 import TimelinePage from "./components/TimelinePage";
 import WeaponsPage from "./components/WeaponsPage";
 import ToolsPage from "./components/ToolsPage";
@@ -41,6 +42,8 @@ function App() {
     setPersos,
     persoResources,
     setPersoResources,
+    constructions,
+    setConstructions,
     lunes,
     setLunes,
     stocks,
@@ -94,6 +97,7 @@ function App() {
   const {
     saveCityMultipliersEntity,
     saveCurrentLuneEntity,
+    saveConstructionsEntity,
     saveResourceEntity,
     deleteResourceEntity,
     savePersoEntity,
@@ -169,6 +173,7 @@ function App() {
     resources,
     stocks,
     persoResources,
+    constructions,
     lunes,
     setResources,
     setStocks,
@@ -212,17 +217,21 @@ function App() {
     addConstruction,
     updateConstruction,
     removeConstruction,
+    toggleConstructionPlacement,
     updateLuneGlobal,
     toggleOverrideMenu,
     setOverride,
     clearOverrides,
   } = useTimelineActions({
     persos,
+    constructions,
     lunes,
+    setConstructions,
     setLunes,
     setOpenOverrides,
     saveLuneEntity,
     deleteLuneEntity,
+    saveConstructionsEntity,
   });
 
   const {
@@ -288,6 +297,7 @@ function App() {
       resources,
       persos,
       persoResources,
+      constructions,
       lunes,
       currentLune,
       nextPersoId,
@@ -321,22 +331,32 @@ function App() {
         lunes,
         stocks,
         defaultRation,
+        constructions,
         resources,
         persoResources,
         cityMultipliers,
       ),
-    [persos, lunes, stocks, resources, persoResources, cityMultipliers],
+    [
+      persos,
+      lunes,
+      stocks,
+      constructions,
+      resources,
+      persoResources,
+      cityMultipliers,
+    ],
   );
 
   const pages: PageTab[] = [
     { key: "reserve", label: "1. Ville" },
     { key: "effectif", label: "2. Effectif" },
     { key: "groupes", label: "3. Groupe" },
-    { key: "timeline", label: "4. Ligne du temps" },
-    { key: "armes", label: "5. Armes" },
-    { key: "outils", label: "6. Outils" },
-    { key: "sacs", label: "7. Sacs" },
-    { key: "resources", label: "8. Ressources" },
+    { key: "chantiers", label: "4. Chantiers" },
+    { key: "timeline", label: "5. Ligne du temps" },
+    { key: "armes", label: "6. Armes" },
+    { key: "outils", label: "7. Outils" },
+    { key: "sacs", label: "8. Sacs" },
+    { key: "resources", label: "9. Ressources" },
   ];
 
   return (
@@ -457,17 +477,27 @@ function App() {
         />
       )}
 
+      {page === "chantiers" && (
+        <ChantiersPage
+          constructions={constructions}
+          resources={resources}
+          constructionStates={timelineData[0]?.constructionStates || {}}
+          addConstruction={addConstruction}
+          updateConstruction={updateConstruction}
+          removeConstruction={removeConstruction}
+        />
+      )}
+
       {page === "timeline" && (
         <TimelinePage
           currentLune={currentLune}
           resources={resources}
+          constructions={constructions}
           timelineData={timelineData}
           removeLune={removeLune}
           updateLuneGlobal={updateLuneGlobal}
           updateRation={updateRation}
-          addConstruction={addConstruction}
-          updateConstruction={updateConstruction}
-          removeConstruction={removeConstruction}
+          toggleConstructionPlacement={toggleConstructionPlacement}
           toggleOverrideMenu={toggleOverrideMenu}
           openOverrides={openOverrides}
           setOverride={setOverride}

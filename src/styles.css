@@ -234,6 +234,49 @@ button:disabled {
   color: #9ad9e3;
 }
 
+.info {
+  color: #81d4fa;
+  font-weight: bold;
+}
+
+.construction-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.construction-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #181818;
+  border: 1px solid #3b3b3b;
+}
+
+.construction-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.construction-place-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  color: #d0ecf3;
+}
+
+.construction-place-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4caf50;
+}
+
 .construction-list {
   display: flex;
   flex-direction: column;

@@ -40,10 +40,12 @@ type TimelineStats = {
 type ConstructionState = {
   assignedBuilders: number;
   buildersRequired: number;
+  remainingBuilders?: number;
   resourceCode: string;
   resourceCost: number;
   rewardType: string;
   isCompleted: boolean;
+  statusCode?: "todo" | "in-progress" | "done";
   statusLabel: string;
 };
 
@@ -88,13 +90,12 @@ const getRewardLabel = (rewardType: LuneConstruction["rewardType"]) =>
 function TimelinePage({
   currentLune,
   resources,
+  constructions,
   timelineData,
   removeLune,
   updateLuneGlobal,
   updateRation,
-  addConstruction,
-  updateConstruction,
-  removeConstruction,
+  toggleConstructionPlacement,
   toggleOverrideMenu,
   openOverrides,
   setOverride,
@@ -103,6 +104,7 @@ function TimelinePage({
 }: {
   currentLune: number;
   resources: Resource[];
+  constructions: LuneConstruction[];
   timelineData: TimelineSegment[];
   removeLune: (luneIndex: number) => void;
   updateLuneGlobal: (
@@ -116,14 +118,11 @@ function TimelinePage({
     field: "tache" | "eau" | "nrt" | "med" | "drogue" | "constructionId",
     value: string | boolean,
   ) => void;
-  addConstruction: (luneIndex: number) => void;
-  updateConstruction: (
+  toggleConstructionPlacement: (
     luneIndex: number,
     constructionId: string,
-    field: string,
-    rawValue: string | number,
+    isPlaced: boolean,
   ) => void;
-  removeConstruction: (luneIndex: number, constructionId: string) => void;
   toggleOverrideMenu: (luneIndex: number, persoId: number) => void;
   openOverrides: Record<string, boolean>;
   setOverride: (
@@ -140,7 +139,7 @@ function TimelinePage({
 
   return (
     <>
-      <h2>3. Ligne du Temps & Assignations</h2>
+      <h2>5. Ligne du Temps & Assignations</h2>
       <p className='info-text'>
         Chaque perso peut consommer <strong>une seule drogue par lune</strong>.
         L'effet n'est appliqué que si la ressource est bien portée en quantité
@@ -218,35 +217,28 @@ function TimelinePage({
 
                 <div className='construction-box'>
                   <div className='construction-box-header'>
-                    <strong>🏗️ Chantiers de la lune</strong>
-                    <button
-                      className='btn-add'
-                      type='button'
-                      onClick={() => addConstruction(luneIndex)}
-                    >
-                      + Ajouter un chantier
-                    </button>
+                    <strong>🏗️ Suivi des chantiers</strong>
+                    <span className='info-text'>
+                      Administration dans l’onglet Chantiers
+                    </span>
                   </div>
 
                   <p className='construction-help'>
-                    Définis ici le <strong>coût</strong>, les
-                    <strong> bâtisseurs requis</strong> et le
-                    <strong> gain</strong>. Ensuite, assigne les persos à
-                    <strong> 🛠️ Construire</strong> dans le tableau ci-dessous.
+                    Les chantiers sont définis globalement. Ici, tu vois leur
+                    état sur cette lune et tu choisis lesquels les persos
+                    poursuivent.
                   </p>
 
                   {(segment.lune.constructions?.length ?? 0) === 0 ? (
                     <p className='info-text'>
-                      Aucun chantier défini pour cette lune. Ajoute-en un pour
-                      remplacer l’ancien coût global.
+                      Aucun chantier actif pour cette lune.
                     </p>
                   ) : (
-                    <div className='construction-list'>
+                    <div className='construction-summary-list'>
                       {(segment.lune.constructions ?? []).map(
                         (construction) => {
                           const constructionState =
                             segment.constructionStates?.[construction.id];
-
                           const resourceLabel = getResourceLabel(
                             availableResources,
                             construction.resourceCode,
@@ -254,158 +246,50 @@ function TimelinePage({
                           const rewardLabel = getRewardLabel(
                             construction.rewardType,
                           );
-                          const assignedBuilders =
-                            constructionState?.assignedBuilders ?? 0;
+                          const stateClass = constructionState?.isCompleted
+                            ? "safe"
+                            : constructionState?.statusCode === "in-progress"
+                              ? "warning"
+                              : "info";
+                          const isPlacedThisLune = (
+                            segment.lune.placedConstructionIds ?? []
+                          ).includes(construction.id);
+                          const isCompleted = Boolean(
+                            constructionState?.isCompleted,
+                          );
 
                           return (
                             <div
                               key={`${segment.lune.id}-${construction.id}`}
-                              className='construction-item'
+                              className='construction-summary-item'
                             >
-                              <div className='construction-form-grid'>
-                                <label className='construction-field'>
-                                  <span className='construction-field-label'>
-                                    Chantier
-                                  </span>
-                                  <input
-                                    type='text'
-                                    className='construction-text-input'
-                                    value={construction.name}
-                                    placeholder='Nom du chantier'
-                                    onChange={(event) =>
-                                      updateConstruction(
-                                        luneIndex,
-                                        construction.id,
-                                        "name",
-                                        event.target.value,
-                                      )
-                                    }
-                                  />
-                                </label>
-                                <label className='construction-field'>
-                                  <span className='construction-field-label'>
-                                    Ressource consommée
-                                  </span>
-                                  <select
-                                    value={construction.resourceCode}
-                                    onChange={(event) =>
-                                      updateConstruction(
-                                        luneIndex,
-                                        construction.id,
-                                        "resourceCode",
-                                        event.target.value,
-                                      )
-                                    }
-                                  >
-                                    {availableResources.map((resource) => (
-                                      <option
-                                        key={resource.id}
-                                        value={resource.code}
-                                      >
-                                        {resource.name ||
-                                          resource.code.toUpperCase()}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <label className='construction-field'>
-                                  <span className='construction-field-label'>
-                                    Coût
-                                  </span>
-                                  <input
-                                    type='number'
-                                    className='construction-number-input'
-                                    min='0'
-                                    step='1'
-                                    value={construction.resourceCost}
-                                    onChange={(event) =>
-                                      updateConstruction(
-                                        luneIndex,
-                                        construction.id,
-                                        "resourceCost",
-                                        event.target.value,
-                                      )
-                                    }
-                                  />
-                                </label>
-                                <label className='construction-field'>
-                                  <span className='construction-field-label'>
-                                    Bâtisseurs requis
-                                  </span>
-                                  <input
-                                    type='number'
-                                    className='construction-number-input'
-                                    min='1'
-                                    step='1'
-                                    value={construction.buildersRequired}
-                                    onChange={(event) =>
-                                      updateConstruction(
-                                        luneIndex,
-                                        construction.id,
-                                        "buildersRequired",
-                                        event.target.value,
-                                      )
-                                    }
-                                  />
-                                </label>
-                                <label className='construction-field'>
-                                  <span className='construction-field-label'>
-                                    Gain au perso
-                                  </span>
-                                  <select
-                                    value={construction.rewardType}
-                                    onChange={(event) =>
-                                      updateConstruction(
-                                        luneIndex,
-                                        construction.id,
-                                        "rewardType",
-                                        event.target.value,
-                                      )
-                                    }
-                                  >
-                                    {constructionRewardOptions.map((option) => (
-                                      <option
-                                        key={option.key}
-                                        value={option.key}
-                                      >
-                                        {option.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <button
-                                  className='btn-del construction-delete-btn'
-                                  type='button'
-                                  title='Supprimer ce chantier'
-                                  onClick={() =>
-                                    removeConstruction(
-                                      luneIndex,
-                                      construction.id,
-                                    )
-                                  }
-                                >
-                                  ✕
-                                </button>
+                              <div>
+                                <strong>{construction.name}</strong>
+                                <div className='info-text'>
+                                  Coût : {construction.resourceCost}{" "}
+                                  {resourceLabel} • Gain : {rewardLabel}
+                                </div>
                               </div>
-
-                              <div className='construction-meta'>
-                                <span className='construction-pill'>
-                                  Coût :{" "}
-                                  <strong>{construction.resourceCost}</strong>{" "}
-                                  {resourceLabel}
-                                </span>
-                                <span className='construction-pill'>
-                                  Gain : <strong>{rewardLabel}</strong>
-                                </span>
-                                <span className='construction-pill'>
-                                  Affectés : <strong>{assignedBuilders}</strong>
-                                  /{construction.buildersRequired}
-                                </span>
+                              <div className='construction-summary-actions'>
+                                <label className='construction-place-toggle'>
+                                  <input
+                                    type='checkbox'
+                                    checked={isPlacedThisLune}
+                                    disabled={isCompleted}
+                                    onChange={(event) =>
+                                      toggleConstructionPlacement(
+                                        luneIndex,
+                                        construction.id,
+                                        event.target.checked,
+                                      )
+                                    }
+                                  />
+                                  {isPlacedThisLune ? "Posé" : "Poser"}
+                                </label>
                                 <span
-                                  className={`construction-status ${constructionState?.isCompleted ? "safe" : "warning"}`}
+                                  className={`construction-status ${stateClass}`}
                                 >
-                                  {constructionState?.statusLabel ??
-                                    `En attente (${assignedBuilders}/${construction.buildersRequired})`}
+                                  {constructionState?.statusLabel || "À faire"}
                                 </span>
                               </div>
                             </div>
@@ -492,17 +376,43 @@ function TimelinePage({
                                 }
                               >
                                 <option value=''>Choisir un chantier</option>
-                                {(segment.lune.constructions ?? []).map(
-                                  (construction) => (
-                                    <option
-                                      key={construction.id}
-                                      value={construction.id}
-                                    >
-                                      {construction.name} •{" "}
-                                      {construction.buildersRequired} bât.
-                                    </option>
-                                  ),
-                                )}
+                                {(segment.lune.constructions ?? [])
+                                  .filter((construction) => {
+                                    const isPlacedThisLune = (
+                                      segment.lune.placedConstructionIds ?? []
+                                    ).includes(construction.id);
+                                    const state =
+                                      segment.constructionStates?.[
+                                        construction.id
+                                      ];
+
+                                    return (
+                                      isPlacedThisLune ||
+                                      row.ration.constructionId ===
+                                        construction.id
+                                    );
+                                  })
+                                  .map((construction) => {
+                                    const state =
+                                      segment.constructionStates?.[
+                                        construction.id
+                                      ];
+                                    const isPlacedThisLune = (
+                                      segment.lune.placedConstructionIds ?? []
+                                    ).includes(construction.id);
+
+                                    return (
+                                      <option
+                                        key={construction.id}
+                                        value={construction.id}
+                                      >
+                                        {construction.name} •{" "}
+                                        {isPlacedThisLune
+                                          ? "posé"
+                                          : "à poser d'abord"}
+                                      </option>
+                                    );
+                                  })}
                               </select>
                             ) : null}
                           </td>

@@ -11,6 +11,7 @@ import type {
   CityMultipliers,
   Group,
   Lune,
+  LuneConstruction,
   Outil,
   Perso,
   PersoArme,
@@ -73,6 +74,7 @@ const getRouteStateFromLocation = (): AppRouteState => {
       }
       return { ...defaultRouteState, page: "groupes" };
     }
+    case "chantiers":
     case "timeline":
     case "armes":
     case "outils":
@@ -106,6 +108,8 @@ const getPathForRouteState = ({
       return selectedGroupId ? `/groupes/${selectedGroupId}` : "/groupes";
     case "group":
       return selectedGroupId ? `/groupes/${selectedGroupId}/edit` : "/groupes";
+    case "chantiers":
+      return "/chantiers";
     case "timeline":
       return "/timeline";
     case "armes":
@@ -125,6 +129,7 @@ export const useAppState = () => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [persos, setPersos] = useState<Perso[]>([]);
   const [persoResources, setPersoResources] = useState<PersoResource[]>([]);
+  const [constructions, setConstructions] = useState<LuneConstruction[]>([]);
   const [lunes, setLunes] = useState<Lune[]>([]);
   const [stocks, setStocks] = useState<Stocks>(defaultStocks as Stocks);
   const [cityMultipliers, setCityMultipliers] = useState<CityMultipliers>(
@@ -199,6 +204,7 @@ export const useAppState = () => {
     setResources(state.resources);
     setPersos(state.persos);
     setPersoResources(state.persoResources);
+    setConstructions(state.constructions);
     setLunes(state.lunes);
     setStocks(state.stocks);
     setCityMultipliers(state.cityMultipliers);
@@ -226,6 +232,8 @@ export const useAppState = () => {
     setPersos,
     persoResources,
     setPersoResources,
+    constructions,
+    setConstructions,
     lunes,
     setLunes,
     stocks,
