@@ -224,7 +224,7 @@ function ChantiersPage({
                         progress?.status ?? construction.status,
                       )}
                     </div>
-                    <InfoText className='mt-1 mb-0'>
+                    <InfoText className='mb-0 mt-1'>
                       {state?.statusLabel || "Appliqué à la timeline."}
                     </InfoText>
                   </td>

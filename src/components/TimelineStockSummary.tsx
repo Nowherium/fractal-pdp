@@ -9,7 +9,7 @@ const stockFields = [
 
 function TimelineStockSummary({ stats }: { stats: TimelineSegment["stats"] }) {
   return (
-    <div className='mt-[15px] mb-2.5 flex justify-around gap-[15px] rounded-[5px] border border-border-main bg-[#0a0a0a] p-2.5 max-md:flex-col max-md:items-stretch'>
+    <div className='mb-2.5 mt-[15px] flex justify-around gap-[15px] rounded-[5px] border border-border-main bg-[#0a0a0a] p-2.5 max-md:flex-col max-md:items-stretch'>
       {stockFields.map((field) => (
         <div key={field.valueKey} className='text-center'>
           {field.label}

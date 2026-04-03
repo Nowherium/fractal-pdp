@@ -92,7 +92,7 @@ function TimelinePage({
           return (
             <div
               key={segment.lune.id}
-              className='mb-5 rounded-lg border border-border-strong border-l-[5px] border-l-accent-cyan bg-panel-alt p-[15px] shadow-panel'
+              className='mb-5 rounded-lg border border-l-[5px] border-border-strong border-l-accent-cyan bg-panel-alt p-[15px] shadow-panel'
             >
               <div className='mb-2.5 flex items-center justify-between border-b border-border-main pb-2.5'>
                 <h3 className='m-0 border-none p-0'>
