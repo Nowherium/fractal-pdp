@@ -717,6 +717,50 @@ const ensurePersoResourceCoverage = async (
   );
 };
 
+const ensurePersoRationCoverage = async (
+  client: PoolClient,
+  persoIds: Array<number | string> = [],
+) => {
+  const normalizedPersoIds = (persoIds || [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+
+  if (normalizedPersoIds.length === 0) {
+    return;
+  }
+
+  const rationDefaults = defaultRation();
+
+  await client.query(
+    `INSERT INTO rations (
+       lune_id,
+       perso_id,
+       eau,
+       nrt,
+       med,
+       tache,
+       drogue,
+       construction_id
+     )
+     SELECT l.id, target.perso_id, $2, $3, $4, $5, $6, $7
+     FROM unnest($1::int[]) AS target(perso_id)
+     CROSS JOIN lunes AS l
+     LEFT JOIN rations AS r
+       ON r.lune_id = l.id
+      AND r.perso_id = target.perso_id
+     WHERE r.perso_id IS NULL`,
+    [
+      normalizedPersoIds,
+      rationDefaults.eau,
+      rationDefaults.nrt,
+      rationDefaults.med,
+      rationDefaults.tache,
+      rationDefaults.drogue,
+      rationDefaults.constructionId,
+    ],
+  );
+};
+
 const syncAndValidateGroups = async (client: PoolClient) => {
   await client.query(
     `UPDATE groups AS g
@@ -851,6 +895,7 @@ export {
   ensureGroupExists,
   ensurePersoExists,
   ensurePersoResourceCoverage,
+  ensurePersoRationCoverage,
   syncAndValidateGroups,
   validateQuantityAgainstAssignments,
   buildStocksPayload,

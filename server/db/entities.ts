@@ -2,6 +2,7 @@ import {
   ensureGroupExists,
   ensurePersoExists,
   ensurePersoResourceCoverage,
+  ensurePersoRationCoverage,
   normalizeArmeRow,
   normalizeBoolean,
   normalizeNonNegativeNumber,
@@ -275,6 +276,7 @@ const upsertPerso = async (perso: EntityInput | null | undefined) => {
     );
 
     await ensurePersoResourceCoverage(client, [payload.id]);
+    await ensurePersoRationCoverage(client, [payload.id]);
     await syncAndValidateGroups(client);
   });
 };

@@ -135,6 +135,26 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
   };
 };
 
+const getExistingPersoIds = async (
+  client: PoolClient,
+  persoIds: number[] = [],
+): Promise<Set<number>> => {
+  if (persoIds.length === 0) {
+    return new Set();
+  }
+
+  const { rows } = await client.query(
+    `SELECT id
+     FROM persos
+     WHERE id = ANY($1::int[])`,
+    [persoIds],
+  );
+
+  return new Set(
+    rows.map((row) => Number(row.id)).filter((id) => Number.isFinite(id)),
+  );
+};
+
 const getLuneById = async (client: PoolClient, luneId: number) => {
   const { rows: luneRows } = await client.query(
     "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions FROM lunes WHERE id = $1 LIMIT 1",
@@ -181,6 +201,18 @@ const upsertLune = async (lune: LuneInput) => {
 
     const { lunesPayload, rationsPayload, overridesPayload } =
       buildLunesWritePayload([mergedLune]);
+    const existingPersoIds = await getExistingPersoIds(client, [
+      ...new Set([
+        ...rationsPayload.map((ration) => ration.perso_id),
+        ...overridesPayload.map((override) => override.perso_id),
+      ]),
+    ]);
+    const filteredRationsPayload = rationsPayload.filter((ration) =>
+      existingPersoIds.has(ration.perso_id),
+    );
+    const filteredOverridesPayload = overridesPayload.filter((override) =>
+      existingPersoIds.has(override.perso_id),
+    );
 
     await client.query(
       `INSERT INTO lunes (id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions)
@@ -203,7 +235,7 @@ const upsertLune = async (lune: LuneInput) => {
     );
 
     await client.query("DELETE FROM rations WHERE lune_id = $1", [luneId]);
-    if (rationsPayload.length > 0) {
+    if (filteredRationsPayload.length > 0) {
       await client.query(
         `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id)
          SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id
@@ -217,12 +249,12 @@ const upsertLune = async (lune: LuneInput) => {
            drogue text,
            construction_id text
          )`,
-        [JSON.stringify(rationsPayload)],
+        [JSON.stringify(filteredRationsPayload)],
       );
     }
 
     await client.query("DELETE FROM overrides WHERE lune_id = $1", [luneId]);
-    if (overridesPayload.length > 0) {
+    if (filteredOverridesPayload.length > 0) {
       await client.query(
         `INSERT INTO overrides (lune_id, perso_id, data)
          SELECT lune_id, perso_id, data
@@ -231,7 +263,7 @@ const upsertLune = async (lune: LuneInput) => {
            perso_id integer,
            data jsonb
          )`,
-        [JSON.stringify(overridesPayload)],
+        [JSON.stringify(filteredOverridesPayload)],
       );
     }
 

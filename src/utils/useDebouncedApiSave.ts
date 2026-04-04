@@ -18,6 +18,7 @@ export const useDebouncedApiSave = ({
   delay = 400,
 }: UseDebouncedApiSaveParams) => {
   const saveTimers = useRef<Record<string, number>>({});
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
 
   return useCallback(
     (
@@ -36,20 +37,24 @@ export const useDebouncedApiSave = ({
 
       setSaveStatus("Sauvegarde en cours...");
 
-      saveTimers.current[key] = window.setTimeout(async () => {
-        try {
-          await saveEntity(endpoint, payload, method);
-          const now = new Date().toLocaleTimeString();
-          setSaveStatus("Sauvegardé à " + now);
-          window.setTimeout(() => {
-            setSaveStatus("(Auto-sauvegarde active)");
-          }, 2000);
-        } catch (error) {
-          console.error(error);
-          setSaveStatus(
-            error instanceof Error ? error.message : "Erreur de sauvegarde",
-          );
-        }
+      saveTimers.current[key] = window.setTimeout(() => {
+        saveChain.current = saveChain.current
+          .catch(() => undefined)
+          .then(async () => {
+            try {
+              await saveEntity(endpoint, payload, method);
+              const now = new Date().toLocaleTimeString();
+              setSaveStatus("Sauvegardé à " + now);
+              window.setTimeout(() => {
+                setSaveStatus("(Auto-sauvegarde active)");
+              }, 2000);
+            } catch (error) {
+              console.error(error);
+              setSaveStatus(
+                error instanceof Error ? error.message : "Erreur de sauvegarde",
+              );
+            }
+          });
       }, delay);
 
       return () => {
