@@ -53,6 +53,9 @@ type EntityInput = {
   fiabilite?: unknown;
   degats?: unknown;
   att?: unknown;
+  esclave?: unknown;
+  overrideCapacity?: unknown;
+  override_capacity?: unknown;
 } & Record<string, unknown>;
 
 const buildUniqueEntriesById = <T>(
@@ -230,11 +233,12 @@ const upsertPerso = async (perso: EntityInput | null | undefined) => {
       cmd: normalizeNumber(mergedPerso.cmd),
       combat: normalizeNumber(mergedPerso.combat),
       group_id: normalizeOptionalId(mergedPerso.groupId),
+      esclave: normalizeBoolean(mergedPerso.esclave, false),
     };
     await ensureGroupExists(client, payload.group_id);
     await client.query(
-      `INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id, esclave)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (id)
        DO UPDATE SET
          nom = EXCLUDED.nom,
@@ -249,7 +253,8 @@ const upsertPerso = async (perso: EntityInput | null | undefined) => {
          capart = EXCLUDED.capart,
          cmd = EXCLUDED.cmd,
          combat = EXCLUDED.combat,
-         group_id = EXCLUDED.group_id`,
+         group_id = EXCLUDED.group_id,
+         esclave = EXCLUDED.esclave`,
       [
         payload.id,
         payload.nom,
@@ -265,6 +270,7 @@ const upsertPerso = async (perso: EntityInput | null | undefined) => {
         payload.cmd,
         payload.combat,
         payload.group_id,
+        payload.esclave,
       ],
     );
 
@@ -519,7 +525,7 @@ const upsertGroup = async (group: EntityInput | null | undefined) => {
 
   await withTransaction(async (client) => {
     const { rows: existingRows } = await client.query(
-      `SELECT group_id AS id, name, chef
+      `SELECT group_id AS id, name, chef, override_capacity
        FROM groups
        WHERE group_id = $1
        LIMIT 1`,
@@ -531,15 +537,20 @@ const upsertGroup = async (group: EntityInput | null | undefined) => {
       id: groupId,
     };
 
+    const payloadOverride = Boolean(
+      mergedGroup.overrideCapacity ?? mergedGroup.override_capacity,
+    );
+
     await client.query(
-      `INSERT INTO groups (group_id, name, chef)
-       VALUES ($1, $2, $3)
+      `INSERT INTO groups (group_id, name, chef, override_capacity)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (group_id)
-       DO UPDATE SET name = EXCLUDED.name, chef = EXCLUDED.chef`,
+       DO UPDATE SET name = EXCLUDED.name, chef = EXCLUDED.chef, override_capacity = EXCLUDED.override_capacity`,
       [
         groupId,
         mergedGroup.name || `Groupe ${groupId}`,
         normalizeOptionalId(mergedGroup.chef),
+        payloadOverride,
       ],
     );
 
