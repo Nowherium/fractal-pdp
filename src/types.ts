@@ -66,6 +66,7 @@ export interface Perso {
   poidsMax?: number;
   poidsMaxEffectif?: number;
   poidsTotal?: number;
+  esclave?: boolean;
   [key: string]: unknown;
 }
 
@@ -79,6 +80,7 @@ export interface Group {
   id: number;
   name: string;
   chef: number | null;
+  overrideCapacity?: boolean;
   [key: string]: unknown;
 }
 
