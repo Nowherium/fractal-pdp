@@ -30,7 +30,7 @@ function GroupEditPage({
   handleGroupUpdate: (
     groupId: number,
     field: string,
-    rawValue: string | number | null,
+    rawValue: string | number | boolean | null,
     options?: { persist?: boolean },
   ) => void;
   handleGroupMembersUpdate: (
@@ -55,7 +55,7 @@ function GroupEditPage({
   const memberIds = memberPersos.map((perso) => perso.id);
   const leader = getGroupLeader(group, persos);
   const groupCapacity = getGroupCapacity(leader);
-  const isAtCapacity = memberPersos.length >= groupCapacity;
+  const leaderCmd = Number(leader?.cmd ?? 0);
 
   const toggleMember = (persoId: number, checked: boolean) => {
     const nextMemberIds = checked
@@ -105,7 +105,22 @@ function GroupEditPage({
             <option value=''>Sélectionner</option>
             {memberPersos.map((perso) => {
               const optionCapacity = getGroupCapacity(perso);
-              const isTooSmall = memberPersos.length > optionCapacity;
+              const optionCmd = Number(perso.cmd ?? 0);
+              let isTooSmall = false;
+
+              if (!group.overrideCapacity) {
+                if (memberPersos.length > optionCapacity) {
+                  isTooSmall = true;
+                  if (
+                    memberPersos.length === 2 &&
+                    optionCmd < 1 &&
+                    memberPersos.some((m) => m.id !== perso.id && m.esclave)
+                  ) {
+                    isTooSmall = false;
+                  }
+                }
+              }
+
               return (
                 <option key={perso.id} value={perso.id} disabled={isTooSmall}>
                   {perso.nom} (cap. {optionCapacity})
@@ -113,6 +128,29 @@ function GroupEditPage({
               );
             })}
           </select>
+        </Field>
+
+        <Field label='Forcer la limite (Override)'>
+          <label className='mt-2 flex cursor-pointer items-center gap-2'>
+            <input
+              type='checkbox'
+              className='h-4 w-4 accent-green-500'
+              checked={!!group.overrideCapacity}
+              onChange={(event) =>
+                handleGroupUpdate(
+                  group.id,
+                  "overrideCapacity",
+                  event.target.checked,
+                  {
+                    persist: true,
+                  },
+                )
+              }
+            />
+            <span className='text-sm text-[#f1f1f1]'>
+              Ignorer la limite de commandement
+            </span>
+          </label>
         </Field>
       </div>
 
@@ -132,7 +170,20 @@ function GroupEditPage({
           <div className={memberListClassName}>
             {persos.map((perso) => {
               const isMember = memberIds.includes(perso.id);
-              const disableCheck = !isMember && isAtCapacity;
+
+              let disableCheck = false;
+              if (!isMember && !group.overrideCapacity) {
+                const hypotheticalSize = memberPersos.length + 1;
+
+                if (hypotheticalSize > groupCapacity) {
+                  disableCheck = true;
+
+                  if (hypotheticalSize === 2 && leaderCmd < 1 && perso.esclave) {
+                    disableCheck = false;
+                  }
+                }
+              }
+
               return (
                 <label key={perso.id} className={memberItemClassName}>
                   <input
@@ -145,7 +196,10 @@ function GroupEditPage({
                     }
                   />
                   <span>
-                    {perso.nom} (#{perso.id})
+                    {perso.nom} (#{perso.id}){" "}
+                    {perso.esclave && (
+                      <span className='ml-1 text-xs text-gray-400'>(Esclave)</span>
+                    )}
                   </span>
                 </label>
               );
