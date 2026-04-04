@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS resources (
 CREATE TABLE IF NOT EXISTS groups (
   group_id serial PRIMARY KEY,
   name text UNIQUE NOT NULL,
-  chef integer
+  chef integer,
+  override_capacity boolean NOT NULL DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS cities (
@@ -45,7 +46,8 @@ CREATE TABLE IF NOT EXISTS persos (
   capart numeric NOT NULL DEFAULT 0,
   cmd numeric NOT NULL DEFAULT 0,
   combat numeric NOT NULL DEFAULT 0,
-  group_id integer
+  group_id integer,
+  esclave boolean NOT NULL DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS perso_resources (

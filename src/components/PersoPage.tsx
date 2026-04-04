@@ -363,6 +363,27 @@ function PersoPage({
             ))}
           </select>
         </Field>
+
+        <Field label='Statut spécial'>
+          <label className='mt-2 flex cursor-pointer items-center gap-2'>
+            <input
+              type='checkbox'
+              className='h-4 w-4 accent-green-500'
+              checked={!!perso.esclave}
+              onChange={(event) =>
+                handlePersoUpdate(
+                  perso.id,
+                  "esclave",
+                  event.target.checked,
+                  { persist: true },
+                )
+              }
+            />
+            <span className='text-sm text-[#f1f1f1]'>
+              Ce personnage est un esclave
+            </span>
+          </label>
+        </Field>
       </div>
 
       <div className={sectionClassName}>

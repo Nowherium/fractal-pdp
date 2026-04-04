@@ -97,7 +97,7 @@ export const recalculateGroups = (
       return group;
     }
 
-    return { ...group, chef: members[0] ?? null };
+    return { ...group, chef: null };
   });
 };
 
@@ -106,15 +106,23 @@ export const validateGroupCapacities = (
   candidateGroups: Group[] = [],
 ): string => {
   for (const group of candidateGroups) {
+    if (group.overrideCapacity) continue;
+
     const members = getGroupMembers(candidatePersos, group.id);
     if (members.length === 0) continue;
 
     const leader =
       members.find((perso) => perso.id === group.chef) || members[0] || null;
     const capacity = getGroupCapacity(leader);
+    const leaderCmd = Number(leader?.cmd ?? 0);
 
-    if (members.length > capacity) {
-      return `Le groupe "${group.name}" dépasse la capacité de commandement de ${leader?.nom || "ce leader"} (${capacity} membres max).`;
+    const isApprenticeSlaverException =
+      members.length === 2 &&
+      leaderCmd < 1 &&
+      members.some((m) => m.id !== group.chef && m.esclave);
+
+    if (members.length > capacity && !isApprenticeSlaverException) {
+      return `Le groupe "${group.name}" dépasse la capacité de commandement de ${leader?.nom || "ce leader"} (${capacity} places).`;
     }
   }
 
