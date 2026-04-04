@@ -2,16 +2,16 @@ import type { TimelineSegment } from "../utils/timelineTypes";
 
 const stockFields = [
   {
-    label: "Stock Fin Lune EAU",
-    valueKey: "stockEau",
-    classKey: "classEau",
-    deltaKey: "deltaEau",
-  },
-  {
     label: "Stock Fin Lune NRT",
     valueKey: "stockNrt",
     classKey: "classNrt",
     deltaKey: "deltaNrt",
+  },
+  {
+    label: "Stock Fin Lune EAU",
+    valueKey: "stockEau",
+    classKey: "classEau",
+    deltaKey: "deltaEau",
   },
   {
     label: "Stock Fin Lune MED",
@@ -28,7 +28,7 @@ const stockFields = [
 ] as const;
 
 const formatDelta = (value: number) =>
-  `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
+  `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
 
 const getDeltaClassName = (value: number) => {
   if (value > 0) return "text-green-400";
@@ -47,7 +47,7 @@ function TimelineStockSummary({ stats }: { stats: TimelineSegment["stats"] }) {
             {field.label}
             <br />
             <span className={`text-[1.2em] font-bold ${stats[field.classKey]}`}>
-              {stats[field.valueKey].toFixed(2)}
+              {stats[field.valueKey].toFixed(1)}
             </span>{" "}
             <span
               className={`text-sm font-semibold ${getDeltaClassName(deltaValue)}`}

@@ -4,7 +4,6 @@ import SaveBar from "./components/SaveBar";
 import PageTabs from "./components/PageTabs";
 import ReservePage from "./components/ReservePage";
 import ResourcesPage from "./components/ResourcesPage";
-import Button from "./components/ui/Button";
 import ToastViewport from "./components/ui/ToastViewport";
 import EffectifPage from "./components/EffectifPage";
 import PersoPage from "./components/PersoPage";
@@ -12,6 +11,8 @@ import GroupPage from "./components/GroupPage";
 import GroupEditPage from "./components/GroupEditPage";
 import GroupViewPage from "./components/GroupViewPage";
 import ChantiersPage from "./components/ChantiersPage";
+import ExchangeModeToggle from "./components/shared/ExchangeModeToggle";
+import TimelineControls from "./components/TimelineControls";
 import TimelinePage from "./components/TimelinePage";
 import WeaponsPage from "./components/WeaponsPage";
 import ToolsPage from "./components/ToolsPage";
@@ -23,9 +24,13 @@ import {
   getPlacedConstructionIdsForLune,
   normalizeConstructionPlacements,
   normalizeCurrentLune,
+  normalizeStockQuantity,
   syncLuneConstructionPlacements,
 } from "./utils/stateUtils";
-import { simulateTimeline } from "./utils/timelineSimulation";
+import {
+  applyTimelineSegmentToState,
+  simulateTimeline,
+} from "./utils/timelineSimulation";
 import {
   exportStateData,
   importStateFile,
@@ -37,6 +42,7 @@ import {
 } from "./hooks/useAppPersistence";
 import { useAppState } from "./hooks/useAppState";
 import { useDerivedPersoState } from "./hooks/useDerivedPersoState";
+import { useAppActionToasts } from "./hooks/useAppActionToasts";
 import { useGroupActions } from "./hooks/useGroupActions";
 import { useInventoryActions } from "./hooks/useInventoryActions";
 import { usePersoActions } from "./hooks/usePersoActions";
@@ -135,6 +141,7 @@ function App() {
   });
 
   useDerivedPersoState({
+    persos,
     resources,
     armes,
     persoArmes,
@@ -147,6 +154,9 @@ function App() {
   });
 
   const [visiblePastLunes, setVisiblePastLunes] = useState<number>(0);
+  const [exchangeCityStocksWithPersos, setExchangeCityStocksWithPersos] =
+    useState(false);
+  const [showEffectifStocks, setShowEffectifStocks] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: number; message: string }>>(
     [],
   );
@@ -193,7 +203,7 @@ function App() {
   }, [currentLune, lunes, persos, constructions, setLunes, saveLuneEntity]);
 
   const handleStockChange = (field: string, rawValue: string | number) => {
-    const value = Number(rawValue) || 0;
+    const value = normalizeStockQuantity(rawValue);
     setStocks((previous: Record<string, number>) => ({
       ...previous,
       [field]: value,
@@ -251,12 +261,15 @@ function App() {
     groups,
     resources,
     sacs,
+    stocks,
+    exchangeCityStocksWithPersos,
     persoResources,
     lunes,
     nextPersoId,
     setPersos,
     setGroups,
     setPersoResources,
+    setStocks,
     setLunes,
     setPage,
     setSelectedPersoId,
@@ -265,6 +278,7 @@ function App() {
     savePersoEntity,
     deletePersoEntity,
     savePersoResourcesEntity,
+    saveStockEntity,
     saveLuneEntity,
   });
 
@@ -446,104 +460,64 @@ function App() {
     [timelineData, earliestVisibleLune],
   );
 
-  const handleAddResource = () => {
-    addResource();
-    showToast("Ressource ajoutée.");
-  };
+  const {
+    handleAddResource,
+    handleRemoveResource,
+    handleAddPerso,
+    handleRemovePerso,
+    handleAddGroup,
+    handleRemoveGroup,
+    handleAddConstruction,
+    handleRemoveConstruction,
+    handleAddLune,
+    handleRemoveLune,
+    handleAddArme,
+    handleRemoveArme,
+    handleAddOutil,
+    handleRemoveOutil,
+    handleAddSac,
+    handleRemoveSac,
+  } = useAppActionToasts({
+    resources,
+    persos,
+    groups,
+    constructions,
+    lunes,
+    armes,
+    outils,
+    sacs,
+    addResource,
+    removeResource,
+    addPerso,
+    removePerso,
+    addGroup,
+    removeGroup,
+    addConstruction,
+    removeConstruction,
+    addLune,
+    removeLune,
+    addArme,
+    removeArme,
+    addOutil,
+    removeOutil,
+    addSac,
+    removeSac,
+    showToast,
+  });
 
-  const handleRemoveResource = (index: number) => {
-    const resource = resources[index];
-    removeResource(index);
-    showToast(
-      `Ressource ${resource?.name || resource?.code?.toUpperCase() || "supprimée"}.`,
-    );
-  };
-
-  const handleAddPerso = () => {
-    addPerso();
-    showToast("Membre recruté.");
-  };
-
-  const handleRemovePerso = (index: number) => {
-    const perso = persos[index];
-    removePerso(index);
-    showToast(`${perso?.nom || "Le personnage"} a été renvoyé.`);
-  };
-
-  const handleAddGroup = () => {
-    addGroup();
-    showToast("Groupe créé.");
-  };
-
-  const handleRemoveGroup = (groupId: number) => {
-    const group = groups.find((item) => item.id === groupId);
-    removeGroup(groupId);
-    showToast(`${group?.name || "Le groupe"} a été supprimé.`);
-  };
-
-  const handleAddConstruction = () => {
-    addConstruction();
-    showToast("Chantier ajouté.");
-  };
-
-  const handleRemoveConstruction = (constructionId: string) => {
-    const construction = constructions.find(
-      (item) => item.id === constructionId,
-    );
-    removeConstruction(constructionId);
-    showToast(`${construction?.name || "Le chantier"} a été supprimé.`);
-  };
-
-  const handleAddLune = () => {
-    addLune();
-    showToast("Nouvelle lune ajoutée.");
-  };
-
-  const handleRemoveLune = (luneIndex: number) => {
-    const luneId = Number(lunes[luneIndex]?.id ?? luneIndex + 1);
-    removeLune(luneIndex);
-    showToast(`Lune ${luneId} supprimée.`);
-  };
-
-  const handleAddArme = () => {
-    addArme();
-    showToast("Arme ajoutée.");
-  };
-
-  const handleRemoveArme = (index: number) => {
-    const arme = armes[index];
-    removeArme(index);
-    showToast(`${arme?.name || "L'arme"} a été supprimée.`);
-  };
-
-  const handleAddOutil = () => {
-    addOutil();
-    showToast("Outil ajouté.");
-  };
-
-  const handleRemoveOutil = (index: number) => {
-    const outil = outils[index];
-    removeOutil(index);
-    showToast(`${outil?.name || "L'outil"} a été supprimé.`);
-  };
-
-  const handleAddSac = () => {
-    addSac();
-    showToast("Sac ajouté.");
-  };
-
-  const handleRemoveSac = (index: number) => {
-    const sac = sacs[index];
-    removeSac(index);
-    showToast(`${sac?.name || "Le sac"} a été supprimé.`);
-  };
-
-  const canShowMorePastLunes = visiblePastLunes < Number(currentLune ?? 1) - 1;
+  const hasNoPersos = persos.length === 0;
+  const currentLuneValue = Math.max(1, Number(currentLune ?? 1));
+  const maxVisiblePastLunes = Math.max(0, currentLuneValue - 1);
+  const areTurnControlsDisabled = hasNoPersos;
+  const timelineControlsDisabledTitle = areTurnControlsDisabled
+    ? "Aucun perso dans les effectifs."
+    : undefined;
+  const canShowMorePastLunes = visiblePastLunes < maxVisiblePastLunes;
   const canShowLessPastLunes = visiblePastLunes > 0;
 
   const handleShowPastLunes = () => {
     setVisiblePastLunes((previous) =>
-      Math.min(Math.max(0, Number(currentLune ?? 1) - 1), previous + 1),
+      Math.min(maxVisiblePastLunes, previous + 1),
     );
   };
 
@@ -556,6 +530,70 @@ function App() {
   };
 
   const handleAdvanceTurn = () => {
+    if (hasNoPersos) {
+      return;
+    }
+
+    if (currentTimelineSegment?.endingState) {
+      const advancedState = applyTimelineSegmentToState(
+        persos,
+        stocks,
+        currentTimelineSegment,
+        persoResources,
+        resources,
+      );
+
+      setPersos(advancedState.persos);
+      advancedState.persos.forEach((perso) => {
+        const previousPerso = persos.find((item) => item.id === perso.id);
+        if (!previousPerso) {
+          return;
+        }
+
+        if (
+          Number(previousPerso.pv ?? 0) !== Number(perso.pv ?? 0) ||
+          previousPerso.present !== perso.present ||
+          Number(previousPerso.combat ?? 0) !== Number(perso.combat ?? 0) ||
+          Number(previousPerso.capEau ?? 0) !== Number(perso.capEau ?? 0) ||
+          Number(previousPerso.capNrt ?? 0) !== Number(perso.capNrt ?? 0) ||
+          Number(previousPerso.capMed ?? 0) !== Number(perso.capMed ?? 0) ||
+          Number(previousPerso.capMat ?? 0) !== Number(perso.capMat ?? 0) ||
+          Number(previousPerso.capart ?? 0) !== Number(perso.capart ?? 0)
+        ) {
+          savePersoEntity(perso);
+        }
+      });
+
+      setPersoResources(advancedState.persoResources);
+      const persoIdsWithResourceChanges = new Set(
+        [...persoResources, ...advancedState.persoResources].map((entry) =>
+          Number(entry.perso_id),
+        ),
+      );
+
+      persoIdsWithResourceChanges.forEach((persoId) => {
+        const previousResources = persoResources
+          .filter((entry) => Number(entry.perso_id) === persoId)
+          .sort((left, right) => left.resource_id - right.resource_id);
+        const nextResources = advancedState.persoResources
+          .filter((entry) => Number(entry.perso_id) === persoId)
+          .sort((left, right) => left.resource_id - right.resource_id);
+
+        if (
+          JSON.stringify(previousResources) !== JSON.stringify(nextResources)
+        ) {
+          savePersoResourcesEntity(persoId, nextResources);
+        }
+      });
+
+      setStocks(advancedState.stocks);
+      Object.entries(advancedState.stocks).forEach(([code, quantity]) => {
+        if (Number(stocks[code] ?? 0) !== Number(quantity ?? 0)) {
+          saveStockEntity(code, Number(quantity ?? 0));
+        }
+      });
+    }
+
     const nextCurrentLune = Number(currentLune ?? 1) + 1;
     const maxLuneId = lunes.reduce(
       (maxValue, lune) => Math.max(maxValue, Number(lune.id) || 0),
@@ -602,61 +640,26 @@ function App() {
         </div>
       ) : null}
 
-      <div className='mb-4 flex flex-wrap items-center justify-center gap-3'>
-        <div className='flex flex-wrap gap-2'>
-          <Button
-            className='mt-0'
-            size='sm'
-            variant='success'
-            disabled={!canShowMorePastLunes}
-            onClick={handleShowPastLunes}
-          >
-            ⏪ Lunes passées
-            {visiblePastLunes > 0 ? ` (${visiblePastLunes})` : ""}
-          </Button>
-          <Button
-            className='mt-0'
-            size='sm'
-            variant='success'
-            disabled={!canShowLessPastLunes}
-            onClick={handleHidePastLunes}
-          >
-            ⏩ Lunes suivantes
-          </Button>
-          <Button
-            className='mt-0'
-            size='sm'
-            variant='success'
-            disabled={!canShowLessPastLunes}
-            onClick={handleBackToCurrentLune}
-          >
-            🎯 Lune courante
-          </Button>
-        </div>
-
-        <label className='inline-flex items-center gap-2.5 rounded-lg border border-[#3a3a3a] bg-[#161616] px-[14px] py-2.5 font-bold text-accent-blue'>
-          🌘 Lune actuelle
-          <input
-            className='w-[90px] text-center'
-            type='number'
-            min='1'
-            step='1'
-            value={currentLune}
-            onChange={(event) => handleCurrentLuneChange(event.target.value)}
-          />
-        </label>
-
-        <Button
-          className='mt-0'
-          size='sm'
-          variant='success'
-          onClick={handleAdvanceTurn}
-        >
-          ⏭️ Passer le tour
-        </Button>
-      </div>
+      <TimelineControls
+        visiblePastLunes={visiblePastLunes}
+        canShowMorePastLunes={canShowMorePastLunes}
+        canShowLessPastLunes={canShowLessPastLunes}
+        currentLune={currentLune}
+        areTurnControlsDisabled={areTurnControlsDisabled}
+        disabledTitle={timelineControlsDisabledTitle}
+        onShowPastLunes={handleShowPastLunes}
+        onHidePastLunes={handleHidePastLunes}
+        onBackToCurrentLune={handleBackToCurrentLune}
+        onCurrentLuneChange={(value) => handleCurrentLuneChange(value)}
+        onAdvanceTurn={handleAdvanceTurn}
+      />
 
       <PageTabs pages={pages} currentPage={page} setPage={setPage} />
+
+      <ExchangeModeToggle
+        checked={exchangeCityStocksWithPersos}
+        onChange={setExchangeCityStocksWithPersos}
+      />
 
       {page === "reserve" && (
         <ReservePage
@@ -687,12 +690,17 @@ function App() {
       {page === "effectif" && (
         <EffectifPage
           persos={persos}
+          resources={resources}
+          persoResources={persoResources}
           removePerso={handleRemovePerso}
           addPerso={handleAddPerso}
           openPersoPage={openPersoPage}
           updatePersoPresence={(persoId, isPresent) =>
             handlePersoUpdateById(persoId, "present", isPresent)
           }
+          handlePersoResourceUpdate={handlePersoResourceUpdate}
+          showStocks={showEffectifStocks}
+          setShowStocks={setShowEffectifStocks}
         />
       )}
 

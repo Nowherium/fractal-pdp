@@ -1,5 +1,16 @@
 import type { Group, Perso, PersoCapacityKey } from "../types";
 
+export const isPersoCadavre = (
+  perso: Partial<Perso> | null | undefined,
+): boolean => {
+  const pv = perso?.pv;
+  if (pv === null || pv === undefined) {
+    return false;
+  }
+
+  return Number(pv) <= 0;
+};
+
 export const getGroupMembers = (
   persos: Perso[] = [],
   groupId: number | null | undefined,
@@ -10,15 +21,28 @@ export const getGroupLeader = (
   persos: Perso[] = [],
 ): Perso | null => {
   const members = getGroupMembers(persos, group.id);
-  return members.find((perso) => perso.id === group.chef) || members[0] || null;
+  const livingMembers = members.filter((perso) => !isPersoCadavre(perso));
+
+  return (
+    livingMembers.find((perso) => perso.id === group.chef) ||
+    livingMembers[0] ||
+    members.find((perso) => perso.id === group.chef) ||
+    members[0] ||
+    null
+  );
 };
 
 export const getGroupCapacity = (leader: Perso | null | undefined): number =>
-  Math.max(1, Math.floor(Number(leader?.cmd ?? 0)) + 1);
+  isPersoCadavre(leader)
+    ? 0
+    : Math.max(1, Math.floor(Number(leader?.cmd ?? 0)) + 1);
 
 export const getPersoCombatValue = (
   perso: Partial<Perso> | null | undefined,
-): number => Number(perso?.combatEffectif ?? perso?.combat ?? 0);
+): number =>
+  isPersoCadavre(perso)
+    ? 0
+    : Number(perso?.combatEffectif ?? perso?.combat ?? 0);
 
 export const getPersoWeightValue = (
   perso: Partial<Perso> | null | undefined,
@@ -36,6 +60,10 @@ export const getPersoCapacityValue = (
   perso: Partial<Perso> | null | undefined,
   type: PersoCapacityKey,
 ): number => {
+  if (isPersoCadavre(perso)) {
+    return 0;
+  }
+
   switch (type) {
     case "eau":
       return Number(perso?.capEauEffectif ?? perso?.capEau ?? 0);
@@ -109,8 +137,7 @@ export const validateGroupCapacities = (
     const members = getGroupMembers(candidatePersos, group.id);
     if (members.length === 0) continue;
 
-    const leader =
-      members.find((perso) => perso.id === group.chef) || members[0] || null;
+    const leader = getGroupLeader(group, candidatePersos);
     const capacity = getGroupCapacity(leader);
     const leaderCmd = Number(leader?.cmd ?? 0);
 

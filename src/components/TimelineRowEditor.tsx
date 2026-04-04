@@ -27,11 +27,51 @@ function TimelineRationCheckbox({
   return (
     <input
       type='checkbox'
-      className='h-[18px] w-[18px] cursor-pointer accent-green-500'
+      className={`h-[18px] w-[18px] accent-green-500 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
       checked={checked}
       disabled={disabled}
+      title={
+        disabled
+          ? "Stock ville + perso insuffisant"
+          : "Activer ou retirer cette consommation pour la lune"
+      }
       onChange={(event) => onChange(event.target.checked)}
     />
+  );
+}
+
+function TimelineRationCell({
+  checked,
+  stock,
+  disabled,
+  onChange,
+  source,
+}: {
+  checked: boolean;
+  stock: number;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+  source?: "perso" | "ville" | "none";
+}) {
+  const stockClassName =
+    stock <= 0
+      ? "text-[0.72rem] text-accent-red"
+      : "text-[0.72rem] text-[#9ea7b3]";
+
+  return (
+    <div className='flex flex-col items-center gap-1'>
+      <TimelineRationCheckbox
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+      />
+      <span className={stockClassName}>stk {formatDrugQuantity(stock)}</span>
+      {source === "ville" ? (
+        <span className='rounded-full bg-[#16324a] px-1.5 py-0.5 text-[0.65rem] font-semibold text-accent-cyan'>
+          ville
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -197,30 +237,36 @@ function TimelineRowEditor({
           ) : null}
         </td>
         <td>
-          <TimelineRationCheckbox
-            checked={!row.isAbsent && row.ration.eau && !row.mortAuDebut}
-            disabled={isRowLocked}
-            onChange={(checked) =>
-              updateRation(actualLuneIndex, row.persoId, "eau", checked)
-            }
-          />
-        </td>
-        <td>
-          <TimelineRationCheckbox
+          <TimelineRationCell
             checked={!row.isAbsent && row.ration.nrt && !row.mortAuDebut}
-            disabled={isRowLocked}
+            stock={Number(row.resourceStocks?.["nrt"] ?? 0)}
+            disabled={isRowLocked || !(row.rationAvailability?.["nrt"] ?? true)}
             onChange={(checked) =>
               updateRation(actualLuneIndex, row.persoId, "nrt", checked)
             }
+            source={row.rationSource?.["nrt"] ?? "none"}
           />
         </td>
         <td>
-          <TimelineRationCheckbox
+          <TimelineRationCell
+            checked={!row.isAbsent && row.ration.eau && !row.mortAuDebut}
+            stock={Number(row.resourceStocks?.["eau"] ?? 0)}
+            disabled={isRowLocked || !(row.rationAvailability?.["eau"] ?? true)}
+            onChange={(checked) =>
+              updateRation(actualLuneIndex, row.persoId, "eau", checked)
+            }
+            source={row.rationSource?.["eau"] ?? "none"}
+          />
+        </td>
+        <td>
+          <TimelineRationCell
             checked={!row.isAbsent && row.ration.med && !row.mortAuDebut}
-            disabled={isRowLocked}
+            stock={Number(row.resourceStocks?.["med"] ?? 0)}
+            disabled={isRowLocked || !(row.rationAvailability?.["med"] ?? true)}
             onChange={(checked) =>
               updateRation(actualLuneIndex, row.persoId, "med", checked)
             }
+            source={row.rationSource?.["med"] ?? "none"}
           />
         </td>
         <td className={row.classPv}>

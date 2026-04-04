@@ -20,6 +20,8 @@ import type {
 } from "../types";
 import { formControlClassName, toFormInputValue } from "../utils/formUtils";
 import { sortResources } from "../utils/resourceOrder";
+import { isPersoCadavre } from "../utils/groupUtils";
+import { normalizeStockQuantity } from "../utils/stateUtils";
 
 const persoFields: Array<{
   key: string;
@@ -146,6 +148,7 @@ function PersoPage({
   }
 
   const orderedResources = sortResources(resources);
+  const isCadavre = isPersoCadavre(perso);
 
   const carriedWeaponIds = persoArmes
     .filter((entry) => entry.perso_id === perso.id)
@@ -282,6 +285,12 @@ function PersoPage({
         ← Retour à l'Effectif
       </Button>
       <h2>Modifier {perso.nom || "le personnage"}</h2>
+      {isCadavre ? (
+        <InfoText className='font-semibold not-italic text-accent-red'>
+          ☠️ Statut : cadavre — ce personnage est hors d’état tant que ses PV
+          restent à 0.
+        </InfoText>
+      ) : null}
       <InfoText>
         Poids total porté :{" "}
         <strong
@@ -413,7 +422,9 @@ function PersoPage({
                   type='number'
                   step='0.1'
                   min='0'
-                  value={carriedResourceQuantities.get(resource.id) ?? 0}
+                  value={normalizeStockQuantity(
+                    carriedResourceQuantities.get(resource.id) ?? 0,
+                  )}
                   onChange={(event) =>
                     handlePersoResourceUpdate(
                       perso.id,

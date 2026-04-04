@@ -8,25 +8,33 @@ import type {
   PersoResource,
   Resource,
   Sac,
+  Stocks,
 } from "../types";
 import {
   recalculateGroups,
   validateGroupCapacities,
 } from "../utils/groupUtils";
 import { createDefaultPerso } from "../utils/entityDefaults";
-import { defaultRation, normalizePersoFieldValue } from "../utils/stateUtils";
+import {
+  defaultRation,
+  normalizePersoFieldValue,
+  normalizeStockQuantity,
+} from "../utils/stateUtils";
 
 interface UsePersoActionsParams {
   persos: Perso[];
   groups: Group[];
   resources: Resource[];
   sacs: Sac[];
+  stocks: Stocks;
+  exchangeCityStocksWithPersos: boolean;
   persoResources: PersoResource[];
   lunes: Lune[];
   nextPersoId: number;
   setPersos: Dispatch<SetStateAction<Perso[]>>;
   setGroups: Dispatch<SetStateAction<Group[]>>;
   setPersoResources: Dispatch<SetStateAction<PersoResource[]>>;
+  setStocks: Dispatch<SetStateAction<Stocks>>;
   setLunes: Dispatch<SetStateAction<Lune[]>>;
   setPage: Dispatch<SetStateAction<AppPage>>;
   setSelectedPersoId: Dispatch<SetStateAction<number | null>>;
@@ -38,6 +46,7 @@ interface UsePersoActionsParams {
     persoId: number,
     nextPersoResources: PersoResource[],
   ) => void;
+  saveStockEntity: (code: string, quantity: number) => void;
   saveLuneEntity: (lune: Lune) => void;
 }
 
@@ -46,12 +55,15 @@ export const usePersoActions = ({
   groups,
   resources,
   sacs,
+  stocks,
+  exchangeCityStocksWithPersos,
   persoResources,
   lunes,
   nextPersoId,
   setPersos,
   setGroups,
   setPersoResources,
+  setStocks,
   setLunes,
   setPage,
   setSelectedPersoId,
@@ -60,6 +72,7 @@ export const usePersoActions = ({
   savePersoEntity,
   deletePersoEntity,
   savePersoResourcesEntity,
+  saveStockEntity,
   saveLuneEntity,
 }: UsePersoActionsParams) => {
   const openPersoPage = (persoId: number) => {
@@ -122,7 +135,44 @@ export const usePersoActions = ({
     resourceId: number,
     rawValue: string | number,
   ) => {
-    const quantity = Math.max(0, Number(rawValue) || 0);
+    const requestedQuantity = normalizeStockQuantity(rawValue);
+    const currentQuantity = normalizeStockQuantity(
+      persoResources.find(
+        (entry) =>
+          entry.perso_id === persoId && entry.resource_id === resourceId,
+      )?.quantity ?? 0,
+    );
+    const resourceCode = String(
+      resources.find((resource) => resource.id === resourceId)?.code ?? "",
+    )
+      .trim()
+      .toLowerCase();
+    const currentCityStock = normalizeStockQuantity(stocks[resourceCode] ?? 0);
+
+    let quantity = requestedQuantity;
+    let nextStocks = stocks;
+
+    if (exchangeCityStocksWithPersos && resourceCode) {
+      const delta = requestedQuantity - currentQuantity;
+
+      if (delta > 0) {
+        const transferable = Math.min(delta, currentCityStock);
+        quantity = normalizeStockQuantity(currentQuantity + transferable);
+        nextStocks = {
+          ...stocks,
+          [resourceCode]: normalizeStockQuantity(
+            currentCityStock - transferable,
+          ),
+        };
+      } else if (delta < 0) {
+        nextStocks = {
+          ...stocks,
+          [resourceCode]: normalizeStockQuantity(
+            currentCityStock + Math.abs(delta),
+          ),
+        };
+      }
+    }
 
     const remainingEntries = persoResources.filter(
       (entry) =>
@@ -137,7 +187,7 @@ export const usePersoActions = ({
             {
               perso_id: persoId,
               resource_id: resourceId,
-              quantity,
+              quantity: normalizeStockQuantity(quantity),
             },
           ].sort(
             (left, right) =>
@@ -150,6 +200,15 @@ export const usePersoActions = ({
       persoId,
       nextPersoResources.filter((entry) => entry.perso_id === persoId),
     );
+
+    if (
+      exchangeCityStocksWithPersos &&
+      resourceCode &&
+      Number(nextStocks[resourceCode] ?? 0) !== currentCityStock
+    ) {
+      setStocks(nextStocks);
+      saveStockEntity(resourceCode, Number(nextStocks[resourceCode] ?? 0));
+    }
   };
 
   const addPerso = () => {

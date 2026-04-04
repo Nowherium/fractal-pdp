@@ -6,6 +6,7 @@ import type {
   PersoResource,
   Ration,
   Resource,
+  Stocks,
 } from "../types";
 import type {
   CityMultipliersInput,
@@ -58,6 +59,14 @@ const overrideCapMappings = [
   ["capArt", "art"],
 ] as const;
 
+const persoCapStateMappings = [
+  ["eau", "capEau", "capEauEffectif"],
+  ["nrt", "capNrt", "capNrtEffectif"],
+  ["med", "capMed", "capMedEffectif"],
+  ["mat", "capMat", "capMatEffectif"],
+  ["art", "capart", "capArtEffectif"],
+] as const;
+
 const isProductionTask = (task: string): task is ProductionTaskKey =>
   productionTaskKeys.includes(task as ProductionTaskKey);
 
@@ -100,7 +109,7 @@ const buildDrugStocksByPerso = (
     const resourceId = Number(entry.resource_id);
     const code = resourceCodesById.get(resourceId);
 
-    if (!Number.isFinite(persoId) || !code || !DRUG_EFFECTS[code]) {
+    if (!Number.isFinite(persoId) || !code) {
       return acc;
     }
 
@@ -123,6 +132,223 @@ const buildAvailableDrugsMap = (
         : Number(remainingStocks[code] ?? 0),
     ]),
   );
+
+const buildAvailableResourceCodes = (resources: Resource[] = []): Set<string> =>
+  new Set(
+    resources
+      .map((resource) =>
+        String(resource.code ?? "")
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+
+const roundStateValue = (value: number): number =>
+  Number((Number(value) || 0).toFixed(2));
+
+const getInitialPersoCapValue = (
+  perso: Perso,
+  baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capart",
+  effectifField:
+    | "capEauEffectif"
+    | "capNrtEffectif"
+    | "capMedEffectif"
+    | "capMatEffectif"
+    | "capArtEffectif",
+): number => {
+  const baseValue = Math.max(0, Number(perso[baseField] ?? 0) || 0);
+  const effectifValue = Math.max(
+    0,
+    Number(perso[effectifField] ?? baseValue) || 0,
+  );
+
+  return roundStateValue(Math.max(baseValue, effectifValue));
+};
+
+const clonePersoDrugStocks = (source: PersoDrugStocks = {}): PersoDrugStocks =>
+  Object.fromEntries(
+    Object.entries(source).map(([persoId, drugStocks]) => [
+      Number(persoId),
+      Object.fromEntries(
+        Object.entries(drugStocks ?? {}).map(([code, quantity]) => [
+          code,
+          Math.max(0, Number(quantity ?? 0) || 0),
+        ]),
+      ),
+    ]),
+  );
+
+const buildTimelineStateSnapshot = ({
+  persos,
+  pvCourants,
+  capCourantes,
+  combatCourants,
+  presenceCourante,
+  stocks,
+  remainingResourceStocksByPerso,
+}: {
+  persos: Perso[];
+  pvCourants: SimulationState["pvCourants"];
+  capCourantes: SimulationState["capCourantes"];
+  combatCourants: SimulationState["combatCourants"];
+  presenceCourante: SimulationState["presenceCourante"];
+  stocks: Record<string, number>;
+  remainingResourceStocksByPerso: PersoDrugStocks;
+}) => ({
+  persos: Object.fromEntries(
+    persos.map((perso) => {
+      const currentCaps = getOrCreatePersoCaps(capCourantes, perso.id, {
+        eau: getInitialPersoCapValue(perso, "capEau", "capEauEffectif"),
+        nrt: getInitialPersoCapValue(perso, "capNrt", "capNrtEffectif"),
+        med: getInitialPersoCapValue(perso, "capMed", "capMedEffectif"),
+        mat: getInitialPersoCapValue(perso, "capMat", "capMatEffectif"),
+        art: getInitialPersoCapValue(perso, "capart", "capArtEffectif"),
+      });
+
+      return [
+        perso.id,
+        {
+          pv: roundStateValue(
+            Math.max(0, Number(pvCourants[perso.id] ?? perso.pv ?? 0) || 0),
+          ),
+          present: normalizePresenceValue(
+            presenceCourante[perso.id],
+            normalizePresenceValue(perso.present, true),
+          ),
+          combat: roundStateValue(
+            Math.max(
+              0,
+              Number(combatCourants[perso.id] ?? perso.combat ?? 0) || 0,
+            ),
+          ),
+          caps: {
+            eau: roundStateValue(Number(currentCaps.eau ?? 0)),
+            nrt: roundStateValue(Number(currentCaps.nrt ?? 0)),
+            med: roundStateValue(Number(currentCaps.med ?? 0)),
+            mat: roundStateValue(Number(currentCaps.mat ?? 0)),
+            art: roundStateValue(Number(currentCaps.art ?? 0)),
+          },
+        },
+      ];
+    }),
+  ),
+  stocks: createStockSnapshot(stocks),
+  carriedResources: clonePersoDrugStocks(remainingResourceStocksByPerso),
+});
+
+const resolveBaseCapFromEffective = (
+  perso: Perso,
+  baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capart",
+  effectifField:
+    | "capEauEffectif"
+    | "capNrtEffectif"
+    | "capMedEffectif"
+    | "capMatEffectif"
+    | "capArtEffectif",
+  nextEffectiveValue: number,
+): number => {
+  const safeNextEffective = Math.max(0, Number(nextEffectiveValue ?? 0) || 0);
+  const currentBase = Math.max(0, Number(perso[baseField] ?? 0) || 0);
+  const currentEffectif = Math.max(
+    0,
+    Number(perso[effectifField] ?? currentBase) || 0,
+  );
+
+  if (currentBase <= 0 || currentEffectif <= 0) {
+    return roundStateValue(safeNextEffective);
+  }
+
+  const multiplier = currentEffectif / currentBase;
+  if (!Number.isFinite(multiplier) || multiplier <= 0) {
+    return roundStateValue(safeNextEffective);
+  }
+
+  return roundStateValue(
+    Math.max(
+      0,
+      currentBase + (safeNextEffective - currentEffectif) / multiplier,
+    ),
+  );
+};
+
+export const applyTimelineSegmentToState = (
+  persos: Perso[] = [],
+  stocks: Stocks = {},
+  segment?: TimelineSegment | null,
+  persoResources: PersoResource[] = [],
+  resources: Resource[] = [],
+): { persos: Perso[]; stocks: Stocks; persoResources: PersoResource[] } => {
+  const endingState = segment?.endingState;
+  if (!endingState) {
+    return {
+      persos: [...persos],
+      stocks: { ...stocks },
+      persoResources: [...persoResources],
+    };
+  }
+
+  const nextPersos = persos.map((perso) => {
+    const snapshot = endingState.persos[perso.id];
+    if (!snapshot) {
+      return perso;
+    }
+
+    const nextPerso = {
+      ...perso,
+      present: snapshot.present,
+      pv: roundStateValue(snapshot.pv),
+      combat: roundStateValue(snapshot.combat),
+      capEauEffectif: roundStateValue(snapshot.caps.eau),
+      capNrtEffectif: roundStateValue(snapshot.caps.nrt),
+      capMedEffectif: roundStateValue(snapshot.caps.med),
+      capMatEffectif: roundStateValue(snapshot.caps.mat),
+      capArtEffectif: roundStateValue(snapshot.caps.art),
+    };
+
+    persoCapStateMappings.forEach(([capKey, baseField, effectifField]) => {
+      nextPerso[baseField] = resolveBaseCapFromEffective(
+        perso,
+        baseField,
+        effectifField,
+        snapshot.caps[capKey],
+      );
+    });
+
+    return nextPerso;
+  });
+
+  const resourceCodesById = new Map<number, string>(
+    resources.map((resource) => [
+      Number(resource.id),
+      String(resource.code ?? "")
+        .trim()
+        .toLowerCase(),
+    ]),
+  );
+
+  const nextPersoResources = persoResources.flatMap((entry) => {
+    const persoId = Number(entry.perso_id);
+    const code = resourceCodesById.get(Number(entry.resource_id));
+    const remainingResources = endingState.carriedResources?.[persoId];
+
+    if (!code || !remainingResources || !(code in remainingResources)) {
+      return [entry];
+    }
+
+    const quantity = Math.max(0, Number(remainingResources[code] ?? 0) || 0);
+    return quantity > 0 ? [{ ...entry, quantity }] : [];
+  });
+
+  return {
+    persos: nextPersos,
+    stocks: {
+      ...stocks,
+      ...endingState.stocks,
+    },
+    persoResources: nextPersoResources,
+  };
+};
 
 const buildInitialConstructionProgress = (
   constructions: LuneConstruction[] = [],
@@ -189,11 +415,11 @@ const initializePersoSimulationState = (
     pvCourants[perso.id] = Math.max(0, Number(perso.pv ?? perso.pvmax ?? 0));
     presenceCourante[perso.id] = normalizePresenceValue(perso.present, true);
     capCourantes[perso.id] = {
-      eau: Number(perso.capEauEffectif ?? perso.capEau ?? 0),
-      nrt: Number(perso.capNrtEffectif ?? perso.capNrt ?? 0),
-      med: Number(perso.capMedEffectif ?? perso.capMed ?? 0),
-      mat: Number(perso.capMatEffectif ?? perso.capMat ?? 0),
-      art: Number(perso.capArtEffectif ?? perso.capart ?? 0),
+      eau: getInitialPersoCapValue(perso, "capEau", "capEauEffectif"),
+      nrt: getInitialPersoCapValue(perso, "capNrt", "capNrtEffectif"),
+      med: getInitialPersoCapValue(perso, "capMed", "capMedEffectif"),
+      mat: getInitialPersoCapValue(perso, "capMat", "capMatEffectif"),
+      art: getInitialPersoCapValue(perso, "capart", "capArtEffectif"),
     };
     combatCourants[perso.id] = Number(perso.combat ?? 0);
     remainingDrugStocksByPerso[perso.id] =
@@ -312,6 +538,8 @@ const simulatePersoForLune = ({
   combatCourants,
   presenceCourante,
   remainingDrugStocksByPerso,
+  availableCityResourceStocks,
+  availableResourceCodes,
 }: {
   perso: Perso;
   lune: Lune;
@@ -324,18 +552,79 @@ const simulatePersoForLune = ({
   combatCourants: SimulationState["combatCourants"];
   presenceCourante: SimulationState["presenceCourante"];
   remainingDrugStocksByPerso: PersoDrugStocks;
+  availableCityResourceStocks: Record<string, number>;
+  availableResourceCodes: Set<string>;
 }): ProcessPersoResult => {
   const basePvDebut = Number(pvCourants[perso.id] ?? 0);
-  const ration = { ...defaultRation(), ...(lune.rations[perso.id] ?? {}) };
+  const storedRation = {
+    ...defaultRation(),
+    ...(lune.rations[perso.id] ?? {}),
+  };
   const override = overrides[perso.id] ?? {};
   const hasOverride = Object.keys(override).length > 0;
   const isAbsent = presenceCourante[perso.id] === false;
   const mortAuDebut = basePvDebut <= 0;
-  const selectedDrugCode = normalizeDrugCode(ration.drogue);
+  const selectedDrugCode = normalizeDrugCode(storedRation.drogue);
   const persoDrugStocks =
     remainingDrugStocksByPerso[perso.id] ??
     (remainingDrugStocksByPerso[perso.id] = {});
   const availableDrugs = buildAvailableDrugsMap(persoDrugStocks);
+  const resourceStocks = {
+    eau: Number(persoDrugStocks["eau"] ?? 0),
+    nrt: Number(persoDrugStocks["nrt"] ?? 0),
+    med: Number(persoDrugStocks["med"] ?? 0),
+  };
+  const resolveRationAvailability = (resourceCode: "eau" | "nrt" | "med") => {
+    if (isAbsent || mortAuDebut) {
+      return false;
+    }
+
+    if (!availableResourceCodes.has(resourceCode)) {
+      return true;
+    }
+
+    return (
+      Number(persoDrugStocks[resourceCode] ?? 0) >= 1 ||
+      Number(availableCityResourceStocks[resourceCode] ?? 0) >= 1
+    );
+  };
+  const resolveRationSource = (
+    resourceCode: "eau" | "nrt" | "med",
+  ): "perso" | "ville" | "none" => {
+    if (isAbsent || mortAuDebut) {
+      return "none";
+    }
+
+    if (!availableResourceCodes.has(resourceCode)) {
+      return "perso";
+    }
+
+    if (Number(persoDrugStocks[resourceCode] ?? 0) >= 1) {
+      return "perso";
+    }
+
+    if (Number(availableCityResourceStocks[resourceCode] ?? 0) >= 1) {
+      return "ville";
+    }
+
+    return "none";
+  };
+  const rationAvailability = {
+    eau: resolveRationAvailability("eau"),
+    nrt: resolveRationAvailability("nrt"),
+    med: resolveRationAvailability("med"),
+  };
+  const rationSource = {
+    eau: resolveRationSource("eau"),
+    nrt: resolveRationSource("nrt"),
+    med: resolveRationSource("med"),
+  };
+  const ration = {
+    ...storedRation,
+    eau: Boolean(storedRation.eau),
+    nrt: Boolean(storedRation.nrt),
+    med: Boolean(storedRation.med),
+  };
 
   const baseCapsAtStart: PersoCaps = {
     eau: Number(capCourantes[perso.id]?.eau ?? 0),
@@ -393,6 +682,9 @@ const simulatePersoForLune = ({
         mortText,
         hasOverride,
         availableDrugs,
+        resourceStocks,
+        rationAvailability,
+        rationSource,
         drugStatus,
         drugClassName,
       },
@@ -465,17 +757,57 @@ const simulatePersoForLune = ({
       };
     }
 
-    if (ration.eau) consumption.eau += 1;
-    if (ration.nrt) consumption.nrt += 1;
-    if (ration.med) consumption.med += 1;
+    const consumeRationResource = (resourceCode: "eau" | "nrt" | "med") => {
+      if (!ration[resourceCode]) {
+        return false;
+      }
 
-    const degats =
+      if (!availableResourceCodes.has(resourceCode)) {
+        return true;
+      }
+
+      const persoQuantity = Number(persoDrugStocks[resourceCode] ?? 0);
+      if (persoQuantity >= 1) {
+        persoDrugStocks[resourceCode] = Math.max(0, persoQuantity - 1);
+        return true;
+      }
+
+      const cityQuantity = Number(
+        availableCityResourceStocks[resourceCode] ?? 0,
+      );
+      if (cityQuantity >= 1) {
+        availableCityResourceStocks[resourceCode] = Math.max(
+          0,
+          cityQuantity - 1,
+        );
+        return true;
+      }
+
+      return false;
+    };
+
+    ration.eau = consumeRationResource("eau");
+    ration.nrt = consumeRationResource("nrt");
+    ration.med = consumeRationResource("med");
+
+    if (ration.eau) {
+      consumption.eau += 1;
+    }
+    if (ration.nrt) {
+      consumption.nrt += 1;
+    }
+    if (ration.med) {
+      consumption.med += 1;
+    }
+
+    const hasFullRation = ration.eau && ration.nrt && ration.med;
+    const degatsManqueRation =
       (ration.eau ? 0 : 1) + (ration.nrt ? 0 : 1) + (ration.med ? 0 : 0.5);
-    pvFin = Math.max(0, pvDebut - degats);
-    pvCourants[perso.id] =
-      temporaryPvBonus > 0
-        ? Math.max(0, Math.min(pvFin, Number(perso.pvmax ?? pvFin)))
-        : pvFin;
+    const pvMax = Math.max(pvDebut, Number(perso.pvmax ?? pvDebut) || 0);
+    const pvDelta = hasFullRation ? 1 : -degatsManqueRation;
+
+    pvFin = Math.max(0, Math.min(pvMax, pvDebut + pvDelta));
+    pvCourants[perso.id] = pvFin;
     classPv = pvFin <= 0 ? "danger" : pvFin <= 5 ? "warning" : "safe";
     mortText = pvFin <= 0 ? " (DÉCÈS)" : "";
   } else {
@@ -498,6 +830,9 @@ const simulatePersoForLune = ({
       mortText,
       hasOverride,
       availableDrugs,
+      resourceStocks,
+      rationAvailability,
+      rationSource,
       drugStatus,
       drugClassName,
     },
@@ -744,10 +1079,12 @@ export const simulateTimeline = (
 ): TimelineSegment[] => {
   const timeline: TimelineSegment[] = [];
   const productionMultipliers = normalizeProductionMultipliers(cityMultipliers);
-  const remainingDrugStocksByPerso = buildDrugStocksByPerso(
+  const availableResourceCodes = buildAvailableResourceCodes(resources);
+  const baseDrugStocksByPerso = buildDrugStocksByPerso(
     resources,
     persoResources,
   );
+  let remainingDrugStocksByPerso = clonePersoDrugStocks(baseDrugStocksByPerso);
   const baseResourceStocks = Object.fromEntries(
     Object.entries(stocks || {}).map(([code, value]) => [
       code,
@@ -755,7 +1092,7 @@ export const simulateTimeline = (
     ]),
   );
   const resourceStocks = { ...baseResourceStocks };
-  const { pvCourants, capCourantes, combatCourants, presenceCourante } =
+  let { pvCourants, capCourantes, combatCourants, presenceCourante } =
     initializePersoSimulationState(persos, remainingDrugStocksByPerso);
 
   const normalizedConstructions = normalizeLuneConstructions(constructions);
@@ -771,6 +1108,9 @@ export const simulateTimeline = (
       Number(lune.id ?? 0) >= Number(currentLune ?? 1)
     ) {
       Object.assign(resourceStocks, baseResourceStocks);
+      remainingDrugStocksByPerso = clonePersoDrugStocks(baseDrugStocksByPerso);
+      ({ pvCourants, capCourantes, combatCourants, presenceCourante } =
+        initializePersoSimulationState(persos, remainingDrugStocksByPerso));
       hasResetStocksForCurrentLune = true;
     }
     const overrides = lune.overrides || {};
@@ -794,6 +1134,7 @@ export const simulateTimeline = (
       combatCourants,
     });
 
+    const availableCityResourceStocks = createStockSnapshot(resourceStocks);
     const rows: TimelineRow[] = [];
     const constructionAssignments: ConstructionAssignment[] = [];
     const luneTotals = createEmptyLuneTotals();
@@ -811,6 +1152,8 @@ export const simulateTimeline = (
         combatCourants,
         presenceCourante,
         remainingDrugStocksByPerso,
+        availableCityResourceStocks,
+        availableResourceCodes,
       });
 
       rows.push(persoResult.row);
@@ -846,6 +1189,15 @@ export const simulateTimeline = (
       rows,
       constructionStates,
       stats: stockStats,
+      endingState: buildTimelineStateSnapshot({
+        persos,
+        pvCourants,
+        capCourantes,
+        combatCourants,
+        presenceCourante,
+        stocks: projectedStocks,
+        remainingResourceStocksByPerso: remainingDrugStocksByPerso,
+      }),
     });
   });
 

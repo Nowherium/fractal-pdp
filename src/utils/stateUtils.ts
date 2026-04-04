@@ -492,6 +492,24 @@ export const normalizeCurrentLune = (value: unknown): number => {
   return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 1;
 };
 
+export const normalizeStockQuantity = (value: unknown): number => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.max(0, Number(numericValue.toFixed(1)));
+};
+
+export const normalizeProductionCapacity = (value: unknown): number => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.max(0, Number(numericValue.toFixed(2)));
+};
+
 export const normalizeOptionalGroupId = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const numericValue = Number(value);
@@ -513,6 +531,16 @@ export const normalizePersoFieldValue = (
     return Math.max(0, numericValue);
   }
 
+  if (
+    field === "capEau" ||
+    field === "capNrt" ||
+    field === "capMed" ||
+    field === "capMat" ||
+    field === "capart"
+  ) {
+    return normalizeProductionCapacity(numericValue);
+  }
+
   return numericValue;
 };
 
@@ -531,11 +559,11 @@ export const normalizePersos = (persos: Array<Partial<Perso>> = []): Perso[] =>
   persos.map((perso) => {
     const pvmax = Math.max(0, Number(perso.pvmax ?? 0) || 0);
     const pv = Math.max(0, Number(perso.pv ?? pvmax) || 0);
-    const capEau = Number(perso.capEau ?? 0);
-    const capNrt = Number(perso.capNrt ?? 0);
-    const capMed = Number(perso.capMed ?? 0);
-    const capMat = Number(perso.capMat ?? 0);
-    const capart = Number(perso.capart ?? 0);
+    const capEau = normalizeProductionCapacity(perso.capEau ?? 0);
+    const capNrt = normalizeProductionCapacity(perso.capNrt ?? 0);
+    const capMed = normalizeProductionCapacity(perso.capMed ?? 0);
+    const capMat = normalizeProductionCapacity(perso.capMat ?? 0);
+    const capart = normalizeProductionCapacity(perso.capart ?? 0);
     const combat = Number(perso.combat ?? 0);
     const poidsMaxValue = Number(perso.poidsMax ?? 20);
     const poidsMax = Number.isFinite(poidsMaxValue)
@@ -555,11 +583,21 @@ export const normalizePersos = (persos: Array<Partial<Perso>> = []): Perso[] =>
       capMed,
       capMat,
       capart,
-      capEauEffectif: Number(perso.capEauEffectif ?? capEau),
-      capNrtEffectif: Number(perso.capNrtEffectif ?? capNrt),
-      capMedEffectif: Number(perso.capMedEffectif ?? capMed),
-      capMatEffectif: Number(perso.capMatEffectif ?? capMat),
-      capArtEffectif: Number(perso.capArtEffectif ?? capart),
+      capEauEffectif: normalizeProductionCapacity(
+        perso.capEauEffectif ?? capEau,
+      ),
+      capNrtEffectif: normalizeProductionCapacity(
+        perso.capNrtEffectif ?? capNrt,
+      ),
+      capMedEffectif: normalizeProductionCapacity(
+        perso.capMedEffectif ?? capMed,
+      ),
+      capMatEffectif: normalizeProductionCapacity(
+        perso.capMatEffectif ?? capMat,
+      ),
+      capArtEffectif: normalizeProductionCapacity(
+        perso.capArtEffectif ?? capart,
+      ),
       poidsTotal: Number(perso.poidsTotal ?? 0),
       cmd: Number(perso.cmd ?? 0),
       combat,

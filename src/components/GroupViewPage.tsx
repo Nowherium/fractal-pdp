@@ -8,6 +8,7 @@ import {
   getPersoCombatValue,
   getPersoWeightLimit,
   getPersoWeightValue,
+  isPersoCadavre,
   isPersoOverweight,
 } from "../utils/groupUtils";
 import Button from "./ui/Button";
@@ -91,9 +92,22 @@ function GroupViewPage({
             </thead>
             <tbody>
               {memberPersos.map((perso) => (
-                <tr key={perso.id}>
-                  <td>{perso.nom}</td>
-                  <td>{perso.id === group.chef ? "Leader" : "Membre"}</td>
+                <tr
+                  key={perso.id}
+                  className={isPersoCadavre(perso) ? "dead" : undefined}
+                >
+                  <td>
+                    {perso.nom}
+                    {isPersoCadavre(perso) ? (
+                      <div className='inactive-note text-accent-red'>
+                        Cadavre
+                      </div>
+                    ) : null}
+                  </td>
+                  <td>
+                    {perso.id === group.chef ? "Leader" : "Membre"}
+                    {isPersoCadavre(perso) ? " (cadavre)" : ""}
+                  </td>
                   <td>{formatNumber(getPersoCapacityValue(perso, "eau"))}</td>
                   <td>{formatNumber(getPersoCapacityValue(perso, "nrt"))}</td>
                   <td>{formatNumber(getPersoCapacityValue(perso, "med"))}</td>

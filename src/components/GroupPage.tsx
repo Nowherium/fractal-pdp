@@ -1,6 +1,10 @@
 import type { Group, Perso } from "../types";
 import { confirmAction } from "../utils/confirmAction";
-import { calculateGroupTotals, getGroupMembers } from "../utils/groupUtils";
+import {
+  calculateGroupTotals,
+  getGroupMembers,
+  isPersoCadavre,
+} from "../utils/groupUtils";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
 import Panel from "./ui/Panel";
@@ -32,13 +36,16 @@ function GroupPage({
   const getChefLabel = (chefId: number | null | undefined) => {
     if (chefId === null || chefId === undefined) return "Aucun";
     const chef = persos.find((p) => p.id === chefId);
-    return chef ? chef.nom : "Chef introuvable";
+    if (!chef) return "Chef introuvable";
+    return `${chef.nom}${isPersoCadavre(chef) ? " ☠" : ""}`;
   };
 
   const getMembersLabel = (groupId: number) => {
     const members = getGroupMembers(persos, groupId);
     if (members.length === 0) return "Aucun membre";
-    return members.map((member) => member.nom).join(", ");
+    return members
+      .map((member) => `${member.nom}${isPersoCadavre(member) ? " ☠" : ""}`)
+      .join(", ");
   };
 
   return (
@@ -72,11 +79,16 @@ function GroupPage({
             {groups.map((group) => {
               const members = getGroupMembers(persos, group.id);
               const totals = calculateGroupTotals(members);
-              const presentCount = members.filter(
+              const livingMembers = members.filter(
+                (member) => !isPersoCadavre(member),
+              );
+              const presentCount = livingMembers.filter(
                 (member) => member.present !== false,
               ).length;
+              const presentTotal = livingMembers.length || members.length;
               const allPresent =
-                members.length > 0 && presentCount === members.length;
+                livingMembers.length > 0 &&
+                presentCount === livingMembers.length;
 
               return (
                 <tr key={group.id}>
@@ -96,7 +108,7 @@ function GroupPage({
                         }
                       />
                       <span>
-                        {presentCount}/{members.length}
+                        {presentCount}/{presentTotal}
                       </span>
                     </label>
                   </td>

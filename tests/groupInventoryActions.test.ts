@@ -4,6 +4,7 @@ import test from "node:test";
 import { useGroupActions } from "../src/hooks/useGroupActions";
 import { useInventoryActions } from "../src/hooks/useInventoryActions";
 import { usePersoActions } from "../src/hooks/usePersoActions";
+import { calculateGroupTotals } from "../src/utils/groupUtils";
 import type {
   AppPage,
   Arme,
@@ -134,6 +135,7 @@ test("addPerso creates an unassigned personnage by default", () => {
   const groupsState = createState<Group[]>([
     { id: 1, name: "Alpha", chef: null },
   ]);
+  const stocksState = createState<Record<string, number>>({});
   const persoResourcesState = createState<PersoResource[]>([]);
   const lunesState = createState<Lune[]>([]);
   const pageState = createState<AppPage>("effectif");
@@ -147,12 +149,15 @@ test("addPerso creates an unassigned personnage by default", () => {
     groups: groupsState.get(),
     resources: [],
     sacs: [],
+    stocks: stocksState.get(),
+    exchangeCityStocksWithPersos: false,
     persoResources: persoResourcesState.get(),
     lunes: lunesState.get(),
     nextPersoId: nextPersoIdState.get(),
     setPersos: persosState.set,
     setGroups: groupsState.set,
     setPersoResources: persoResourcesState.set,
+    setStocks: stocksState.set,
     setLunes: lunesState.set,
     setPage: pageState.set,
     setSelectedPersoId: selectedPersoIdState.set,
@@ -161,6 +166,7 @@ test("addPerso creates an unassigned personnage by default", () => {
     savePersoEntity: (perso) => savedPersos.push(perso),
     deletePersoEntity: () => undefined,
     savePersoResourcesEntity: () => undefined,
+    saveStockEntity: () => undefined,
     saveLuneEntity: () => undefined,
   });
 
@@ -170,6 +176,238 @@ test("addPerso creates an unassigned personnage by default", () => {
   assert.equal(savedPersos[0]?.groupId ?? null, null);
   assert.equal(pageState.get(), "perso");
   assert.equal(selectedPersoIdState.get(), 1);
+});
+
+test("handlePersoUpdateById rounds production capacities to two decimals", () => {
+  const persosState = createState<Perso[]>([
+    { id: 1, nom: "Alya", capEau: 1, capEauEffectif: 1 },
+  ]);
+  const groupsState = createState<Group[]>([]);
+  const stocksState = createState<Record<string, number>>({});
+  const persoResourcesState = createState<PersoResource[]>([]);
+  const savedPersos: Perso[] = [];
+
+  const actions = usePersoActions({
+    persos: persosState.get(),
+    groups: groupsState.get(),
+    resources: [],
+    sacs: [],
+    stocks: stocksState.get(),
+    exchangeCityStocksWithPersos: false,
+    persoResources: persoResourcesState.get(),
+    lunes: [],
+    nextPersoId: 2,
+    setPersos: persosState.set,
+    setGroups: groupsState.set,
+    setPersoResources: persoResourcesState.set,
+    setStocks: stocksState.set,
+    setLunes: () => undefined,
+    setPage: () => undefined,
+    setSelectedPersoId: () => undefined,
+    setOpenOverrides: () => undefined,
+    setNextPersoId: () => undefined,
+    savePersoEntity: (perso) => savedPersos.push(perso),
+    deletePersoEntity: () => undefined,
+    savePersoResourcesEntity: () => undefined,
+    saveStockEntity: () => undefined,
+    saveLuneEntity: () => undefined,
+  });
+
+  actions.handlePersoUpdateById(1, "capEau", 2.256);
+
+  assert.equal(persosState.get()[0]?.capEau, 2.26);
+  assert.equal(savedPersos[0]?.capEau, 2.26);
+});
+
+test("handlePersoResourceUpdate leaves city stock unchanged when exchange mode is disabled", () => {
+  const persosState = createState<Perso[]>([{ id: 1, nom: "Alya" }]);
+  const groupsState = createState<Group[]>([]);
+  const stocksState = createState<Record<string, number>>({ eau: 5 });
+  const persoResourcesState = createState<PersoResource[]>([
+    { perso_id: 1, resource_id: 1, quantity: 2 },
+  ]);
+  const savedStockUpdates: Array<{ code: string; quantity: number }> = [];
+  const savedPersoResourceUpdates: PersoResource[][] = [];
+
+  const actions = usePersoActions({
+    persos: persosState.get(),
+    groups: groupsState.get(),
+    resources: [{ id: 1, code: "eau", name: "Eau" }],
+    sacs: [],
+    stocks: stocksState.get(),
+    exchangeCityStocksWithPersos: false,
+    persoResources: persoResourcesState.get(),
+    lunes: [],
+    nextPersoId: 2,
+    setPersos: persosState.set,
+    setGroups: groupsState.set,
+    setPersoResources: persoResourcesState.set,
+    setStocks: stocksState.set,
+    setLunes: () => undefined,
+    setPage: () => undefined,
+    setSelectedPersoId: () => undefined,
+    setOpenOverrides: () => undefined,
+    setNextPersoId: () => undefined,
+    savePersoEntity: () => undefined,
+    deletePersoEntity: () => undefined,
+    savePersoResourcesEntity: (_persoId, nextPersoResources) =>
+      savedPersoResourceUpdates.push(nextPersoResources),
+    saveStockEntity: (code, quantity) =>
+      savedStockUpdates.push({ code, quantity }),
+    saveLuneEntity: () => undefined,
+  });
+
+  actions.handlePersoResourceUpdate(1, 1, 4);
+
+  assert.equal(persoResourcesState.get()[0]?.quantity, 4);
+  assert.equal(stocksState.get()["eau"], 5);
+  assert.deepEqual(savedStockUpdates, []);
+  assert.equal(savedPersoResourceUpdates[0]?.[0]?.quantity, 4);
+});
+
+test("handlePersoResourceUpdate rounds exchanged stock quantities to one decimal", () => {
+  const persosState = createState<Perso[]>([{ id: 1, nom: "Alya" }]);
+  const groupsState = createState<Group[]>([]);
+  const stocksState = createState<Record<string, number>>({ eau: 5 });
+  const persoResourcesState = createState<PersoResource[]>([
+    { perso_id: 1, resource_id: 1, quantity: 2 },
+  ]);
+
+  const actions = usePersoActions({
+    persos: persosState.get(),
+    groups: groupsState.get(),
+    resources: [{ id: 1, code: "eau", name: "Eau" }],
+    sacs: [],
+    stocks: stocksState.get(),
+    exchangeCityStocksWithPersos: true,
+    persoResources: persoResourcesState.get(),
+    lunes: [],
+    nextPersoId: 2,
+    setPersos: persosState.set,
+    setGroups: groupsState.set,
+    setPersoResources: persoResourcesState.set,
+    setStocks: stocksState.set,
+    setLunes: () => undefined,
+    setPage: () => undefined,
+    setSelectedPersoId: () => undefined,
+    setOpenOverrides: () => undefined,
+    setNextPersoId: () => undefined,
+    savePersoEntity: () => undefined,
+    deletePersoEntity: () => undefined,
+    savePersoResourcesEntity: () => undefined,
+    saveStockEntity: () => undefined,
+    saveLuneEntity: () => undefined,
+  });
+
+  actions.handlePersoResourceUpdate(1, 1, 4.26);
+
+  assert.equal(persoResourcesState.get()[0]?.quantity, 4.3);
+  assert.equal(stocksState.get()["eau"], 2.7);
+});
+
+test("handlePersoResourceUpdate transfers stock between the city and the perso when exchange mode is enabled", () => {
+  const persosState = createState<Perso[]>([{ id: 1, nom: "Alya" }]);
+  const groupsState = createState<Group[]>([]);
+  const stocksState = createState<Record<string, number>>({ eau: 5 });
+  const persoResourcesState = createState<PersoResource[]>([
+    { perso_id: 1, resource_id: 1, quantity: 2 },
+  ]);
+  const savedStockUpdates: Array<{ code: string; quantity: number }> = [];
+
+  const actions = usePersoActions({
+    persos: persosState.get(),
+    groups: groupsState.get(),
+    resources: [{ id: 1, code: "eau", name: "Eau" }],
+    sacs: [],
+    stocks: stocksState.get(),
+    exchangeCityStocksWithPersos: true,
+    persoResources: persoResourcesState.get(),
+    lunes: [],
+    nextPersoId: 2,
+    setPersos: persosState.set,
+    setGroups: groupsState.set,
+    setPersoResources: persoResourcesState.set,
+    setStocks: stocksState.set,
+    setLunes: () => undefined,
+    setPage: () => undefined,
+    setSelectedPersoId: () => undefined,
+    setOpenOverrides: () => undefined,
+    setNextPersoId: () => undefined,
+    savePersoEntity: () => undefined,
+    deletePersoEntity: () => undefined,
+    savePersoResourcesEntity: () => undefined,
+    saveStockEntity: (code, quantity) =>
+      savedStockUpdates.push({ code, quantity }),
+    saveLuneEntity: () => undefined,
+  });
+
+  actions.handlePersoResourceUpdate(1, 1, 4);
+  assert.equal(persoResourcesState.get()[0]?.quantity, 4);
+  assert.equal(stocksState.get()["eau"], 3);
+
+  const releaseActions = usePersoActions({
+    persos: persosState.get(),
+    groups: groupsState.get(),
+    resources: [{ id: 1, code: "eau", name: "Eau" }],
+    sacs: [],
+    stocks: stocksState.get(),
+    exchangeCityStocksWithPersos: true,
+    persoResources: persoResourcesState.get(),
+    lunes: [],
+    nextPersoId: 2,
+    setPersos: persosState.set,
+    setGroups: groupsState.set,
+    setPersoResources: persoResourcesState.set,
+    setStocks: stocksState.set,
+    setLunes: () => undefined,
+    setPage: () => undefined,
+    setSelectedPersoId: () => undefined,
+    setOpenOverrides: () => undefined,
+    setNextPersoId: () => undefined,
+    savePersoEntity: () => undefined,
+    deletePersoEntity: () => undefined,
+    savePersoResourcesEntity: () => undefined,
+    saveStockEntity: (code, quantity) =>
+      savedStockUpdates.push({ code, quantity }),
+    saveLuneEntity: () => undefined,
+  });
+
+  releaseActions.handlePersoResourceUpdate(1, 1, 1);
+
+  assert.equal(persoResourcesState.get()[0]?.quantity, 1);
+  assert.equal(stocksState.get()["eau"], 6);
+  assert.deepEqual(savedStockUpdates, [
+    { code: "eau", quantity: 3 },
+    { code: "eau", quantity: 6 },
+  ]);
+});
+
+test("calculateGroupTotals ignores cadavre production and combat", () => {
+  const totals = calculateGroupTotals([
+    {
+      id: 1,
+      nom: "Cadavre",
+      pv: 0,
+      capEau: 5,
+      capNrt: 4,
+      combat: 3,
+      poidsTotal: 2,
+    },
+    {
+      id: 2,
+      nom: "Vivant",
+      pv: 5,
+      capEau: 1,
+      capNrt: 2,
+      combat: 2,
+      poidsTotal: 1,
+    },
+  ] as Perso[]);
+
+  assert.equal(totals.eau, 1);
+  assert.equal(totals.nrt, 2);
+  assert.equal(totals.combat, 2);
+  assert.equal(totals.poids, 3);
 });
 
 test("removeGroup deletes only the group and unassigns its members", () => {

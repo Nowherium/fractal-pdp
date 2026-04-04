@@ -12,6 +12,7 @@ import type {
   Sac,
   ToolSpecialite,
 } from "../types";
+import { normalizeProductionCapacity } from "../utils/stateUtils";
 
 type ToolMultiplierBySpecialite = Record<ToolSpecialite, number>;
 
@@ -36,6 +37,7 @@ const sumItemWeights = <T extends { poids?: number }>(items: T[]): number =>
   items.reduce((total, item) => total + Number(item.poids ?? 0), 0);
 
 interface UseDerivedPersoStateParams {
+  persos: Perso[];
   resources: Resource[];
   armes: Arme[];
   persoArmes: PersoArme[];
@@ -48,6 +50,7 @@ interface UseDerivedPersoStateParams {
 }
 
 export const useDerivedPersoState = ({
+  persos,
   resources,
   armes,
   persoArmes,
@@ -59,6 +62,9 @@ export const useDerivedPersoState = ({
   setPersos,
 }: UseDerivedPersoStateParams) => {
   useEffect(() => {
+    if (persos.length === 0) {
+      return;
+    }
     const resourcesById = new Map<number, Resource>(
       resources.map((resource) => [resource.id, resource]),
     );
@@ -70,8 +76,10 @@ export const useDerivedPersoState = ({
     );
     const sacsById = new Map<number, Sac>(sacs.map((sac) => [sac.id, sac]));
 
-    setPersos((previous) =>
-      previous.map((perso) => {
+    setPersos((previous) => {
+      let hasChanges = false;
+
+      const nextPersos = previous.map((perso) => {
         const equippedEntry = persoArmes.find(
           (entry) => entry.perso_id === perso.id && entry.equipee,
         );
@@ -136,15 +144,21 @@ export const useDerivedPersoState = ({
             { ...defaultToolMultipliers },
           );
 
-        const nextCapEauEffectif =
-          Number(perso.capEau ?? 0) * Number(multiplierBySpecialite.eau ?? 1);
-        const nextCapNrtEffectif =
-          Number(perso.capNrt ?? 0) * Number(multiplierBySpecialite.nrt ?? 1);
-        const nextCapMedEffectif = Number(perso.capMed ?? 0);
-        const nextCapMatEffectif =
-          Number(perso.capMat ?? 0) * Number(multiplierBySpecialite.mat ?? 1);
-        const nextCapArtEffectif =
-          Number(perso.capart ?? 0) * Number(multiplierBySpecialite.art ?? 1);
+        const nextCapEauEffectif = normalizeProductionCapacity(
+          Number(perso.capEau ?? 0) * Number(multiplierBySpecialite.eau ?? 1),
+        );
+        const nextCapNrtEffectif = normalizeProductionCapacity(
+          Number(perso.capNrt ?? 0) * Number(multiplierBySpecialite.nrt ?? 1),
+        );
+        const nextCapMedEffectif = normalizeProductionCapacity(
+          Number(perso.capMed ?? 0),
+        );
+        const nextCapMatEffectif = normalizeProductionCapacity(
+          Number(perso.capMat ?? 0) * Number(multiplierBySpecialite.mat ?? 1),
+        );
+        const nextCapArtEffectif = normalizeProductionCapacity(
+          Number(perso.capart ?? 0) * Number(multiplierBySpecialite.art ?? 1),
+        );
         const nextPoidsTotal =
           sumItemWeights(carriedWeapons) +
           sumItemWeights(carriedTools) +
@@ -167,6 +181,8 @@ export const useDerivedPersoState = ({
           return perso;
         }
 
+        hasChanges = true;
+
         return {
           ...perso,
           equippedWeaponId: nextEquippedWeaponId,
@@ -180,9 +196,12 @@ export const useDerivedPersoState = ({
           poidsMaxEffectif: nextPoidsMaxEffectif,
           poidsTotal: nextPoidsTotal,
         };
-      }),
-    );
+      });
+
+      return hasChanges ? nextPersos : previous;
+    });
   }, [
+    persos,
     resources,
     armes,
     persoArmes,

@@ -23,6 +23,9 @@ export type TimelineRow = {
   mortText?: string;
   hasOverride?: boolean;
   availableDrugs: Record<string, number>;
+  resourceStocks?: Record<"eau" | "nrt" | "med", number>;
+  rationAvailability?: Record<"eau" | "nrt" | "med", boolean>;
+  rationSource?: Record<"eau" | "nrt" | "med", "perso" | "ville" | "none">;
   drugStatus?: string;
   drugClassName?: string;
 };
@@ -54,12 +57,26 @@ export type ConstructionState = {
   statusLabel: string;
 };
 
+export type TimelinePersoSnapshot = {
+  pv: number;
+  present: boolean;
+  combat: number;
+  caps: PersoCaps;
+};
+
+export type TimelineStateSnapshot = {
+  persos: Record<number, TimelinePersoSnapshot>;
+  stocks: StockSnapshot;
+  carriedResources?: Record<number, Record<string, number>>;
+};
+
 export type TimelineSegment = {
   actualIndex?: number;
   lune: Lune;
   rows: TimelineRow[];
   stats: TimelineStats;
   constructionStates?: Record<string, ConstructionState>;
+  endingState?: TimelineStateSnapshot;
 };
 
 export type ProductionMultipliers = Pick<

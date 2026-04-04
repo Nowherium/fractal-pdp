@@ -1,8 +1,11 @@
+import { useState } from "react";
+
 import TimelineConstructionList from "./TimelineConstructionList";
 import TimelineRowEditor from "./TimelineRowEditor";
 import TimelineStockSummary from "./TimelineStockSummary";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
+import Toggle from "./ui/Toggle";
 
 import type { LuneConstruction, Resource } from "../types";
 import { confirmAction } from "../utils/confirmAction";
@@ -33,6 +36,7 @@ function TimelinePage({
   setOverride,
   clearOverrides,
   addLune,
+  defaultShowAbsentPersos = false,
 }: {
   currentLune: number;
   resources: Resource[];
@@ -65,7 +69,11 @@ function TimelinePage({
   ) => void;
   clearOverrides: (luneIndex: number, persoId: number) => void;
   addLune: () => void;
+  defaultShowAbsentPersos?: boolean;
 }) {
+  const [showAbsentPersos, setShowAbsentPersos] = useState(
+    defaultShowAbsentPersos,
+  );
   const availableResources =
     resources.length > 0 ? resources : [{ id: 0, code: "mat", name: "MAT" }];
 
@@ -74,10 +82,15 @@ function TimelinePage({
       <h2>5. Ligne du Temps & Assignations</h2>
       <InfoText>
         Chaque perso peut consommer <strong>une seule drogue par lune</strong>.
-        L'effet n'est appliqué que si la ressource est bien portée en quantité
-        suffisante. La <strong>météo</strong> de chaque lune définit
-        <strong> 4 coefficients</strong> distincts pour `eau`, `nrt`, `med` et
-        `mat`, chacun entre <strong>0</strong> et <strong>1</strong>.
+        Les cases <strong>Boit</strong>, <strong>Mange</strong> et
+        <strong>Med</strong> sont maintenant{" "}
+        <strong>pilotées manuellement</strong>
+        si le stock cumulé <strong>ville + perso</strong> est suffisant. La
+        <strong> météo</strong> de chaque lune définit{" "}
+        <strong>4 coefficients</strong>
+        distincts pour `eau`, `nrt`, `med` et `mat`, chacun entre{" "}
+        <strong>0</strong>
+        et <strong>1</strong>.
       </InfoText>
       <div id='timeline'>
         {timelineData.map((segment, luneIndex) => {
@@ -88,36 +101,53 @@ function TimelinePage({
           const placedConstructionIds = getPlacedConstructionIdsForLune(
             segment.lune,
           );
+          const visibleRows = segment.rows.filter(
+            (row) => showAbsentPersos || (!row.isAbsent && !row.mortAuDebut),
+          );
+          const emptyStateMessage =
+            segment.rows.length === 0
+              ? "Il n'y a plus aucun perso dans les effectifs."
+              : "Aucun perso affiché pour cette lune. Pense à vérifier le toggle « absents ».";
 
           return (
             <div
               key={segment.lune.id}
               className='mb-5 rounded-lg border border-l-[5px] border-border-strong border-l-accent-cyan bg-panel-alt p-[15px] shadow-panel'
             >
-              <div className='mb-2.5 flex items-center justify-between border-b border-border-main pb-2.5'>
+              <div className='mb-2.5 flex items-center justify-between gap-3 border-b border-border-main pb-2.5'>
                 <h3 className='m-0 border-none p-0'>
                   LUNE {Number(segment.lune.id)}
                   {isPastLune ? " • passée (lecture seule)" : ""}
                 </h3>
-                <Button
-                  className='mt-0'
-                  size='sm'
-                  variant='danger'
-                  disabled={isLockedLune}
-                  title={
-                    isLockedLune
-                      ? "Les lunes passées et la lune en cours ne peuvent pas être supprimées"
-                      : undefined
-                  }
-                  onClick={() =>
-                    confirmAction(
-                      `Supprimer la lune ${Number(segment.lune.id)} ?`,
-                      () => removeLune(actualLuneIndex),
-                    )
-                  }
-                >
-                  X Supprimer
-                </Button>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <Toggle
+                    label='absents'
+                    srLabel='Afficher les absents'
+                    checked={showAbsentPersos}
+                    onChange={(event) =>
+                      setShowAbsentPersos(event.target.checked)
+                    }
+                  />
+                  <Button
+                    className='mt-0'
+                    size='sm'
+                    variant='danger'
+                    disabled={isLockedLune}
+                    title={
+                      isLockedLune
+                        ? "Les lunes passées et la lune en cours ne peuvent pas être supprimées"
+                        : undefined
+                    }
+                    onClick={() =>
+                      confirmAction(
+                        `Supprimer la lune ${Number(segment.lune.id)} ?`,
+                        () => removeLune(actualLuneIndex),
+                      )
+                    }
+                  >
+                    X Supprimer
+                  </Button>
+                </div>
               </div>
 
               <div className='mt-2.5 block rounded-[4px] border-l-[3px] border-l-accent-orange bg-[#2c2c2c] p-2.5'>
@@ -161,29 +191,40 @@ function TimelinePage({
                       <th>PV Début</th>
                       <th style={{ backgroundColor: "#113333" }}>TÂCHE</th>
                       <th>Drogue (1 max)</th>
-                      <th>Boit (-1)</th>
-                      <th>Mange (-1)</th>
-                      <th>Med (-0.5)</th>
+                      <th>Mange</th>
+                      <th>Boit</th>
+                      <th>Med</th>
                       <th>PV Fin</th>
                       <th>Ajuster</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {segment.rows.map((row) => (
-                      <TimelineRowEditor
-                        key={`${segment.lune.id}-${row.persoId}`}
-                        segment={segment}
-                        row={row}
-                        actualLuneIndex={actualLuneIndex}
-                        isPastLune={isPastLune}
-                        placedConstructionIds={placedConstructionIds}
-                        toggleOverrideMenu={toggleOverrideMenu}
-                        openOverrides={openOverrides}
-                        updateRation={updateRation}
-                        setOverride={setOverride}
-                        clearOverrides={clearOverrides}
-                      />
-                    ))}
+                    {visibleRows.length > 0 ? (
+                      visibleRows.map((row) => (
+                        <TimelineRowEditor
+                          key={`${segment.lune.id}-${row.persoId}`}
+                          segment={segment}
+                          row={row}
+                          actualLuneIndex={actualLuneIndex}
+                          isPastLune={isPastLune}
+                          placedConstructionIds={placedConstructionIds}
+                          toggleOverrideMenu={toggleOverrideMenu}
+                          openOverrides={openOverrides}
+                          updateRation={updateRation}
+                          setOverride={setOverride}
+                          clearOverrides={clearOverrides}
+                        />
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={9}
+                          className='py-3 text-center text-[0.85em] italic text-[#9ea7b3]'
+                        >
+                          {emptyStateMessage}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
 

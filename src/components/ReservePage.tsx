@@ -16,6 +16,7 @@ import type {
   Stocks,
 } from "../types";
 import { sortResources } from "../utils/resourceOrder";
+import { normalizeStockQuantity } from "../utils/stateUtils";
 
 const formatWeight = (value: number | string | null | undefined) =>
   Number(value ?? 0).toFixed(2);
@@ -230,8 +231,8 @@ function ReservePage({
             <input
               className={fieldInputClassName}
               type='number'
-              value={stocks[resource.code] ?? 0}
-              step='1'
+              value={normalizeStockQuantity(stocks[resource.code] ?? 0)}
+              step='0.1'
               onChange={(event) =>
                 handleStockChange(resource.code, event.target.value)
               }
