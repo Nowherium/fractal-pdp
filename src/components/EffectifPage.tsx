@@ -121,8 +121,7 @@ function EffectifPage({
         <thead>
           <tr>
             <th>Nom</th>
-            <th>PV</th>
-            <th>PV Max</th>
+            <th>PV / Max</th>
             {capacityFields.map((field) => (
               <th key={field.key} className={highlightCellClassName}>
                 {field.label}
@@ -153,8 +152,9 @@ function EffectifPage({
                     <div className='inactive-note text-accent-red'>Cadavre</div>
                   ) : null}
                 </td>
-                <td>{p.pv ?? 0}</td>
-                <td>{p.pvmax ?? 0}</td>
+                <td>
+                  {p.pv ?? 0} / {p.pvmax ?? 0}
+                </td>
                 {capacityFields.map((field) => {
                   const resourceCode = String(field.key);
                   const resourceId = resourceIdByCode.get(resourceCode);

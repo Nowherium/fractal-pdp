@@ -2,21 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import SaveBar from "./components/SaveBar";
 import PageTabs from "./components/PageTabs";
-import ReservePage from "./components/ReservePage";
-import ResourcesPage from "./components/ResourcesPage";
+import AppPageContent from "./components/AppPageContent";
 import ToastViewport from "./components/ui/ToastViewport";
-import EffectifPage from "./components/EffectifPage";
-import PersoPage from "./components/PersoPage";
-import GroupPage from "./components/GroupPage";
-import GroupEditPage from "./components/GroupEditPage";
-import GroupViewPage from "./components/GroupViewPage";
-import ChantiersPage from "./components/ChantiersPage";
 import ExchangeModeToggle from "./components/shared/ExchangeModeToggle";
 import TimelineControls from "./components/TimelineControls";
-import TimelinePage from "./components/TimelinePage";
-import WeaponsPage from "./components/WeaponsPage";
-import ToolsPage from "./components/ToolsPage";
-import BagsPage from "./components/BagsPage";
 import {
   buildConstructionProgressById,
   createLune,
@@ -27,10 +16,7 @@ import {
   normalizeStockQuantity,
   syncLuneConstructionPlacements,
 } from "./utils/stateUtils";
-import {
-  applyTimelineSegmentToState,
-  simulateTimeline,
-} from "./utils/timelineSimulation";
+import { simulateTimeline } from "./utils/timelineSimulation";
 import {
   exportStateData,
   importStateFile,
@@ -42,6 +28,7 @@ import {
 } from "./hooks/useAppPersistence";
 import { useAppState } from "./hooks/useAppState";
 import { useDerivedPersoState } from "./hooks/useDerivedPersoState";
+import { useAdvanceTurn } from "./hooks/useAdvanceTurn";
 import { useAppActionToasts } from "./hooks/useAppActionToasts";
 import { useGroupActions } from "./hooks/useGroupActions";
 import { useInventoryActions } from "./hooks/useInventoryActions";
@@ -529,86 +516,27 @@ function App() {
     setVisiblePastLunes(0);
   };
 
-  const handleAdvanceTurn = () => {
-    if (hasNoPersos) {
-      return;
-    }
-
-    if (currentTimelineSegment?.endingState) {
-      const advancedState = applyTimelineSegmentToState(
-        persos,
-        stocks,
-        currentTimelineSegment,
-        persoResources,
-        resources,
-      );
-
-      setPersos(advancedState.persos);
-      advancedState.persos.forEach((perso) => {
-        const previousPerso = persos.find((item) => item.id === perso.id);
-        if (!previousPerso) {
-          return;
-        }
-
-        if (
-          Number(previousPerso.pv ?? 0) !== Number(perso.pv ?? 0) ||
-          previousPerso.present !== perso.present ||
-          Number(previousPerso.combat ?? 0) !== Number(perso.combat ?? 0) ||
-          Number(previousPerso.capEau ?? 0) !== Number(perso.capEau ?? 0) ||
-          Number(previousPerso.capNrt ?? 0) !== Number(perso.capNrt ?? 0) ||
-          Number(previousPerso.capMed ?? 0) !== Number(perso.capMed ?? 0) ||
-          Number(previousPerso.capMat ?? 0) !== Number(perso.capMat ?? 0) ||
-          Number(previousPerso.capart ?? 0) !== Number(perso.capart ?? 0)
-        ) {
-          savePersoEntity(perso);
-        }
-      });
-
-      setPersoResources(advancedState.persoResources);
-      const persoIdsWithResourceChanges = new Set(
-        [...persoResources, ...advancedState.persoResources].map((entry) =>
-          Number(entry.perso_id),
-        ),
-      );
-
-      persoIdsWithResourceChanges.forEach((persoId) => {
-        const previousResources = persoResources
-          .filter((entry) => Number(entry.perso_id) === persoId)
-          .sort((left, right) => left.resource_id - right.resource_id);
-        const nextResources = advancedState.persoResources
-          .filter((entry) => Number(entry.perso_id) === persoId)
-          .sort((left, right) => left.resource_id - right.resource_id);
-
-        if (
-          JSON.stringify(previousResources) !== JSON.stringify(nextResources)
-        ) {
-          savePersoResourcesEntity(persoId, nextResources);
-        }
-      });
-
-      setStocks(advancedState.stocks);
-      Object.entries(advancedState.stocks).forEach(([code, quantity]) => {
-        if (Number(stocks[code] ?? 0) !== Number(quantity ?? 0)) {
-          saveStockEntity(code, Number(quantity ?? 0));
-        }
-      });
-    }
-
-    const nextCurrentLune = Number(currentLune ?? 1) + 1;
-    const maxLuneId = lunes.reduce(
-      (maxValue, lune) => Math.max(maxValue, Number(lune.id) || 0),
-      0,
-    );
-
-    if (maxLuneId < nextCurrentLune) {
-      addLune();
-    }
-
-    setVisiblePastLunes(0);
-    setCurrentLune(nextCurrentLune);
-    saveCurrentLuneEntity(nextCurrentLune);
-    showToast(`Passage à la lune ${nextCurrentLune}.`);
-  };
+  const { handleAdvanceTurn } = useAdvanceTurn({
+    hasNoPersos,
+    currentTimelineSegment,
+    persos,
+    stocks,
+    persoResources,
+    resources,
+    lunes,
+    currentLune,
+    addLune,
+    setPersos,
+    setPersoResources,
+    setStocks,
+    setVisiblePastLunes,
+    setCurrentLune,
+    savePersoEntity,
+    savePersoResourcesEntity,
+    saveStockEntity,
+    saveCurrentLuneEntity,
+    showToast,
+  });
 
   const pages: PageTab[] = [
     { key: "reserve", label: "1. Ville" },
@@ -661,157 +589,127 @@ function App() {
         onChange={setExchangeCityStocksWithPersos}
       />
 
-      {page === "reserve" && (
-        <ReservePage
-          resources={resources}
-          stocks={stocks}
-          cityMultipliers={cityMultipliers}
-          handleStockChange={handleStockChange}
-          handleCityMultiplierChange={handleCityMultiplierChange}
-          armes={armes}
-          persoArmes={persoArmes}
-          outils={outils}
-          persoOutils={persoOutils}
-          sacs={sacs}
-          persoSacs={persoSacs}
-        />
-      )}
-
-      {page === "resources" && (
-        <ResourcesPage
-          resources={resources}
-          addResource={handleAddResource}
-          updateResource={updateResource}
-          removeResource={handleRemoveResource}
-          getResourceDeleteGuard={getResourceDeleteGuard}
-        />
-      )}
-
-      {page === "effectif" && (
-        <EffectifPage
-          persos={persos}
-          resources={resources}
-          persoResources={persoResources}
-          removePerso={handleRemovePerso}
-          addPerso={handleAddPerso}
-          openPersoPage={openPersoPage}
-          updatePersoPresence={(persoId, isPresent) =>
-            handlePersoUpdateById(persoId, "present", isPresent)
-          }
-          handlePersoResourceUpdate={handlePersoResourceUpdate}
-          showStocks={showEffectifStocks}
-          setShowStocks={setShowEffectifStocks}
-        />
-      )}
-
-      {page === "groupes" && (
-        <GroupPage
-          groups={groups}
-          persos={persos}
-          openGroupPage={openGroupPage}
-          openGroupViewPage={openGroupViewPage}
-          addGroup={handleAddGroup}
-          removeGroup={handleRemoveGroup}
-          setGroupPresence={setGroupPresence}
-        />
-      )}
-
-      {page === "group-view" && (
-        <GroupViewPage
-          group={groups.find((g: { id: number }) => g.id === selectedGroupId)}
-          persos={persos}
-          openEditPage={openGroupPage}
-          closePage={closeGroupPage}
-        />
-      )}
-
-      {page === "group" && (
-        <GroupEditPage
-          group={groups.find((g: { id: number }) => g.id === selectedGroupId)}
-          persos={persos}
-          handleGroupUpdate={handleGroupUpdateSafe}
-          handleGroupMembersUpdate={handleGroupMembersUpdate}
-          closePage={closeGroupPage}
-        />
-      )}
-
-      {page === "perso" && (
-        <PersoPage
-          perso={persos.find((p: { id: number }) => p.id === selectedPersoId)}
-          resources={resources}
-          groups={groups}
-          armes={armes}
-          persoArmes={persoArmes}
-          outils={outils}
-          persoOutils={persoOutils}
-          sacs={sacs}
-          persoSacs={persoSacs}
-          persoResources={persoResources}
-          handlePersoUpdate={handlePersoUpdateById}
-          handlePersoResourceUpdate={handlePersoResourceUpdate}
-          handlePersoWeaponsUpdate={handlePersoWeaponsUpdate}
-          handlePersoToolsUpdate={handlePersoToolsUpdate}
-          handlePersoBagsUpdate={handlePersoBagsUpdate}
-          closePage={closePersoPage}
-        />
-      )}
-
-      {page === "chantiers" && (
-        <ChantiersPage
-          constructions={constructions}
-          resources={resources}
-          constructionProgress={constructionProgress}
-          constructionStates={currentTimelineSegment?.constructionStates || {}}
-          addConstruction={handleAddConstruction}
-          updateConstruction={updateConstruction}
-          removeConstruction={handleRemoveConstruction}
-        />
-      )}
-
-      {page === "timeline" && (
-        <TimelinePage
-          currentLune={currentLune}
-          resources={resources}
-          constructions={constructions}
-          timelineData={visibleTimelineData}
-          removeLune={handleRemoveLune}
-          updateLuneGlobal={updateLuneGlobal}
-          updateRation={updateRation}
-          toggleConstructionPlacement={toggleConstructionPlacement}
-          toggleOverrideMenu={toggleOverrideMenu}
-          openOverrides={openOverrides}
-          setOverride={setOverride}
-          clearOverrides={clearOverrides}
-          addLune={handleAddLune}
-        />
-      )}
-
-      {page === "armes" && (
-        <WeaponsPage
-          armes={armes}
-          addArme={handleAddArme}
-          updateArme={updateArme}
-          removeArme={handleRemoveArme}
-        />
-      )}
-
-      {page === "outils" && (
-        <ToolsPage
-          outils={outils}
-          addOutil={handleAddOutil}
-          updateOutil={updateOutil}
-          removeOutil={handleRemoveOutil}
-        />
-      )}
-
-      {page === "sacs" && (
-        <BagsPage
-          sacs={sacs}
-          addSac={handleAddSac}
-          updateSac={updateSac}
-          removeSac={handleRemoveSac}
-        />
-      )}
+      <AppPageContent
+        page={page}
+        reserveProps={{
+          resources,
+          stocks,
+          cityMultipliers,
+          handleStockChange,
+          handleCityMultiplierChange,
+          armes,
+          persoArmes,
+          outils,
+          persoOutils,
+          sacs,
+          persoSacs,
+        }}
+        resourcesProps={{
+          resources,
+          addResource: handleAddResource,
+          updateResource,
+          removeResource: handleRemoveResource,
+          getResourceDeleteGuard,
+        }}
+        effectifProps={{
+          persos,
+          resources,
+          persoResources,
+          removePerso: handleRemovePerso,
+          addPerso: handleAddPerso,
+          openPersoPage,
+          updatePersoPresence: (persoId, isPresent) =>
+            handlePersoUpdateById(persoId, "present", isPresent),
+          handlePersoResourceUpdate,
+          showStocks: showEffectifStocks,
+          setShowStocks: setShowEffectifStocks,
+        }}
+        groupProps={{
+          list: {
+            groups,
+            persos,
+            openGroupPage,
+            openGroupViewPage,
+            addGroup: handleAddGroup,
+            removeGroup: handleRemoveGroup,
+            setGroupPresence,
+          },
+          edit: {
+            persos,
+            handleGroupUpdate: handleGroupUpdateSafe,
+            handleGroupMembersUpdate,
+            closePage: closeGroupPage,
+          },
+          view: {
+            persos,
+            openEditPage: openGroupPage,
+            closePage: closeGroupPage,
+          },
+          groups,
+          selectedGroupId,
+        }}
+        persoProps={{
+          persos,
+          selectedPersoId,
+          resources,
+          groups,
+          armes,
+          persoArmes,
+          outils,
+          persoOutils,
+          sacs,
+          persoSacs,
+          persoResources,
+          handlePersoUpdate: handlePersoUpdateById,
+          handlePersoResourceUpdate,
+          handlePersoWeaponsUpdate,
+          handlePersoToolsUpdate,
+          handlePersoBagsUpdate,
+          closePage: closePersoPage,
+        }}
+        chantiersProps={{
+          constructions,
+          resources,
+          constructionProgress,
+          constructionStates: currentTimelineSegment?.constructionStates || {},
+          addConstruction: handleAddConstruction,
+          updateConstruction,
+          removeConstruction: handleRemoveConstruction,
+        }}
+        timelineProps={{
+          currentLune,
+          resources,
+          constructions,
+          timelineData: visibleTimelineData,
+          removeLune: handleRemoveLune,
+          updateLuneGlobal,
+          updateRation,
+          toggleConstructionPlacement,
+          toggleOverrideMenu,
+          openOverrides,
+          setOverride,
+          clearOverrides,
+          addLune: handleAddLune,
+        }}
+        weaponsProps={{
+          armes,
+          addArme: handleAddArme,
+          updateArme,
+          removeArme: handleRemoveArme,
+        }}
+        toolsProps={{
+          outils,
+          addOutil: handleAddOutil,
+          updateOutil,
+          removeOutil: handleRemoveOutil,
+        }}
+        bagsProps={{
+          sacs,
+          addSac: handleAddSac,
+          updateSac,
+          removeSac: handleRemoveSac,
+        }}
+      />
     </>
   );
 }

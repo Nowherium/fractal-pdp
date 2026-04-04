@@ -26,20 +26,16 @@ import { normalizeStockQuantity } from "../utils/stateUtils";
 const persoFields: Array<{
   key: string;
   label: string;
-  type: "text" | "number";
+  type: "number";
   step?: string;
 }> = [
-  { key: "nom", label: "Nom", type: "text" },
-  { key: "pvmax", label: "PV max", type: "number", step: "1" },
-  { key: "pv", label: "PV actuels", type: "number", step: "1" },
   { key: "capEau", label: "Capacité Eau", type: "number" },
   { key: "capNrt", label: "Capacité Nrt", type: "number" },
   { key: "capMed", label: "Capacité Med", type: "number" },
   { key: "capMat", label: "Capacité Mat", type: "number" },
   { key: "capart", label: "Capacité Art", type: "number" },
-  { key: "cmd", label: "CMD", type: "number", step: "1" },
-  { key: "combat", label: "Combat", type: "number", step: "1" },
-  { key: "poidsMax", label: "Poids max", type: "number", step: "0.1" },
+  { key: "cmd", label: "CMD", type: "number", step: "0.1" },
+  { key: "combat", label: "Combat", type: "number", step: "0.1" },
 ];
 
 const capacityStep = (value: unknown) => {
@@ -50,8 +46,13 @@ const capacityStep = (value: unknown) => {
   return "0.01";
 };
 
-const shouldUseIncrementStep = (fieldKey: string) =>
-  fieldKey.startsWith("cap") || fieldKey === "cmd" || fieldKey === "combat";
+const shouldUseIncrementStep = (fieldKey: string) => fieldKey !== "poidsMax";
+
+const getNumericFieldStep = (
+  fieldKey: string,
+  value: unknown,
+  fallbackStep?: string,
+) => (shouldUseIncrementStep(fieldKey) ? capacityStep(value) : fallbackStep);
 
 const specialiteLabels: Record<ToolSpecialite, string> = {
   eau: "💧 Eau",
@@ -171,8 +172,9 @@ function PersoPage({
     persoSacs.find((entry) => entry.perso_id === perso.id && entry.equipe)
       ?.sac_id ?? null;
   const equippedBag = sacs.find((sac) => sac.id === equippedBagId) ?? null;
+  const baseWeightLimit = Number(perso.poidsMax ?? 20);
   const effectiveWeightLimit = Number(
-    perso.poidsMaxEffectif ?? perso.poidsMax ?? 20,
+    perso.poidsMaxEffectif ?? baseWeightLimit,
   );
   const isOverweight = Number(perso.poidsTotal ?? 0) > effectiveWeightLimit;
 
@@ -305,49 +307,84 @@ function PersoPage({
         {isOverweight ? " — surcharge, déplacement impossible" : ""}
       </InfoText>
       <div className={formGridClassName}>
+        <Field label='Nom'>
+          <input
+            className={formControlClassName}
+            type='text'
+            value={toFormInputValue(perso.nom)}
+            onChange={(event) =>
+              handlePersoUpdate(perso.id, "nom", event.target.value, {
+                persist: false,
+              })
+            }
+            onBlur={(event) =>
+              handlePersoUpdate(perso.id, "nom", event.target.value, {
+                persist: true,
+              })
+            }
+          />
+        </Field>
+
+        <Field label='PV / PV max'>
+          <div className='grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2'>
+            <div className='flex min-w-0 flex-col gap-1'>
+              <span className='text-[0.78rem] text-[#9ea7b3]'>Actuels</span>
+              <input
+                className={`${formControlClassName} text-right`}
+                type='number'
+                min='0'
+                step={getNumericFieldStep("pv", perso.pv, "1")}
+                value={toFormInputValue(perso.pv)}
+                onChange={(event) =>
+                  handlePersoUpdate(perso.id, "pv", event.target.value)
+                }
+              />
+            </div>
+            <span className='pb-2 text-sm font-semibold text-[#9ea7b3]'>/</span>
+            <div className='flex min-w-0 flex-col gap-1'>
+              <span className='text-[0.78rem] text-[#9ea7b3]'>Max</span>
+              <input
+                className={`${formControlClassName} text-right`}
+                type='number'
+                min='0'
+                step={getNumericFieldStep("pvmax", perso.pvmax, "1")}
+                value={toFormInputValue(perso.pvmax)}
+                onChange={(event) =>
+                  handlePersoUpdate(perso.id, "pvmax", event.target.value)
+                }
+              />
+            </div>
+          </div>
+        </Field>
+
         {persoFields.map((field) => {
           const value = perso[field.key];
-          const step = shouldUseIncrementStep(field.key)
-            ? capacityStep(value)
-            : field.step;
+          const step = getNumericFieldStep(field.key, value, field.step);
 
           return (
             <Field key={field.key} label={field.label}>
               <input
-                className={`${formControlClassName} ${field.type === "number" ? "text-right" : ""}`}
+                className={`${formControlClassName} text-right`}
                 type={field.type}
                 step={step}
-                min={
-                  field.key === "pv" ||
-                  field.key === "pvmax" ||
-                  field.key === "poidsMax"
-                    ? 0
-                    : undefined
-                }
                 value={toFormInputValue(value)}
                 onChange={(event) =>
-                  handlePersoUpdate(
-                    perso.id,
-                    field.key,
-                    event.target.value,
-                    field.type === "text" ? { persist: false } : undefined,
-                  )
-                }
-                onBlur={
-                  field.type === "text"
-                    ? (event) =>
-                        handlePersoUpdate(
-                          perso.id,
-                          field.key,
-                          event.target.value,
-                          { persist: true },
-                        )
-                    : undefined
+                  handlePersoUpdate(perso.id, field.key, event.target.value)
                 }
               />
             </Field>
           );
         })}
+
+        <Field label='Poids max'>
+          <div
+            className={`${formControlClassName} cursor-default text-right text-[#9ea7b3]`}
+            aria-readonly='true'
+          >
+            {baseWeightLimit} Kg
+          </div>
+        </Field>
+
         <Field label='Groupe'>
           <select
             className={formControlClassName}
