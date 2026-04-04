@@ -179,7 +179,7 @@ const defaultPersos = [
   },
 ];
 
-const defaultGroup = { id: 1, name: "Default" };
+const defaultGroup = { id: 1, name: "Groupe de Klostro" };
 const defaultCity = { id: 1, name: "Ville centrale" };
 const defaultCityMultipliers = {
   eau: 1,

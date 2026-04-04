@@ -1,6 +1,4 @@
-import type { Group, Perso } from "../types";
-
-type PersoCapacityType = "eau" | "nrt" | "med" | "mat" | "art";
+import type { Group, Perso, PersoCapacityKey } from "../types";
 
 export const getGroupMembers = (
   persos: Perso[] = [],
@@ -36,7 +34,7 @@ export const isPersoOverweight = (
 
 export const getPersoCapacityValue = (
   perso: Partial<Perso> | null | undefined,
-  type: PersoCapacityType,
+  type: PersoCapacityKey,
 ): number => {
   switch (type) {
     case "eau":

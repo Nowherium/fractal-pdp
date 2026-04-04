@@ -30,12 +30,16 @@ export type TimelineRow = {
 export type TimelineStats = {
   classEau: string;
   stockEau: number;
+  deltaEau: number;
   classNrt: string;
   stockNrt: number;
+  deltaNrt: number;
   classMed: string;
   stockMed: number;
+  deltaMed: number;
   classMat: string;
   stockMat: number;
+  deltaMat: number;
 };
 
 export type ConstructionState = {

@@ -3,6 +3,7 @@ import type {
   AppPage,
   Group,
   Lune,
+  PersistOptions,
   Perso,
   PersoResource,
   Resource,
@@ -12,11 +13,8 @@ import {
   recalculateGroups,
   validateGroupCapacities,
 } from "../utils/groupUtils";
+import { createDefaultPerso } from "../utils/entityDefaults";
 import { defaultRation, normalizePersoFieldValue } from "../utils/stateUtils";
-
-type PersistOptions = {
-  persist?: boolean;
-};
 
 interface UsePersoActionsParams {
   persos: Perso[];
@@ -155,23 +153,7 @@ export const usePersoActions = ({
   };
 
   const addPerso = () => {
-    const newPerso = {
-      id: nextPersoId,
-      nom: "Nouveau",
-      present: true,
-      pvmax: 10,
-      pv: 10,
-      capEau: 1,
-      capNrt: 1,
-      capMed: 0,
-      capMat: 1,
-      capart: 0,
-      cmd: 0,
-      combat: 0,
-      poidsMax: 20,
-      poidsMaxEffectif: 20,
-      groupId: groups[0]?.id ?? null,
-    };
+    const newPerso: Perso = createDefaultPerso(nextPersoId);
 
     setPersos((previous) => [...previous, newPerso]);
     setPersoResources((previous) => [

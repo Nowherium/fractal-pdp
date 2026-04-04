@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import TimelineStockSummary from "../src/components/TimelineStockSummary";
 import type { LuneConstruction } from "../src/types";
 import { simulateTimeline } from "../src/utils/timelineSimulation";
 import {
@@ -15,6 +19,40 @@ const defaultRation = () => ({
   tache: "eau",
   drogue: null,
   constructionId: null,
+});
+
+test("renders stock deltas with the expected formatting and colors", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelineStockSummary, {
+      stats: {
+        stockEau: 7.5,
+        deltaEau: 2.5,
+        classEau: "safe",
+        stockNrt: -1,
+        deltaNrt: -3,
+        classNrt: "danger",
+        stockMed: 4,
+        deltaMed: 0,
+        classMed: "safe",
+        stockMat: 1.25,
+        deltaMat: 0.75,
+        classMat: "safe",
+      },
+    }),
+  );
+
+  assert.match(
+    markup,
+    /7\.50<\/span> <span class="text-sm font-semibold text-green-400">\(\+2\.50\)<\/span>/,
+  );
+  assert.match(
+    markup,
+    /-1\.00<\/span> <span class="text-sm font-semibold text-accent-red">\(-3\.00\)<\/span>/,
+  );
+  assert.match(
+    markup,
+    /4\.00<\/span> <span class="text-sm font-semibold text-gray-400">\(0\.00\)<\/span>/,
+  );
 });
 
 test("ignores absent persos in timeline calculations", () => {
@@ -56,6 +94,42 @@ test("ignores absent persos in timeline calculations", () => {
   assert.equal(segment.stats.stockEau, 6);
   assert.equal(absentRow.isAbsent, true);
   assert.match(absentRow.mortText ?? "", /ABSENT/);
+});
+
+test("exposes stock deltas for the lune summary", () => {
+  const persos = [
+    { id: 1, nom: "Récupérateur", present: true, pv: 10, pvmax: 10, capEau: 3 },
+  ];
+
+  const [segment] = simulateTimeline(
+    persos,
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: { eau: true, nrt: false, med: false, tache: "eau", drogue: null },
+        },
+      },
+    ],
+    { eau: 5, nrt: 2, med: 1, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.stats.stockEau, 7);
+  assert.equal(segment.stats.deltaEau, 2);
+  assert.equal(segment.stats.deltaNrt, 0);
+  assert.equal(segment.stats.deltaMed, 0);
+  assert.equal(segment.stats.deltaMat, 0);
 });
 
 test("keeps chantier progress across lunes once the cost is paid", () => {

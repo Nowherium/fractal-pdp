@@ -1,3 +1,4 @@
+import { formControlClassName } from "../../utils/formUtils";
 import Field from "../ui/Field";
 
 type OptionalSelectOption = {
@@ -23,7 +24,7 @@ function OptionalItemSelect({
   return (
     <Field label={label}>
       <select
-        className='w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-[#f1f1f1]'
+        className={formControlClassName}
         value={value}
         disabled={disabled}
         onChange={(event) =>

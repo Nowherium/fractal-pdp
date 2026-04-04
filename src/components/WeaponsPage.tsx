@@ -1,11 +1,13 @@
 import type { Arme } from "../types";
 import { confirmAction } from "../utils/confirmAction";
+import { formControlClassName, toFormInputValue } from "../utils/formUtils";
+import type { ArmeEditableField } from "../utils/inventoryUtils";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
 import Panel from "./ui/Panel";
 
 const weaponFields: Array<{
-  key: string;
+  key: ArmeEditableField;
   label: string;
   type: "text" | "number";
   step?: string;
@@ -13,18 +15,12 @@ const weaponFields: Array<{
   { key: "name", label: "Nom", type: "text" },
   { key: "att", label: "Att", type: "number", step: "0.1" },
   { key: "degats", label: "Dégâts", type: "number", step: "0.1" },
-  { key: "fiabilite", label: "Fiabilité", type: "number", step: "0.1" },
-  { key: "pv", label: "PV", type: "number", step: "0.1" },
-  { key: "pvm", label: "PVM", type: "number", step: "0.1" },
+  { key: "fiabilite", label: "Fiabilité", type: "number", step: "1" },
+  { key: "pv", label: "PV", type: "number", step: "1" },
+  { key: "pvm", label: "PVM", type: "number", step: "1" },
   { key: "poids", label: "Poids", type: "number", step: "0.1" },
   { key: "quantity", label: "Quantité", type: "number", step: "1" },
 ];
-
-const toInputValue = (value: unknown, fallback: string | number = "") =>
-  typeof value === "string" || typeof value === "number" ? value : fallback;
-
-const inputClassName =
-  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 
 function WeaponsPage({
   armes,
@@ -36,7 +32,7 @@ function WeaponsPage({
   addArme: () => void;
   updateArme: (
     index: number,
-    field: string,
+    field: ArmeEditableField,
     rawValue: string | number,
     options?: { persist?: boolean },
   ) => void;
@@ -72,11 +68,11 @@ function WeaponsPage({
                 {weaponFields.map((field) => (
                   <td key={field.key}>
                     <input
-                      className={`${inputClassName} ${field.type === "number" ? "text-right" : ""}`}
+                      className={`${formControlClassName} ${field.type === "number" ? "text-right" : ""}`}
                       type={field.type}
                       step={field.step}
                       min={field.key === "quantity" ? 0 : undefined}
-                      value={toInputValue(arme[field.key])}
+                      value={toFormInputValue(arme[field.key])}
                       onChange={(event) =>
                         updateArme(
                           index,

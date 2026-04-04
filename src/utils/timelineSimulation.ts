@@ -686,14 +686,20 @@ const processConstructionProgress = ({
 
 const buildStockStats = (
   projectedStocks: Record<string, number>,
+  previousStocks: Record<string, number> = {},
 ): TimelineStats => {
   const nextStocks = createStockSnapshot(projectedStocks);
+  const startingStocks = createStockSnapshot(previousStocks);
 
   return {
     stockEau: nextStocks.eau,
+    deltaEau: nextStocks.eau - startingStocks.eau,
     stockNrt: nextStocks.nrt,
+    deltaNrt: nextStocks.nrt - startingStocks.nrt,
     stockMed: nextStocks.med,
+    deltaMed: nextStocks.med - startingStocks.med,
     stockMat: nextStocks.mat,
+    deltaMat: nextStocks.mat - startingStocks.mat,
     classEau: nextStocks.eau < 0 ? "danger" : "safe",
     classNrt: nextStocks.nrt < 0 ? "danger" : "safe",
     classMed: nextStocks.med < 0 ? "danger" : "safe",
@@ -752,12 +758,6 @@ export const simulateTimeline = (
   const { pvCourants, capCourantes, combatCourants, presenceCourante } =
     initializePersoSimulationState(persos, remainingDrugStocksByPerso);
 
-  let {
-    eau: stockEau,
-    nrt: stockNrt,
-    med: stockMed,
-    mat: stockMat,
-  } = createStockSnapshot(resourceStocks);
   const normalizedConstructions = normalizeLuneConstructions(constructions);
   const constructionProgressById = buildInitialConstructionProgress(
     normalizedConstructions,
@@ -771,10 +771,6 @@ export const simulateTimeline = (
       Number(lune.id ?? 0) >= Number(currentLune ?? 1)
     ) {
       Object.assign(resourceStocks, baseResourceStocks);
-      stockEau = Number(baseResourceStocks["eau"] ?? 0);
-      stockNrt = Number(baseResourceStocks["nrt"] ?? 0);
-      stockMed = Number(baseResourceStocks["med"] ?? 0);
-      stockMat = Number(baseResourceStocks["mat"] ?? 0);
       hasResetStocksForCurrentLune = true;
     }
     const overrides = lune.overrides || {};
@@ -825,6 +821,7 @@ export const simulateTimeline = (
       }
     });
 
+    const startingStocks = createStockSnapshot(resourceStocks);
     const projectedStocks = projectStocksForLune(resourceStocks, luneTotals);
     const constructionStates = processConstructionProgress({
       constructionsForLune: constructionsForLune.map((construction) => ({
@@ -837,10 +834,9 @@ export const simulateTimeline = (
       capCourantes,
       combatCourants,
     });
+    const stockStats = buildStockStats(projectedStocks, startingStocks);
 
     Object.assign(resourceStocks, projectedStocks);
-    ({ stockEau, stockNrt, stockMed, stockMat } =
-      buildStockStats(projectedStocks));
 
     timeline.push({
       lune: {
@@ -849,12 +845,7 @@ export const simulateTimeline = (
       },
       rows,
       constructionStates,
-      stats: buildStockStats({
-        eau: stockEau,
-        nrt: stockNrt,
-        med: stockMed,
-        mat: stockMat,
-      }),
+      stats: stockStats,
     });
   });
 

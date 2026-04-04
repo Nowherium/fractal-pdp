@@ -18,6 +18,14 @@ export interface AppRouteState {
   selectedGroupId: number | null;
 }
 
+export type PersistOptions = {
+  persist?: boolean;
+};
+
+export type ResourceStatKey = "eau" | "nrt" | "med" | "mat";
+export type PersoCapacityKey = ResourceStatKey | "art";
+export type ToolSpecialite = Exclude<PersoCapacityKey, "med">;
+
 export interface CityMultipliers {
   eau: number;
   nrt: number;
@@ -116,7 +124,7 @@ export interface Outil {
   poids?: number;
   pv?: number;
   pvmax?: number;
-  specialite?: string;
+  specialite?: ToolSpecialite;
   [key: string]: unknown;
 }
 
@@ -159,7 +167,7 @@ export interface ConstructionDefinition {
   resourceCode: string;
   resourceCost: number;
   buildersRequired: number;
-  rewardType: "eau" | "nrt" | "med" | "mat" | "art" | "combat";
+  rewardType: PersoCapacityKey | "combat";
 }
 
 export interface ConstructionProgress {

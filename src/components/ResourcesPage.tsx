@@ -1,15 +1,10 @@
 import type { Resource } from "../types";
 import { confirmAction } from "../utils/confirmAction";
+import { formControlClassName, toFormInputValue } from "../utils/formUtils";
 import { compareResources } from "../utils/resourceOrder";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
 import Panel from "./ui/Panel";
-
-const toInputValue = (value: unknown, fallback = "") =>
-  typeof value === "string" || typeof value === "number" ? value : fallback;
-
-const inputClassName =
-  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 
 function ResourcesPage({
   resources,
@@ -69,9 +64,9 @@ function ResourcesPage({
                   <td>{resource.id}</td>
                   <td>
                     <input
-                      className={inputClassName}
+                      className={formControlClassName}
                       type='text'
-                      value={toInputValue(resource.code)}
+                      value={toFormInputValue(resource.code)}
                       onChange={(event) =>
                         updateResource(index, "code", event.target.value, {
                           persist: false,
@@ -86,9 +81,9 @@ function ResourcesPage({
                   </td>
                   <td>
                     <input
-                      className={inputClassName}
+                      className={formControlClassName}
                       type='text'
-                      value={toInputValue(resource.name, resource.code)}
+                      value={toFormInputValue(resource.name, resource.code)}
                       onChange={(event) =>
                         updateResource(index, "name", event.target.value, {
                           persist: false,

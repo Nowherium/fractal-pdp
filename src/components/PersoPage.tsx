@@ -16,7 +16,9 @@ import type {
   PersoSac,
   Resource,
   Sac,
+  ToolSpecialite,
 } from "../types";
+import { formControlClassName, toFormInputValue } from "../utils/formUtils";
 import { sortResources } from "../utils/resourceOrder";
 
 const persoFields: Array<{
@@ -36,7 +38,6 @@ const persoFields: Array<{
   { key: "cmd", label: "CMD", type: "number", step: "1" },
   { key: "combat", label: "Combat", type: "number", step: "1" },
   { key: "poidsMax", label: "Poids max", type: "number", step: "0.1" },
-  { key: "groupId", label: "Groupe", type: "number", step: "1" },
 ];
 
 const capacityStep = (value: unknown) => {
@@ -50,7 +51,7 @@ const capacityStep = (value: unknown) => {
 const shouldUseIncrementStep = (fieldKey: string) =>
   fieldKey.startsWith("cap") || fieldKey === "cmd" || fieldKey === "combat";
 
-const specialiteLabels: Record<string, string> = {
+const specialiteLabels: Record<ToolSpecialite, string> = {
   eau: "💧 Eau",
   nrt: "🍗 Nrt",
   mat: "🧱 Mat",
@@ -59,9 +60,6 @@ const specialiteLabels: Record<string, string> = {
 
 const getResourceDisplayName = (resource?: Resource | null) =>
   resource?.name || resource?.code?.toUpperCase() || "Ressource";
-
-const toInputValue = (value: unknown, fallback: string | number = "") =>
-  typeof value === "string" || typeof value === "number" ? value : fallback;
 
 const toggleIdInList = (ids: number[], itemId: number, checked: boolean) =>
   checked ? [...ids, itemId] : ids.filter((id) => id !== itemId);
@@ -81,8 +79,6 @@ const getAssignmentAvailability = (
 
 const formGridClassName =
   "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
-const fieldInputClassName =
-  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
 const sectionClassName = "mt-6 space-y-2.5";
 
 function PersoPage({
@@ -309,7 +305,7 @@ function PersoPage({
           return (
             <Field key={field.key} label={field.label}>
               <input
-                className={`${fieldInputClassName} ${field.type === "number" ? "text-right" : ""}`}
+                className={`${formControlClassName} ${field.type === "number" ? "text-right" : ""}`}
                 type={field.type}
                 step={step}
                 min={
@@ -319,7 +315,7 @@ function PersoPage({
                     ? 0
                     : undefined
                 }
-                value={toInputValue(value)}
+                value={toFormInputValue(value)}
                 onChange={(event) =>
                   handlePersoUpdate(
                     perso.id,
@@ -345,7 +341,7 @@ function PersoPage({
         })}
         <Field label='Groupe'>
           <select
-            className={fieldInputClassName}
+            className={formControlClassName}
             value={perso.groupId ?? ""}
             onChange={(event) =>
               handlePersoUpdate(
@@ -371,12 +367,9 @@ function PersoPage({
               className='h-4 w-4 accent-green-500'
               checked={!!perso.esclave}
               onChange={(event) =>
-                handlePersoUpdate(
-                  perso.id,
-                  "esclave",
-                  event.target.checked,
-                  { persist: true },
-                )
+                handlePersoUpdate(perso.id, "esclave", event.target.checked, {
+                  persist: true,
+                })
               }
             />
             <span className='text-sm text-[#f1f1f1]'>
@@ -416,7 +409,7 @@ function PersoPage({
                 }
               >
                 <input
-                  className={`${fieldInputClassName} text-right`}
+                  className={`${formControlClassName} text-right`}
                   type='number'
                   step='0.1'
                   min='0'

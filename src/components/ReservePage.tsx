@@ -2,6 +2,8 @@ import Field from "./ui/Field";
 import InfoText from "./ui/InfoText";
 import Panel from "./ui/Panel";
 
+import { formControlClassName } from "../utils/formUtils";
+
 import type {
   Arme,
   CityMultipliers,
@@ -31,8 +33,7 @@ const cityBonusFields: Array<{ key: keyof CityMultipliers; label: string }> = [
 
 const cardGridClassName =
   "grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3";
-const fieldInputClassName =
-  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-right text-[#f1f1f1]";
+const fieldInputClassName = `${formControlClassName} text-right`;
 
 type ReserveItem = {
   id: number;

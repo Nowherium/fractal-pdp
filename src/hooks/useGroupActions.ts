@@ -1,13 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { AppPage, Group, Perso } from "../types";
+import type { AppPage, Group, PersistOptions, Perso } from "../types";
 import {
   recalculateGroups,
   validateGroupCapacities,
 } from "../utils/groupUtils";
-
-type PersistOptions = {
-  persist?: boolean;
-};
 
 interface UseGroupActionsParams {
   groups: Group[];

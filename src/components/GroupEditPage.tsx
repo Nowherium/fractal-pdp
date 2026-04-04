@@ -1,4 +1,5 @@
 import type { Group, Perso } from "../types";
+import { formControlClassName } from "../utils/formUtils";
 import {
   getGroupCapacity,
   getGroupLeader,
@@ -11,8 +12,7 @@ import Panel from "./ui/Panel";
 
 const formGridClassName =
   "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
-const fieldInputClassName =
-  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-[#f1f1f1]";
+const fieldInputClassName = formControlClassName;
 const sectionClassName = "mt-6 space-y-2.5";
 const memberListClassName = "flex flex-col gap-2";
 const memberItemClassName =
@@ -178,7 +178,11 @@ function GroupEditPage({
                 if (hypotheticalSize > groupCapacity) {
                   disableCheck = true;
 
-                  if (hypotheticalSize === 2 && leaderCmd < 1 && perso.esclave) {
+                  if (
+                    hypotheticalSize === 2 &&
+                    leaderCmd < 1 &&
+                    perso.esclave
+                  ) {
                     disableCheck = false;
                   }
                 }
@@ -198,7 +202,9 @@ function GroupEditPage({
                   <span>
                     {perso.nom} (#{perso.id}){" "}
                     {perso.esclave && (
-                      <span className='ml-1 text-xs text-gray-400'>(Esclave)</span>
+                      <span className='ml-1 text-xs text-gray-400'>
+                        (Esclave)
+                      </span>
                     )}
                   </span>
                 </label>

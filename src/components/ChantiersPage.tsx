@@ -4,6 +4,7 @@ import type {
   Resource,
 } from "../types";
 import { confirmAction } from "../utils/confirmAction";
+import { formControlClassName } from "../utils/formUtils";
 import type { ConstructionState } from "../utils/timelineTypes";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
@@ -50,9 +51,8 @@ const getStatusClassName = (
   return "text-accent-blue";
 };
 
-const inputClassName =
-  "w-full rounded-lg border border-border-strong bg-[#111] px-3 py-2.5 text-left text-[#f1f1f1]";
-const numberInputClassName = `${inputClassName} text-right`;
+const inputClassName = formControlClassName;
+const numberInputClassName = `${formControlClassName} text-right`;
 
 function ChantiersPage({
   constructions,

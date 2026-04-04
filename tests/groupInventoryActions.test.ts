@@ -3,13 +3,16 @@ import test from "node:test";
 
 import { useGroupActions } from "../src/hooks/useGroupActions";
 import { useInventoryActions } from "../src/hooks/useInventoryActions";
+import { usePersoActions } from "../src/hooks/usePersoActions";
 import type {
   AppPage,
   Arme,
   Group,
+  Lune,
   Outil,
   Perso,
   PersoArme,
+  PersoResource,
   PersoOutil,
   PersoSac,
   Sac,
@@ -126,6 +129,49 @@ const createInventoryActions = ({
   };
 };
 
+test("addPerso creates an unassigned personnage by default", () => {
+  const persosState = createState<Perso[]>([]);
+  const groupsState = createState<Group[]>([
+    { id: 1, name: "Alpha", chef: null },
+  ]);
+  const persoResourcesState = createState<PersoResource[]>([]);
+  const lunesState = createState<Lune[]>([]);
+  const pageState = createState<AppPage>("effectif");
+  const selectedPersoIdState = createState<number | null>(null);
+  const openOverridesState = createState<Record<string, boolean>>({});
+  const nextPersoIdState = createState(1);
+  const savedPersos: Perso[] = [];
+
+  const actions = usePersoActions({
+    persos: persosState.get(),
+    groups: groupsState.get(),
+    resources: [],
+    sacs: [],
+    persoResources: persoResourcesState.get(),
+    lunes: lunesState.get(),
+    nextPersoId: nextPersoIdState.get(),
+    setPersos: persosState.set,
+    setGroups: groupsState.set,
+    setPersoResources: persoResourcesState.set,
+    setLunes: lunesState.set,
+    setPage: pageState.set,
+    setSelectedPersoId: selectedPersoIdState.set,
+    setOpenOverrides: openOverridesState.set,
+    setNextPersoId: nextPersoIdState.set,
+    savePersoEntity: (perso) => savedPersos.push(perso),
+    deletePersoEntity: () => undefined,
+    savePersoResourcesEntity: () => undefined,
+    saveLuneEntity: () => undefined,
+  });
+
+  actions.addPerso();
+
+  assert.equal(persosState.get()[0]?.groupId ?? null, null);
+  assert.equal(savedPersos[0]?.groupId ?? null, null);
+  assert.equal(pageState.get(), "perso");
+  assert.equal(selectedPersoIdState.get(), 1);
+});
+
 test("removeGroup deletes only the group and unassigns its members", () => {
   const groupsState = createState<Group[]>([
     { id: 1, name: "Alpha", chef: 1 },
@@ -182,7 +228,7 @@ test("removeGroup deletes only the group and unassigns its members", () => {
   assert.deepEqual(deletedGroups, [1]);
 });
 
-test("handleGroupMembersUpdate reassigns members and picks a valid chef", () => {
+test("handleGroupMembersUpdate reassigns members and clears an invalid chef", () => {
   const groupsState = createState<Group[]>([{ id: 1, name: "Alpha", chef: 1 }]);
   const persosState = createState<Perso[]>([
     { id: 1, nom: "Ava", groupId: 1, cmd: 3 },
@@ -219,8 +265,87 @@ test("handleGroupMembersUpdate reassigns members and picks a valid chef", () => 
       { id: 3, groupId: 1 },
     ],
   );
-  assert.equal(groupsState.get()[0]?.chef, 2);
+  assert.equal(groupsState.get()[0]?.chef, null);
   assert.deepEqual(savedMemberUpdates, [{ groupId: 1, memberIds: [2, 3] }]);
+});
+
+test("handleGroupMembersUpdate allows a second esclave for a chef with less than 1 CMD", () => {
+  withAlertStub((alerts) => {
+    const groupsState = createState<Group[]>([
+      { id: 1, name: "Alpha", chef: 1 },
+    ]);
+    const persosState = createState<Perso[]>([
+      { id: 1, nom: "Ava", groupId: 1, cmd: 0 },
+      { id: 2, nom: "Boris", groupId: null, cmd: 0, esclave: true },
+    ]);
+    const savedMemberUpdates: Array<{ groupId: number; memberIds: number[] }> =
+      [];
+
+    const actions = useGroupActions({
+      groups: groupsState.get(),
+      persos: persosState.get(),
+      setGroups: groupsState.set,
+      setPersos: persosState.set,
+      setSelectedGroupId: () => undefined,
+      setPage: () => undefined,
+      saveGroupEntity: () => undefined,
+      deleteGroupEntity: () => undefined,
+      saveGroupMembersEntity: (groupId, memberIds) =>
+        savedMemberUpdates.push({ groupId, memberIds }),
+      savePersoEntity: () => undefined,
+    });
+
+    actions.handleGroupMembersUpdate(1, [1, 2]);
+
+    assert.equal(alerts.length, 0);
+    assert.deepEqual(
+      persosState.get().map((perso) => ({
+        id: perso.id,
+        groupId: perso.groupId ?? null,
+      })),
+      [
+        { id: 1, groupId: 1 },
+        { id: 2, groupId: 1 },
+      ],
+    );
+    assert.deepEqual(savedMemberUpdates, [{ groupId: 1, memberIds: [1, 2] }]);
+  });
+});
+
+test("handleGroupMembersUpdate blocks a second non-esclave for a chef with less than 1 CMD", () => {
+  withAlertStub((alerts) => {
+    const initialGroups: Group[] = [{ id: 1, name: "Alpha", chef: 1 }];
+    const initialPersos: Perso[] = [
+      { id: 1, nom: "Ava", groupId: 1, cmd: 0 },
+      { id: 2, nom: "Boris", groupId: null, cmd: 0, esclave: false },
+    ];
+
+    const groupsState = createState(initialGroups);
+    const persosState = createState(initialPersos);
+    let saveCalls = 0;
+
+    const actions = useGroupActions({
+      groups: groupsState.get(),
+      persos: persosState.get(),
+      setGroups: groupsState.set,
+      setPersos: persosState.set,
+      setSelectedGroupId: () => undefined,
+      setPage: () => undefined,
+      saveGroupEntity: () => undefined,
+      deleteGroupEntity: () => undefined,
+      saveGroupMembersEntity: () => {
+        saveCalls += 1;
+      },
+      savePersoEntity: () => undefined,
+    });
+
+    actions.handleGroupMembersUpdate(1, [1, 2]);
+
+    assert.equal(saveCalls, 0);
+    assert.deepEqual(groupsState.get(), initialGroups);
+    assert.deepEqual(persosState.get(), initialPersos);
+    assert.match(alerts[0] ?? "", /dépasse la capacité de commandement/i);
+  });
 });
 
 test("handleGroupMembersUpdate blocks assignments that exceed leader capacity", () => {

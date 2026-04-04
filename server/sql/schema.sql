@@ -139,24 +139,30 @@ CREATE TABLE IF NOT EXISTS overrides (
   PRIMARY KEY (lune_id, perso_id)
 );
 
+-- Compatibility migrations for already-initialized databases.
+-- `CREATE TABLE IF NOT EXISTS` does not add new columns to existing tables,
+-- so recent additions still need explicit idempotent ALTERs here.
+ALTER TABLE groups
+  ADD COLUMN IF NOT EXISTS override_capacity boolean;
+
+UPDATE groups
+SET override_capacity = COALESCE(override_capacity, false)
+WHERE override_capacity IS NULL;
+
+ALTER TABLE groups
+  ALTER COLUMN override_capacity SET DEFAULT false,
+  ALTER COLUMN override_capacity SET NOT NULL;
+
 ALTER TABLE persos
-  ALTER COLUMN pvmax SET DEFAULT 0,
-  ALTER COLUMN pv SET DEFAULT 0,
-  ALTER COLUMN poidsmax SET DEFAULT 20,
-  ALTER COLUMN capart SET DEFAULT 0,
-  ALTER COLUMN cmd SET DEFAULT 0,
-  ALTER COLUMN combat SET DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS esclave boolean;
 
-ALTER TABLE armes
-  ALTER COLUMN quantity SET DEFAULT 1;
+UPDATE persos
+SET esclave = COALESCE(esclave, false)
+WHERE esclave IS NULL;
 
-ALTER TABLE outils
-  ALTER COLUMN specialite SET DEFAULT 'eau',
-  ALTER COLUMN bonus SET DEFAULT 1,
-  ALTER COLUMN quantity SET DEFAULT 1;
-
-ALTER TABLE sacs
-  ALTER COLUMN quantity SET DEFAULT 1;
+ALTER TABLE persos
+  ALTER COLUMN esclave SET DEFAULT false,
+  ALTER COLUMN esclave SET NOT NULL;
 
 DO $$
 BEGIN

@@ -2,12 +2,18 @@ import type { Dispatch, SetStateAction } from "react";
 import type {
   Arme,
   Outil,
+  PersistOptions,
   Perso,
   PersoArme,
   PersoOutil,
   PersoSac,
   Sac,
 } from "../types";
+import {
+  createDefaultArme,
+  createDefaultOutil,
+  createDefaultSac,
+} from "../utils/entityDefaults";
 import {
   countAssignedBagsForSac,
   countAssignedToolsForOutil,
@@ -16,10 +22,11 @@ import {
   normalizeOutilFieldValue,
   normalizeSacFieldValue,
 } from "../utils/inventoryUtils";
-
-type PersistOptions = {
-  persist?: boolean;
-};
+import type {
+  ArmeEditableField,
+  OutilEditableField,
+  SacEditableField,
+} from "../utils/inventoryUtils";
 
 interface UseInventoryActionsParams {
   armes: Arme[];
@@ -284,17 +291,7 @@ export const useInventoryActions = ({
       armes.reduce((maxId, arme) => Math.max(maxId, Number(arme.id) || 0), 0) +
       1;
 
-    const newArme = {
-      id: nextArmeId,
-      name: "Nouvelle arme",
-      att: 1,
-      degats: 0,
-      fiabilite: 0,
-      pv: 0,
-      pvm: 0,
-      poids: 0,
-      quantity: 1,
-    };
+    const newArme: Arme = createDefaultArme(nextArmeId);
 
     setArmes((previous) => [...previous, newArme]);
     saveArmeEntity(newArme);
@@ -302,7 +299,7 @@ export const useInventoryActions = ({
 
   const updateArme = (
     index: number,
-    field: string,
+    field: ArmeEditableField,
     rawValue: string | number,
     { persist = true }: PersistOptions = {},
   ) => {
@@ -370,16 +367,7 @@ export const useInventoryActions = ({
         0,
       ) + 1;
 
-    const newOutil = {
-      id: nextOutilId,
-      name: "Nouvel outil",
-      specialite: "eau",
-      bonus: 1,
-      pv: 0,
-      pvmax: 0,
-      poids: 0,
-      quantity: 1,
-    };
+    const newOutil: Outil = createDefaultOutil(nextOutilId);
 
     setOutils((previous) => [...previous, newOutil]);
     saveOutilEntity(newOutil);
@@ -387,7 +375,7 @@ export const useInventoryActions = ({
 
   const updateOutil = (
     index: number,
-    field: string,
+    field: OutilEditableField,
     rawValue: string | number,
     { persist = true }: PersistOptions = {},
   ) => {
@@ -441,15 +429,7 @@ export const useInventoryActions = ({
     const nextSacId =
       sacs.reduce((maxId, sac) => Math.max(maxId, Number(sac.id) || 0), 0) + 1;
 
-    const newSac = {
-      id: nextSacId,
-      name: "Nouveau sac",
-      pv: 0,
-      pvmax: 0,
-      poids: 0,
-      capacite: 0,
-      quantity: 1,
-    };
+    const newSac: Sac = createDefaultSac(nextSacId);
 
     setSacs((previous) => [...previous, newSac]);
     saveSacEntity(newSac);
@@ -457,7 +437,7 @@ export const useInventoryActions = ({
 
   const updateSac = (
     index: number,
-    field: string,
+    field: SacEditableField,
     rawValue: string | number,
     { persist = true }: PersistOptions = {},
   ) => {

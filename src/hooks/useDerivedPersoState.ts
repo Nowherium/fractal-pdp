@@ -10,9 +10,10 @@ import type {
   PersoSac,
   Resource,
   Sac,
+  ToolSpecialite,
 } from "../types";
 
-type ToolMultiplierBySpecialite = Record<"eau" | "nrt" | "mat" | "art", number>;
+type ToolMultiplierBySpecialite = Record<ToolSpecialite, number>;
 
 const defaultToolMultipliers: ToolMultiplierBySpecialite = {
   eau: 1,
@@ -23,7 +24,7 @@ const defaultToolMultipliers: ToolMultiplierBySpecialite = {
 
 const normalizeToolSpecialite = (
   specialite: Outil["specialite"],
-): keyof ToolMultiplierBySpecialite => {
+): ToolSpecialite => {
   if (specialite === "nrt" || specialite === "mat" || specialite === "art") {
     return specialite;
   }

@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { Lune, LuneConstruction, Perso, Ration } from "../types";
+import { createDefaultConstruction } from "../utils/entityDefaults";
 import {
   createLune,
   defaultRation,
@@ -149,17 +150,7 @@ export const useTimelineActions = ({
       }, 0) + 1;
 
     const nextConstructions: LuneConstruction[] = sanitizeConstructions(
-      [
-        ...existingConstructions,
-        {
-          id: `construction-${nextConstructionId}`,
-          name: `Chantier ${nextConstructionId}`,
-          resourceCode: "mat",
-          resourceCost: 1,
-          buildersRequired: 1,
-          rewardType: "mat",
-        },
-      ],
+      [...existingConstructions, createDefaultConstruction(nextConstructionId)],
       lunes,
       currentLune,
     );
