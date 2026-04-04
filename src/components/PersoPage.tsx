@@ -377,10 +377,7 @@ function PersoPage({
         })}
 
         <Field label='Poids max'>
-          <div
-            className={`${formControlClassName} cursor-default text-right text-[#9ea7b3]`}
-            aria-readonly='true'
-          >
+          <div className={`text-[#9ea7b3]`} aria-readonly='true'>
             {baseWeightLimit} Kg
           </div>
         </Field>
