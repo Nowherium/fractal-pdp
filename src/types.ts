@@ -24,7 +24,7 @@ export type PersistOptions = {
 
 export type ResourceStatKey = "eau" | "nrt" | "med" | "mat";
 export type PersoCapacityKey = ResourceStatKey | "art";
-export type ToolSpecialite = Exclude<PersoCapacityKey, "med">;
+export type ToolSpecialite = PersoCapacityKey;
 
 export interface CityMultipliers {
   eau: number;
@@ -206,6 +206,17 @@ export interface LuneOverride {
   [key: string]: number | boolean | undefined;
 }
 
+export type TimelineToolAssignments = Partial<
+  Record<PersoCapacityKey, number | null>
+>;
+
+export interface FrozenTimelineData {
+  rows?: unknown[];
+  stats?: Record<string, unknown>;
+  constructionStates?: Record<string, unknown>;
+  endingState?: Record<string, unknown>;
+}
+
 export interface Lune {
   id: number;
   meteo: WeatherCoefficients;
@@ -213,4 +224,6 @@ export interface Lune {
   overrides: Record<string, LuneOverride>;
   constructionPlacements: LunePlacement[];
   constructions: LuneConstruction[];
+  toolAssignments?: TimelineToolAssignments;
+  frozenTimeline?: FrozenTimelineData | null;
 }

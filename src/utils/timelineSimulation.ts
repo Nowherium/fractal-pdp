@@ -2,11 +2,13 @@ import type {
   ConstructionProgressById,
   Lune,
   LuneConstruction,
+  Outil,
   Perso,
   PersoResource,
   Ration,
   Resource,
   Stocks,
+  ToolSpecialite,
 } from "../types";
 import type {
   CityMultipliersInput,
@@ -22,8 +24,10 @@ import type {
   SimulatedConstruction,
   SimulationState,
   StockSnapshot,
+  TimelinePersoSnapshot,
   TimelineRow,
   TimelineSegment,
+  TimelineStateSnapshot,
   TimelineStats,
 } from "./timelineTypes";
 
@@ -47,6 +51,13 @@ import {
   getPlacedConstructionIdsForLune,
   normalizeLuneConstructions,
 } from "./stateUtils";
+import {
+  createDefaultToolMultipliers,
+  getBestToolForSpecialite,
+  getToolBonusMultiplier,
+  normalizeToolSpecialite,
+  toolSpecialiteOrder,
+} from "./toolUtils";
 
 const productionTaskKeys = ["eau", "nrt", "med", "mat"] as const;
 type ProductionTaskKey = (typeof productionTaskKeys)[number];
@@ -150,20 +161,45 @@ const roundStateValue = (value: number): number =>
 const getInitialPersoCapValue = (
   perso: Perso,
   baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capart",
-  effectifField:
-    | "capEauEffectif"
-    | "capNrtEffectif"
-    | "capMedEffectif"
-    | "capMatEffectif"
-    | "capArtEffectif",
-): number => {
-  const baseValue = Math.max(0, Number(perso[baseField] ?? 0) || 0);
-  const effectifValue = Math.max(
-    0,
-    Number(perso[effectifField] ?? baseValue) || 0,
-  );
+): number => roundStateValue(Math.max(0, Number(perso[baseField] ?? 0) || 0));
 
-  return roundStateValue(Math.max(baseValue, effectifValue));
+const buildSelectedToolMultipliers = (
+  lune: Lune,
+  outilsById: Map<number, Outil>,
+  bestToolsBySpecialite: Record<ToolSpecialite, Outil | null>,
+) => {
+  const multipliers = createDefaultToolMultipliers();
+  const toolAssignments = lune.toolAssignments ?? {};
+
+  toolSpecialiteOrder.forEach((specialite) => {
+    const hasExplicitSelection = Object.prototype.hasOwnProperty.call(
+      toolAssignments,
+      specialite,
+    );
+
+    if (hasExplicitSelection) {
+      const outilId = toolAssignments[specialite];
+      if (outilId === null) {
+        return;
+      }
+
+      const selectedTool = outilsById.get(Number(outilId));
+      if (
+        selectedTool &&
+        normalizeToolSpecialite(selectedTool.specialite) === specialite
+      ) {
+        multipliers[specialite] = getToolBonusMultiplier(selectedTool);
+        return;
+      }
+    }
+
+    const fallbackTool = bestToolsBySpecialite[specialite];
+    if (fallbackTool) {
+      multipliers[specialite] = getToolBonusMultiplier(fallbackTool);
+    }
+  });
+
+  return multipliers;
 };
 
 const clonePersoDrugStocks = (source: PersoDrugStocks = {}): PersoDrugStocks =>
@@ -178,6 +214,26 @@ const clonePersoDrugStocks = (source: PersoDrugStocks = {}): PersoDrugStocks =>
       ),
     ]),
   );
+
+const cloneSerializableValue = <T>(value: T): T =>
+  value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
+
+export const buildFrozenTimelineSnapshot = (
+  segment?: TimelineSegment | null,
+) => {
+  if (!segment) {
+    return null;
+  }
+
+  return {
+    rows: cloneSerializableValue(segment.rows ?? []),
+    stats: cloneSerializableValue(segment.stats ?? {}),
+    constructionStates: cloneSerializableValue(
+      segment.constructionStates ?? {},
+    ),
+    endingState: cloneSerializableValue(segment.endingState ?? {}),
+  };
+};
 
 const buildTimelineStateSnapshot = ({
   persos,
@@ -199,11 +255,11 @@ const buildTimelineStateSnapshot = ({
   persos: Object.fromEntries(
     persos.map((perso) => {
       const currentCaps = getOrCreatePersoCaps(capCourantes, perso.id, {
-        eau: getInitialPersoCapValue(perso, "capEau", "capEauEffectif"),
-        nrt: getInitialPersoCapValue(perso, "capNrt", "capNrtEffectif"),
-        med: getInitialPersoCapValue(perso, "capMed", "capMedEffectif"),
-        mat: getInitialPersoCapValue(perso, "capMat", "capMatEffectif"),
-        art: getInitialPersoCapValue(perso, "capart", "capArtEffectif"),
+        eau: getInitialPersoCapValue(perso, "capEau"),
+        nrt: getInitialPersoCapValue(perso, "capNrt"),
+        med: getInitialPersoCapValue(perso, "capMed"),
+        mat: getInitialPersoCapValue(perso, "capMat"),
+        art: getInitialPersoCapValue(perso, "capart"),
       });
 
       return [
@@ -238,38 +294,122 @@ const buildTimelineStateSnapshot = ({
 });
 
 const resolveBaseCapFromEffective = (
-  perso: Perso,
-  baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capart",
-  effectifField:
+  _perso: Perso,
+  _baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capart",
+  _effectifField:
     | "capEauEffectif"
     | "capNrtEffectif"
     | "capMedEffectif"
     | "capMatEffectif"
     | "capArtEffectif",
   nextEffectiveValue: number,
-): number => {
-  const safeNextEffective = Math.max(0, Number(nextEffectiveValue ?? 0) || 0);
-  const currentBase = Math.max(0, Number(perso[baseField] ?? 0) || 0);
-  const currentEffectif = Math.max(
-    0,
-    Number(perso[effectifField] ?? currentBase) || 0,
-  );
+): number => roundStateValue(Math.max(0, Number(nextEffectiveValue ?? 0) || 0));
 
-  if (currentBase <= 0 || currentEffectif <= 0) {
-    return roundStateValue(safeNextEffective);
+const applyTimelineStateSnapshotToSimulation = ({
+  endingState,
+  pvCourants,
+  capCourantes,
+  combatCourants,
+  presenceCourante,
+  resourceStocks,
+  remainingResourceStocksByPerso,
+}: {
+  endingState: TimelineStateSnapshot | undefined;
+  pvCourants: SimulationState["pvCourants"];
+  capCourantes: SimulationState["capCourantes"];
+  combatCourants: SimulationState["combatCourants"];
+  presenceCourante: SimulationState["presenceCourante"];
+  resourceStocks: Record<string, number>;
+  remainingResourceStocksByPerso: PersoDrugStocks;
+}) => {
+  if (!endingState) {
+    return;
   }
 
-  const multiplier = currentEffectif / currentBase;
-  if (!Number.isFinite(multiplier) || multiplier <= 0) {
-    return roundStateValue(safeNextEffective);
+  Object.keys(pvCourants).forEach((key) => delete pvCourants[Number(key)]);
+  Object.keys(capCourantes).forEach((key) => delete capCourantes[Number(key)]);
+  Object.keys(combatCourants).forEach(
+    (key) => delete combatCourants[Number(key)],
+  );
+  Object.keys(presenceCourante).forEach(
+    (key) => delete presenceCourante[Number(key)],
+  );
+
+  Object.entries(endingState.persos ?? {}).forEach(
+    ([persoIdRaw, rawSnapshot]) => {
+      const persoId = Number(persoIdRaw);
+      if (!Number.isFinite(persoId)) {
+        return;
+      }
+
+      const snapshot = rawSnapshot as TimelinePersoSnapshot;
+
+      pvCourants[persoId] = roundStateValue(Number(snapshot.pv ?? 0));
+      combatCourants[persoId] = roundStateValue(Number(snapshot.combat ?? 0));
+      presenceCourante[persoId] = normalizePresenceValue(
+        snapshot.present,
+        true,
+      );
+      capCourantes[persoId] = {
+        eau: roundStateValue(Number(snapshot.caps?.eau ?? 0)),
+        nrt: roundStateValue(Number(snapshot.caps?.nrt ?? 0)),
+        med: roundStateValue(Number(snapshot.caps?.med ?? 0)),
+        mat: roundStateValue(Number(snapshot.caps?.mat ?? 0)),
+        art: roundStateValue(Number(snapshot.caps?.art ?? 0)),
+      };
+    },
+  );
+
+  Object.keys(resourceStocks).forEach((key) => delete resourceStocks[key]);
+  Object.assign(resourceStocks, createStockSnapshot(endingState.stocks ?? {}));
+
+  Object.keys(remainingResourceStocksByPerso).forEach(
+    (key) => delete remainingResourceStocksByPerso[Number(key)],
+  );
+  Object.assign(
+    remainingResourceStocksByPerso,
+    clonePersoDrugStocks(endingState.carriedResources ?? {}),
+  );
+};
+
+const getFrozenTimelineSegment = (
+  lune: Lune,
+): Omit<TimelineSegment, "lune"> | null => {
+  const frozenTimeline = lune.frozenTimeline;
+  if (!frozenTimeline || typeof frozenTimeline !== "object") {
+    return null;
   }
 
-  return roundStateValue(
-    Math.max(
-      0,
-      currentBase + (safeNextEffective - currentEffectif) / multiplier,
-    ),
-  );
+  if (!Array.isArray(frozenTimeline.rows)) {
+    return null;
+  }
+
+  if (!frozenTimeline.stats || typeof frozenTimeline.stats !== "object") {
+    return null;
+  }
+
+  const frozenSegment: Omit<TimelineSegment, "lune"> = {
+    rows: frozenTimeline.rows as TimelineRow[],
+    stats: frozenTimeline.stats as TimelineStats,
+  };
+
+  if (
+    frozenTimeline.constructionStates &&
+    typeof frozenTimeline.constructionStates === "object"
+  ) {
+    frozenSegment.constructionStates =
+      frozenTimeline.constructionStates as Record<string, ConstructionState>;
+  }
+
+  if (
+    frozenTimeline.endingState &&
+    typeof frozenTimeline.endingState === "object"
+  ) {
+    frozenSegment.endingState =
+      frozenTimeline.endingState as TimelineStateSnapshot;
+  }
+
+  return frozenSegment;
 };
 
 export const applyTimelineSegmentToState = (
@@ -415,11 +555,11 @@ const initializePersoSimulationState = (
     pvCourants[perso.id] = Math.max(0, Number(perso.pv ?? perso.pvmax ?? 0));
     presenceCourante[perso.id] = normalizePresenceValue(perso.present, true);
     capCourantes[perso.id] = {
-      eau: getInitialPersoCapValue(perso, "capEau", "capEauEffectif"),
-      nrt: getInitialPersoCapValue(perso, "capNrt", "capNrtEffectif"),
-      med: getInitialPersoCapValue(perso, "capMed", "capMedEffectif"),
-      mat: getInitialPersoCapValue(perso, "capMat", "capMatEffectif"),
-      art: getInitialPersoCapValue(perso, "capart", "capArtEffectif"),
+      eau: getInitialPersoCapValue(perso, "capEau"),
+      nrt: getInitialPersoCapValue(perso, "capNrt"),
+      med: getInitialPersoCapValue(perso, "capMed"),
+      mat: getInitialPersoCapValue(perso, "capMat"),
+      art: getInitialPersoCapValue(perso, "capart"),
     };
     combatCourants[perso.id] = Number(perso.combat ?? 0);
     remainingDrugStocksByPerso[perso.id] =
@@ -540,6 +680,7 @@ const simulatePersoForLune = ({
   remainingDrugStocksByPerso,
   availableCityResourceStocks,
   availableResourceCodes,
+  selectedToolMultipliers,
 }: {
   perso: Perso;
   lune: Lune;
@@ -554,6 +695,7 @@ const simulatePersoForLune = ({
   remainingDrugStocksByPerso: PersoDrugStocks;
   availableCityResourceStocks: Record<string, number>;
   availableResourceCodes: Set<string>;
+  selectedToolMultipliers: Record<ToolSpecialite, number>;
 }): ProcessPersoResult => {
   const basePvDebut = Number(pvCourants[perso.id] ?? 0);
   const storedRation = {
@@ -639,16 +781,51 @@ const simulatePersoForLune = ({
     baseCapsAtStart,
   );
   const baseCombatAtStart = Number(combatCourants[perso.id] ?? 0);
+  const capStateAtStart = Object.fromEntries(
+    (Object.keys(baseCapsAtStart) as Array<keyof PersoCaps>).map(
+      (specialite) => {
+        const rawCap = Number(baseCapsAtStart[specialite] ?? 0);
+        const appliedToolMultiplier = Math.max(
+          1,
+          Number(selectedToolMultipliers[specialite] ?? 1),
+        );
+
+        return [
+          specialite,
+          {
+            rawCap,
+            appliedToolMultiplier,
+            effectiveCap: rawCap * appliedToolMultiplier,
+          },
+        ];
+      },
+    ),
+  ) as Record<
+    keyof PersoCaps,
+    {
+      rawCap: number;
+      appliedToolMultiplier: number;
+      effectiveCap: number;
+    }
+  >;
   let cDebut: PersoCaps = {
     eau:
-      baseCapsAtStart.eau * productionMultipliers.eau * weatherCoefficients.eau,
+      capStateAtStart.eau.effectiveCap *
+      productionMultipliers.eau *
+      weatherCoefficients.eau,
     nrt:
-      baseCapsAtStart.nrt * productionMultipliers.nrt * weatherCoefficients.nrt,
+      capStateAtStart.nrt.effectiveCap *
+      productionMultipliers.nrt *
+      weatherCoefficients.nrt,
     med:
-      baseCapsAtStart.med * productionMultipliers.med * weatherCoefficients.med,
+      capStateAtStart.med.effectiveCap *
+      productionMultipliers.med *
+      weatherCoefficients.med,
     mat:
-      baseCapsAtStart.mat * productionMultipliers.mat * weatherCoefficients.mat,
-    art: baseCapsAtStart.art,
+      capStateAtStart.mat.effectiveCap *
+      productionMultipliers.mat *
+      weatherCoefficients.mat,
+    art: capStateAtStart.art.effectiveCap,
   };
   let pvDebut = basePvDebut;
   let pvFin = pvDebut;
@@ -744,9 +921,10 @@ const simulatePersoForLune = ({
   if (!mortAuDebut) {
     if (isProductionTask(ration.tache)) {
       production[ration.tache] += cDebut[ration.tache];
-      currentCaps[ration.tache] =
-        baseCapsAtStart[ration.tache] +
-        computeIncrement(baseCapsAtStart[ration.tache]);
+      const taskCapState = capStateAtStart[ration.tache];
+      const nextRawCap =
+        taskCapState.rawCap + computeIncrement(taskCapState.rawCap);
+      currentCaps[ration.tache] = nextRawCap;
     }
     if (ration.tache === "construire" && ration.constructionId) {
       constructionAssignment = {
@@ -1076,6 +1254,7 @@ export const simulateTimeline = (
   cityMultipliers: CityMultipliersInput = {},
   currentLune = 1,
   constructionProgress: ConstructionProgressById = {},
+  outils: Outil[] = [],
 ): TimelineSegment[] => {
   const timeline: TimelineSegment[] = [];
   const productionMultipliers = normalizeProductionMultipliers(cityMultipliers);
@@ -1095,6 +1274,15 @@ export const simulateTimeline = (
   let { pvCourants, capCourantes, combatCourants, presenceCourante } =
     initializePersoSimulationState(persos, remainingDrugStocksByPerso);
 
+  const outilsById = new Map<number, Outil>(
+    outils.map((outil) => [Number(outil.id), outil]),
+  );
+  const bestToolsBySpecialite = Object.fromEntries(
+    toolSpecialiteOrder.map((specialite) => [
+      specialite,
+      getBestToolForSpecialite(outils, specialite),
+    ]),
+  ) as Record<ToolSpecialite, Outil | null>;
   const normalizedConstructions = normalizeLuneConstructions(constructions);
   const constructionProgressById = buildInitialConstructionProgress(
     normalizedConstructions,
@@ -1123,6 +1311,37 @@ export const simulateTimeline = (
         constructionProgressById,
         placedConstructionIds,
       });
+    const selectedToolMultipliers = buildSelectedToolMultipliers(
+      lune,
+      outilsById,
+      bestToolsBySpecialite,
+    );
+    const frozenSegment =
+      Number(lune.id ?? 0) < Number(currentLune ?? 1)
+        ? getFrozenTimelineSegment(lune)
+        : null;
+
+    if (frozenSegment) {
+      applyTimelineStateSnapshotToSimulation({
+        endingState: frozenSegment.endingState,
+        pvCourants,
+        capCourantes,
+        combatCourants,
+        presenceCourante,
+        resourceStocks,
+        remainingResourceStocksByPerso: remainingDrugStocksByPerso,
+      });
+
+      timeline.push({
+        lune: {
+          ...lune,
+          constructions: activeConstructionsForLune,
+        },
+        ...frozenSegment,
+      });
+      return;
+    }
+
     const weatherCoefficients = normalizeWeatherCoefficients(lune.meteo);
 
     applyLuneOverrides({
@@ -1154,6 +1373,7 @@ export const simulateTimeline = (
         remainingDrugStocksByPerso,
         availableCityResourceStocks,
         availableResourceCodes,
+        selectedToolMultipliers,
       });
 
       rows.push(persoResult.row);

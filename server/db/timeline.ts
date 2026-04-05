@@ -3,6 +3,7 @@ import {
   buildLunes,
   normalizeBoolean,
   normalizeConstructionPlacements,
+  normalizeLuneToolAssignments,
   normalizeWeatherCoefficients,
   pool,
 } from "./shared";
@@ -12,8 +13,10 @@ type LuneInput = {
   meteo?: unknown;
   constructionPlacements?: unknown;
   placedConstructionIds?: unknown;
+  toolAssignments?: unknown;
   rations?: unknown;
   overrides?: unknown;
+  frozenTimeline?: unknown;
 } & Record<string, unknown>;
 type RationInput = {
   eau?: unknown;
@@ -42,15 +45,17 @@ const normalizeLuneMeteoInput = (value: unknown) =>
   );
 
 const normalizeLuneConstructionPayload = (lune: LuneInput, luneId: number) => {
-  if (Array.isArray(lune.constructionPlacements)) {
-    return normalizeConstructionPlacements(lune.constructionPlacements, luneId);
-  }
+  const placements = Array.isArray(lune.constructionPlacements)
+    ? normalizeConstructionPlacements(lune.constructionPlacements, luneId)
+    : Array.isArray(lune.placedConstructionIds)
+      ? normalizeConstructionPlacements(lune.placedConstructionIds, luneId)
+      : [];
+  const frozenTimeline =
+    lune.frozenTimeline && typeof lune.frozenTimeline === "object"
+      ? (lune.frozenTimeline as Record<string, unknown>)
+      : null;
 
-  if (Array.isArray(lune.placedConstructionIds)) {
-    return normalizeConstructionPlacements(lune.placedConstructionIds, luneId);
-  }
-
-  return [];
+  return frozenTimeline ? { placements, frozenTimeline } : placements;
 };
 
 const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
@@ -62,7 +67,8 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
       meteo_nrt: number;
       meteo_med: number;
       meteo_mat: number;
-      constructions: ReturnType<typeof normalizeConstructionPlacements>;
+      constructions: unknown;
+      tool_assignments: Record<string, number | null>;
     }
   >();
   const rationsPayload: Array<{
@@ -93,6 +99,7 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
       constructions: normalizeLuneConstructionPayload(lune, luneId),
+      tool_assignments: normalizeLuneToolAssignments(lune.toolAssignments),
     });
 
     const rations = asRationRecord(lune.rations);
@@ -157,7 +164,7 @@ const getExistingPersoIds = async (
 
 const getLuneById = async (client: PoolClient, luneId: number) => {
   const { rows: luneRows } = await client.query(
-    "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions FROM lunes WHERE id = $1 LIMIT 1",
+    "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions, tool_assignments FROM lunes WHERE id = $1 LIMIT 1",
     [luneId],
   );
 
@@ -215,15 +222,24 @@ const upsertLune = async (lune: LuneInput) => {
     );
 
     await client.query(
-      `INSERT INTO lunes (id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO lunes (
+         id,
+         meteo_eau,
+         meteo_nrt,
+         meteo_med,
+         meteo_mat,
+         constructions,
+         tool_assignments
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (id)
        DO UPDATE SET
          meteo_eau = EXCLUDED.meteo_eau,
          meteo_nrt = EXCLUDED.meteo_nrt,
          meteo_med = EXCLUDED.meteo_med,
          meteo_mat = EXCLUDED.meteo_mat,
-         constructions = EXCLUDED.constructions`,
+         constructions = EXCLUDED.constructions,
+         tool_assignments = EXCLUDED.tool_assignments`,
       [
         luneId,
         meteo.eau,
@@ -231,6 +247,7 @@ const upsertLune = async (lune: LuneInput) => {
         meteo.med,
         meteo.mat,
         JSON.stringify(lunesPayload[0]?.constructions || []),
+        JSON.stringify(lunesPayload[0]?.tool_assignments || {}),
       ],
     );
 

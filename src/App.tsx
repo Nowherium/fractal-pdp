@@ -410,6 +410,7 @@ function App() {
         cityMultipliers,
         currentLune,
         constructionProgress,
+        outils,
       ),
     [
       persos,
@@ -421,6 +422,7 @@ function App() {
       cityMultipliers,
       currentLune,
       constructionProgress,
+      outils,
     ],
   );
 
@@ -526,6 +528,7 @@ function App() {
     lunes,
     currentLune,
     addLune,
+    setLunes,
     setPersos,
     setPersoResources,
     setStocks,
@@ -534,6 +537,7 @@ function App() {
     savePersoEntity,
     savePersoResourcesEntity,
     saveStockEntity,
+    saveLuneEntity,
     saveCurrentLuneEntity,
     showToast,
   });
@@ -679,6 +683,7 @@ function App() {
         timelineProps={{
           currentLune,
           resources,
+          outils,
           constructions,
           timelineData: visibleTimelineData,
           removeLune: handleRemoveLune,

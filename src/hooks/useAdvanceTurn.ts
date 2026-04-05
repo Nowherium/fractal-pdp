@@ -1,6 +1,9 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 
-import { applyTimelineSegmentToState } from "../utils/timelineSimulation";
+import {
+  applyTimelineSegmentToState,
+  buildFrozenTimelineSnapshot,
+} from "../utils/timelineSimulation";
 import type { Lune, Perso, PersoResource, Resource, Stocks } from "../types";
 import type { TimelineSegment } from "../utils/timelineTypes";
 
@@ -14,6 +17,7 @@ interface UseAdvanceTurnParams {
   lunes: Lune[];
   currentLune: number;
   addLune: () => void;
+  setLunes: Dispatch<SetStateAction<Lune[]>>;
   setPersos: Dispatch<SetStateAction<Perso[]>>;
   setPersoResources: Dispatch<SetStateAction<PersoResource[]>>;
   setStocks: Dispatch<SetStateAction<Stocks>>;
@@ -25,6 +29,7 @@ interface UseAdvanceTurnParams {
     nextPersoResources: PersoResource[],
   ) => void;
   saveStockEntity: (code: string, quantity: number) => void;
+  saveLuneEntity: (lune: Lune) => void;
   saveCurrentLuneEntity: (currentLune: number) => void;
   showToast: (message: string) => void;
 }
@@ -117,6 +122,7 @@ export const useAdvanceTurn = ({
   lunes,
   currentLune,
   addLune,
+  setLunes,
   setPersos,
   setPersoResources,
   setStocks,
@@ -125,12 +131,32 @@ export const useAdvanceTurn = ({
   savePersoEntity,
   savePersoResourcesEntity,
   saveStockEntity,
+  saveLuneEntity,
   saveCurrentLuneEntity,
   showToast,
 }: UseAdvanceTurnParams) => {
   const handleAdvanceTurn = useCallback(() => {
     if (hasNoPersos) {
       return;
+    }
+
+    if (currentTimelineSegment) {
+      const frozenTimeline = buildFrozenTimelineSnapshot(
+        currentTimelineSegment,
+      );
+      const nextLunes = lunes.map((lune) =>
+        Number(lune.id) === Number(currentLune)
+          ? { ...lune, frozenTimeline }
+          : lune,
+      );
+      const frozenCurrentLune = nextLunes.find(
+        (lune) => Number(lune.id) === Number(currentLune),
+      );
+
+      if (frozenCurrentLune) {
+        setLunes(nextLunes);
+        saveLuneEntity(frozenCurrentLune);
+      }
     }
 
     if (currentTimelineSegment?.endingState) {
@@ -188,10 +214,12 @@ export const useAdvanceTurn = ({
     persoResources,
     resources,
     saveCurrentLuneEntity,
+    saveLuneEntity,
     savePersoEntity,
     savePersoResourcesEntity,
     saveStockEntity,
     setCurrentLune,
+    setLunes,
     setPersoResources,
     setPersos,
     setStocks,

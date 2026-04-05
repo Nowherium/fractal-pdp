@@ -100,6 +100,7 @@ type TimelineDomainProps = Pick<
   ComponentProps<typeof TimelinePage>,
   | "currentLune"
   | "resources"
+  | "outils"
   | "constructions"
   | "timelineData"
   | "removeLune"

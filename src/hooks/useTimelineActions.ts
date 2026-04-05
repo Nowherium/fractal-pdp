@@ -7,6 +7,7 @@ import {
   defaultWeatherCoefficients,
   getPlacedConstructionIdsForLune,
   normalizeConstructionPlacements,
+  normalizeOptionalGroupId,
   normalizeWeatherCoefficient,
   normalizeWeatherCoefficients,
   syncConstructionStatusesWithLunes,
@@ -367,6 +368,17 @@ export const useTimelineActions = ({
         };
       }
 
+      if (field.startsWith("toolAssignments.")) {
+        const specialite = field.replace("toolAssignments.", "");
+        const nextToolId = normalizeOptionalGroupId(rawValue);
+        const toolAssignments = { ...(lune.toolAssignments ?? {}) };
+
+        toolAssignments[specialite as keyof typeof toolAssignments] =
+          nextToolId;
+
+        return { ...lune, toolAssignments };
+      }
+
       const value = Math.max(0, Number(rawValue) || 0);
       return { ...lune, [field]: value };
     });
@@ -415,9 +427,7 @@ export const useTimelineActions = ({
           [field]:
             field === "present"
               ? rawValue === true || rawValue === "true"
-              : field === "pv"
-                ? Math.max(0, Number.isFinite(numericValue) ? numericValue : 0)
-                : numericValue,
+              : Math.max(0, Number.isFinite(numericValue) ? numericValue : 0),
         };
       }
 

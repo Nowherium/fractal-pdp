@@ -57,6 +57,7 @@ type DbRow = {
   construction_id?: unknown;
   data?: unknown;
   constructions?: unknown;
+  tool_assignments?: unknown;
   meteo?: unknown;
   meteo_eau?: unknown;
   meteo_nrt?: unknown;
@@ -289,13 +290,37 @@ const normalizeWeaponQuantity = (value: unknown): number => {
 
 const normalizeToolSpecialite = (value: unknown): string => {
   const normalized = String(value ?? "").toLowerCase();
-  return ["eau", "nrt", "mat", "art"].includes(normalized) ? normalized : "eau";
+  return ["eau", "nrt", "med", "mat", "art"].includes(normalized)
+    ? normalized
+    : "eau";
 };
 
 const normalizeOptionalId = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const normalized = Number(value);
   return Number.isFinite(normalized) ? normalized : null;
+};
+
+const normalizeLuneToolAssignments = (value: unknown) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).flatMap(
+      ([specialite, toolId]) => {
+        const normalizedSpecialite = String(specialite).toLowerCase();
+
+        if (
+          !["eau", "nrt", "med", "mat", "art"].includes(normalizedSpecialite)
+        ) {
+          return [];
+        }
+
+        return [[normalizedSpecialite, normalizeOptionalId(toolId)]];
+      },
+    ),
+  );
 };
 
 const normalizeBoolean = (value: unknown, fallback = false): boolean => {
@@ -619,12 +644,25 @@ const buildLunes = (
   });
 
   return luneRows.map((row) => {
+    const constructionPayload =
+      row.constructions &&
+      typeof row.constructions === "object" &&
+      !Array.isArray(row.constructions)
+        ? (row.constructions as Record<string, unknown>)
+        : null;
     const constructionPlacements = normalizeConstructionPlacements(
       Array.isArray(row.constructions)
         ? (row.constructions as ConstructionPlacementLike[])
-        : [],
+        : Array.isArray(constructionPayload?.["placements"])
+          ? (constructionPayload["placements"] as ConstructionPlacementLike[])
+          : [],
       Number(row.id),
     );
+    const frozenTimeline =
+      constructionPayload?.["frozenTimeline"] &&
+      typeof constructionPayload["frozenTimeline"] === "object"
+        ? (constructionPayload["frozenTimeline"] as Record<string, unknown>)
+        : null;
 
     return {
       id: Number(row.id),
@@ -638,6 +676,8 @@ const buildLunes = (
       overrides: overridesByLune[Number(row.id)] || {},
       constructionPlacements,
       constructions: [],
+      toolAssignments: normalizeLuneToolAssignments(row.tool_assignments),
+      frozenTimeline,
     };
   });
 };
@@ -877,6 +917,7 @@ export {
   normalizeWeatherCoefficients,
   normalizeWeaponQuantity,
   normalizeToolSpecialite,
+  normalizeLuneToolAssignments,
   normalizeOptionalId,
   normalizeBoolean,
   getGroupCapacity,

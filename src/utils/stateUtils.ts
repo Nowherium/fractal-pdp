@@ -19,6 +19,7 @@ import type {
   Stocks,
   WeatherCoefficients,
 } from "../types";
+import { normalizeToolSpecialite } from "./toolUtils";
 
 type RawState = {
   resources?: unknown;
@@ -516,6 +517,29 @@ export const normalizeOptionalGroupId = (value: unknown): number | null => {
   return Number.isFinite(numericValue) ? numericValue : null;
 };
 
+export const normalizeLuneToolAssignments = (
+  value: unknown,
+): NonNullable<Lune["toolAssignments"]> => {
+  const source = value && typeof value === "object" ? value : {};
+
+  return Object.fromEntries(
+    ["eau", "nrt", "med", "mat", "art"].flatMap((specialite) => {
+      if (!Object.prototype.hasOwnProperty.call(source, specialite)) {
+        return [];
+      }
+
+      return [
+        [
+          specialite,
+          normalizeOptionalGroupId(
+            (source as Record<string, unknown>)[specialite],
+          ),
+        ],
+      ];
+    }),
+  ) as NonNullable<Lune["toolAssignments"]>;
+};
+
 export const normalizePersoFieldValue = (
   field: string,
   rawValue: unknown,
@@ -665,6 +689,11 @@ export const normalizeLunes = (
           index + 1,
         ),
         constructions: [],
+        toolAssignments: normalizeLuneToolAssignments(lune.toolAssignments),
+        frozenTimeline:
+          lune.frozenTimeline && typeof lune.frozenTimeline === "object"
+            ? lune.frozenTimeline
+            : null,
       });
     });
 
@@ -683,6 +712,8 @@ export const createLune = (persos: Perso[] = [], luneId = 1): Lune =>
     overrides: {},
     constructionPlacements: [],
     constructions: [],
+    toolAssignments: {},
+    frozenTimeline: null,
   });
 
 export const normalizeArmes = (armes: Array<Partial<Arme>> = []): Arme[] =>
@@ -702,11 +733,7 @@ export const normalizeOutils = (outils: Array<Partial<Outil>> = []): Outil[] =>
   outils.map((outil) => ({
     id: Number(outil.id),
     name: outil.name || "Outil sans nom",
-    specialite:
-      typeof outil.specialite === "string" &&
-      ["eau", "nrt", "mat", "art"].includes(outil.specialite)
-        ? outil.specialite
-        : "eau",
+    specialite: normalizeToolSpecialite(outil.specialite),
     bonus: (() => {
       const value = Number(outil.bonus ?? 1);
       return Number.isFinite(value) ? Math.max(0, value) : 1;

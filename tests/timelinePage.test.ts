@@ -4,11 +4,20 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import TimelineOverrideEditor from "../src/components/TimelineOverrideEditor";
 import TimelinePage from "../src/components/TimelinePage";
+import type { Outil } from "../src/types";
 
 const timelinePageProps = {
   currentLune: 1,
   resources: [],
+  outils: [
+    { id: 1, name: "Pompe", specialite: "eau", bonus: 2 },
+    { id: 2, name: "Piège", specialite: "nrt", bonus: 1.5 },
+    { id: 3, name: "Trousse", specialite: "med", bonus: 1.2 },
+    { id: 4, name: "Marteau", specialite: "mat", bonus: 1.3 },
+    { id: 5, name: "Pinceau", specialite: "art", bonus: 1.1 },
+  ] satisfies Outil[],
   constructions: [],
   timelineData: [
     {
@@ -184,4 +193,124 @@ test("shows absent persos when the toggle is enabled", () => {
   assert.match(markup, />Présent</);
   assert.match(markup, />Absent</);
   assert.match(markup, />Cadavre</);
+});
+
+test("renders the compact-view toggle before the absents toggle", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, timelinePageProps),
+  );
+
+  assert.match(markup, /vue compacte/i);
+  assert.match(markup, /vue compacte[\s\S]*absents/i);
+});
+
+test("renders global tool selects for each production specialty", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, timelinePageProps),
+  );
+
+  assert.match(markup, /Outils de production partagés/i);
+  assert.match(markup, /Pompe/);
+  assert.match(markup, /Piège/);
+  assert.match(markup, /Trousse/);
+  assert.match(markup, /Marteau/);
+  assert.match(markup, /Pinceau/);
+});
+
+test("renders collapsible météo and shared-tools sections", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, timelinePageProps),
+  );
+
+  assert.match(markup, /<summary[^>]*>/);
+  assert.match(markup, /Météo de la lune/);
+  assert.match(markup, /Outils de production partagés/);
+  assert.match(markup, /Cliquer pour replier ou déplier/i);
+  assert.match(markup, /▾/);
+});
+
+test("hides the chantier block entirely when no chantier is defined", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, timelinePageProps),
+  );
+
+  assert.doesNotMatch(markup, /Suivi des chantiers/i);
+  assert.doesNotMatch(markup, /Aucun chantier actif pour cette lune/i);
+});
+
+test("shows the chantier block when at least one chantier is defined", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, {
+      ...timelinePageProps,
+      constructions: [
+        {
+          id: "chantier-1",
+          name: "Tour de guet",
+          resourceCode: "mat",
+          resourceCost: 3,
+          buildersRequired: 2,
+          rewardType: "eau",
+          status: "todo",
+        },
+      ],
+    }),
+  );
+
+  assert.match(markup, /Suivi des chantiers/i);
+  assert.match(markup, /Aucun chantier actif pour cette lune/i);
+});
+
+test("preselects the highest-bonus shared tool by default", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, {
+      ...timelinePageProps,
+      outils: [
+        ...timelinePageProps.outils,
+        { id: 6, name: "Seau", specialite: "eau", bonus: 1.1 },
+      ] satisfies Outil[],
+    }),
+  );
+
+  assert.match(
+    markup,
+    /<option[^>]*value="1"[^>]*selected=""[^>]*>Pompe \(x2\.00\)<\/option>/,
+  );
+  assert.doesNotMatch(
+    markup,
+    /<option[^>]*value="6"[^>]*selected=""[^>]*>Seau \(x1\.10\)<\/option>/,
+  );
+});
+
+test("prevents negative values in timeline override number inputs", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelineOverrideEditor, {
+      segment: {
+        ...timelinePageProps.timelineData[0]!,
+        lune: {
+          ...timelinePageProps.timelineData[0]!.lune,
+          overrides: {
+            1: {
+              pv: 5,
+              capNrt: 6,
+              capEau: 7,
+              capMed: 1,
+            },
+          },
+        },
+      },
+      actualLuneIndex: 0,
+      persoId: 1,
+      persoName: "Présent",
+      setOverride: () => undefined,
+      clearOverrides: () => undefined,
+    }),
+  );
+
+  const inputMatches = markup.match(/type="number"[^>]*min="0"/g) ?? [];
+
+  assert.equal(inputMatches.length, 4);
+  assert.match(markup, /step="0\.05"[^>]*value="5"/);
+  assert.match(markup, /step="0\.05"[^>]*value="6"/);
+  assert.match(markup, /step="0\.01"[^>]*value="7"/);
+  assert.match(markup, /step="0\.1"[^>]*value="1"/);
 });

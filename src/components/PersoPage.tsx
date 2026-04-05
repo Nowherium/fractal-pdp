@@ -16,12 +16,16 @@ import type {
   PersoSac,
   Resource,
   Sac,
-  ToolSpecialite,
 } from "../types";
-import { formControlClassName, toFormInputValue } from "../utils/formUtils";
+import {
+  formControlClassName,
+  getIncrementStep,
+  toFormInputValue,
+} from "../utils/formUtils";
 import { sortResources } from "../utils/resourceOrder";
 import { isPersoCadavre } from "../utils/groupUtils";
 import { normalizeStockQuantity } from "../utils/stateUtils";
+import { toolSpecialiteLabels } from "../utils/toolUtils";
 
 const persoFields: Array<{
   key: string;
@@ -38,28 +42,14 @@ const persoFields: Array<{
   { key: "combat", label: "Combat", type: "number", step: "0.1" },
 ];
 
-const capacityStep = (value: unknown) => {
-  const numericValue = Number(value);
-  if (Number.isNaN(numericValue)) return "0.1";
-  if (numericValue < 4) return "0.1";
-  if (numericValue <= 6) return "0.05";
-  return "0.01";
-};
-
 const shouldUseIncrementStep = (fieldKey: string) => fieldKey !== "poidsMax";
 
 const getNumericFieldStep = (
   fieldKey: string,
   value: unknown,
   fallbackStep?: string,
-) => (shouldUseIncrementStep(fieldKey) ? capacityStep(value) : fallbackStep);
-
-const specialiteLabels: Record<ToolSpecialite, string> = {
-  eau: "💧 Eau",
-  nrt: "🍗 Nrt",
-  mat: "🧱 Mat",
-  art: "🎭 Art",
-};
+) =>
+  shouldUseIncrementStep(fieldKey) ? getIncrementStep(value) : fallbackStep;
 
 const getResourceDisplayName = (resource?: Resource | null) =>
   resource?.name || resource?.code?.toUpperCase() || "Ressource";
@@ -277,7 +267,7 @@ function PersoPage({
       id: outil.id,
       checked: isCarried,
       disabled: isUnavailable,
-      label: `${outil.name} (x${outil.bonus} ${specialiteLabels[outil.specialite ?? "eau"] || outil.specialite || "eau"}) • ${assignedCount}/${maxQuantity} attribué(s)${isUnavailable ? " — indisponible" : ""}`,
+      label: `${outil.name} (x${outil.bonus} ${toolSpecialiteLabels[outil.specialite ?? "eau"] || outil.specialite || "eau"}) • ${assignedCount}/${maxQuantity} attribué(s)${isUnavailable ? " — indisponible" : ""}`,
     };
   });
 

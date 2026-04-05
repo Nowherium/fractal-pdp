@@ -1,17 +1,17 @@
 import type { Outil, ToolSpecialite } from "../types";
 import { confirmAction } from "../utils/confirmAction";
 import { formControlClassName, toFormInputValue } from "../utils/formUtils";
+import { toolSpecialiteLabels, toolSpecialiteOrder } from "../utils/toolUtils";
 import type { OutilEditableField } from "../utils/inventoryUtils";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
 import Panel from "./ui/Panel";
 
-const specialites: Array<{ value: ToolSpecialite; label: string }> = [
-  { value: "eau", label: "💧 Eau" },
-  { value: "nrt", label: "🍗 Nrt" },
-  { value: "mat", label: "🧱 Mat" },
-  { value: "art", label: "🎭 Art" },
-];
+const specialites: Array<{ value: ToolSpecialite; label: string }> =
+  toolSpecialiteOrder.map((value) => ({
+    value,
+    label: toolSpecialiteLabels[value],
+  }));
 
 const toolFields: Array<{
   key: OutilEditableField;

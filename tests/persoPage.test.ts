@@ -46,7 +46,7 @@ test("groups PV and PV max in the perso editor", () => {
   assert.match(markup, /PV \/ PV max/);
   assert.match(markup, /Actuels/);
   assert.match(markup, /Max/);
-  assert.match(markup, /type="number" min="0" step="0\.05" value="4"/);
+  assert.match(markup, /type="number" min="0" step="0\.1" value="4"/);
   assert.match(markup, /type="number" min="0" step="0\.05" value="6"/);
   assert.doesNotMatch(markup, /Poids max<\/span><input[^>]*type="number"/);
   assert.doesNotMatch(markup, />PV actuels<\/span>/);

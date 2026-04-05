@@ -1,17 +1,18 @@
 import Button from "./ui/Button";
 
+import { getIncrementStep } from "../utils/formUtils";
 import type { TimelineSegment } from "../utils/timelineTypes";
 
 type OverrideNumberField = {
-  key: "pv" | "capEau" | "capNrt" | "capMed";
+  key: "pv" | "capNrt" | "capEau" | "capMed";
   label: string;
   placeholder: string;
 };
 
 const overrideNumberFields: OverrideNumberField[] = [
   { key: "pv", label: "❤️ PV", placeholder: "Laisse vide" },
-  { key: "capEau", label: "💧 Cap Eau", placeholder: "Auto" },
   { key: "capNrt", label: "🍗 Cap Nrt", placeholder: "Auto" },
+  { key: "capEau", label: "💧 Cap Eau", placeholder: "Auto" },
   { key: "capMed", label: "💊 Cap Med", placeholder: "Auto" },
 ];
 
@@ -60,27 +61,33 @@ function TimelineOverrideEditor({
           partir de cette lune) :
         </div>
         <div className='flex flex-wrap items-center justify-center gap-2.5 p-2.5'>
-          {overrideNumberFields.map((field) => (
-            <div
-              key={field.key}
-              className='rounded-[4px] border border-border-strong bg-table-bg px-2.5 py-[5px]'
-            >
-              {field.label} :
-              <input
-                type='number'
-                placeholder={field.placeholder}
-                value={getOverrideNumberValue(segment, persoId, field.key)}
-                onChange={(event) =>
-                  setOverride(
-                    actualLuneIndex,
-                    persoId,
-                    field.key,
-                    event.target.value,
-                  )
-                }
-              />
-            </div>
-          ))}
+          {overrideNumberFields.map((field) => {
+            const value = getOverrideNumberValue(segment, persoId, field.key);
+
+            return (
+              <div
+                key={field.key}
+                className='rounded-[4px] border border-border-strong bg-table-bg px-2.5 py-[5px]'
+              >
+                {field.label} :
+                <input
+                  type='number'
+                  min='0'
+                  step={getIncrementStep(value)}
+                  placeholder={field.placeholder}
+                  value={value}
+                  onChange={(event) =>
+                    setOverride(
+                      actualLuneIndex,
+                      persoId,
+                      field.key,
+                      event.target.value,
+                    )
+                  }
+                />
+              </div>
+            );
+          })}
           <div className='rounded-[4px] border border-border-strong bg-table-bg px-2.5 py-[5px]'>
             👤 Présence :
             <select

@@ -143,8 +143,8 @@ function TimelineRowEditor({
             }
           >
             <option value=''>Repos / Autre</option>
-            <option value='eau'>💧 Eau ({row.cDebut.eau.toFixed(2)})</option>
             <option value='nrt'>🍗 Nrt ({row.cDebut.nrt.toFixed(2)})</option>
+            <option value='eau'>💧 Eau ({row.cDebut.eau.toFixed(2)})</option>
             <option value='med'>💊 Med ({row.cDebut.med.toFixed(2)})</option>
             <option value='mat'>🧱 Mat ({row.cDebut.mat.toFixed(2)})</option>
             <option value='construire'>🛠️ Construire</option>

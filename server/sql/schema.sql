@@ -117,7 +117,8 @@ CREATE TABLE IF NOT EXISTS lunes (
   meteo_nrt numeric NOT NULL DEFAULT 1,
   meteo_med numeric NOT NULL DEFAULT 1,
   meteo_mat numeric NOT NULL DEFAULT 1,
-  constructions jsonb NOT NULL DEFAULT '[]'::jsonb
+  constructions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  tool_assignments jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 
 CREATE TABLE IF NOT EXISTS rations (
@@ -163,6 +164,17 @@ WHERE esclave IS NULL;
 ALTER TABLE persos
   ALTER COLUMN esclave SET DEFAULT false,
   ALTER COLUMN esclave SET NOT NULL;
+
+ALTER TABLE lunes
+  ADD COLUMN IF NOT EXISTS tool_assignments jsonb;
+
+UPDATE lunes
+SET tool_assignments = COALESCE(tool_assignments, '{}'::jsonb)
+WHERE tool_assignments IS NULL;
+
+ALTER TABLE lunes
+  ALTER COLUMN tool_assignments SET DEFAULT '{}'::jsonb,
+  ALTER COLUMN tool_assignments SET NOT NULL;
 
 DO $$
 BEGIN

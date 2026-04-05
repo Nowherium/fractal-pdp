@@ -13,25 +13,13 @@ import type {
   ToolSpecialite,
 } from "../types";
 import { normalizeProductionCapacity } from "../utils/stateUtils";
+import {
+  createDefaultToolMultipliers,
+  getToolBonusMultiplier,
+  normalizeToolSpecialite,
+} from "../utils/toolUtils";
 
 type ToolMultiplierBySpecialite = Record<ToolSpecialite, number>;
-
-const defaultToolMultipliers: ToolMultiplierBySpecialite = {
-  eau: 1,
-  nrt: 1,
-  mat: 1,
-  art: 1,
-};
-
-const normalizeToolSpecialite = (
-  specialite: Outil["specialite"],
-): ToolSpecialite => {
-  if (specialite === "nrt" || specialite === "mat" || specialite === "art") {
-    return specialite;
-  }
-
-  return "eau";
-};
 
 const sumItemWeights = <T extends { poids?: number }>(items: T[]): number =>
   items.reduce((total, item) => total + Number(item.poids ?? 0), 0);
@@ -131,18 +119,15 @@ export const useDerivedPersoState = ({
           }, 0);
 
         const multiplierBySpecialite =
-          carriedTools.reduce<ToolMultiplierBySpecialite>(
-            (acc, outil) => {
-              const specialite = normalizeToolSpecialite(outil.specialite);
+          carriedTools.reduce<ToolMultiplierBySpecialite>((acc, outil) => {
+            const specialite = normalizeToolSpecialite(outil.specialite);
 
-              return {
-                ...acc,
-                [specialite]:
-                  Number(acc[specialite] ?? 1) * Number(outil.bonus ?? 1),
-              };
-            },
-            { ...defaultToolMultipliers },
-          );
+            return {
+              ...acc,
+              [specialite]:
+                Number(acc[specialite] ?? 1) * getToolBonusMultiplier(outil),
+            };
+          }, createDefaultToolMultipliers());
 
         const nextCapEauEffectif = normalizeProductionCapacity(
           Number(perso.capEau ?? 0) * Number(multiplierBySpecialite.eau ?? 1),
@@ -151,7 +136,7 @@ export const useDerivedPersoState = ({
           Number(perso.capNrt ?? 0) * Number(multiplierBySpecialite.nrt ?? 1),
         );
         const nextCapMedEffectif = normalizeProductionCapacity(
-          Number(perso.capMed ?? 0),
+          Number(perso.capMed ?? 0) * Number(multiplierBySpecialite.med ?? 1),
         );
         const nextCapMatEffectif = normalizeProductionCapacity(
           Number(perso.capMat ?? 0) * Number(multiplierBySpecialite.mat ?? 1),

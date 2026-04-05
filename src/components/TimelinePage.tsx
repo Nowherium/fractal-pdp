@@ -4,13 +4,14 @@ import TimelineSegmentCard from "./TimelineSegmentCard";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
 
-import type { LuneConstruction, Resource } from "../types";
+import type { LuneConstruction, Outil, Resource } from "../types";
 import type { TimelineSegment } from "../utils/timelineTypes";
 
 function TimelinePage({
   currentLune,
   resources,
-  constructions: _constructions,
+  outils,
+  constructions,
   timelineData,
   removeLune,
   updateLuneGlobal,
@@ -25,6 +26,7 @@ function TimelinePage({
 }: {
   currentLune: number;
   resources: Resource[];
+  outils: Outil[];
   constructions: LuneConstruction[];
   timelineData: TimelineSegment[];
   removeLune: (luneIndex: number) => void;
@@ -68,7 +70,7 @@ function TimelinePage({
       <InfoText>
         Chaque perso peut consommer <strong>une seule drogue par lune</strong>.
         Les cases <strong>Boit</strong>, <strong>Mange</strong> et
-        <strong>Med</strong> sont maintenant{" "}
+        <strong> Med</strong> sont maintenant{" "}
         <strong>pilotées manuellement</strong>
         si le stock cumulé <strong>ville + perso</strong> est suffisant. La
         <strong> météo</strong> de chaque lune définit{" "}
@@ -85,6 +87,8 @@ function TimelinePage({
             luneIndex={luneIndex}
             currentLune={currentLune}
             availableResources={availableResources}
+            outils={outils}
+            hasDefinedConstructions={constructions.length > 0}
             showAbsentPersos={showAbsentPersos}
             onShowAbsentPersosChange={setShowAbsentPersos}
             removeLune={removeLune}

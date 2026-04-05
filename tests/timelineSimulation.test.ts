@@ -8,6 +8,7 @@ import TimelineStockSummary from "../src/components/TimelineStockSummary";
 import type { LuneConstruction } from "../src/types";
 import {
   applyTimelineSegmentToState,
+  buildFrozenTimelineSnapshot,
   simulateTimeline,
 } from "../src/utils/timelineSimulation";
 import {
@@ -619,6 +620,280 @@ test("anchors the current lune to the live perso state instead of replaying past
   assert.equal(secondSegment.rows[0]?.pvFin, 9);
 });
 
+test("keeps passed lunes frozen instead of recalculating them from the live current state", () => {
+  const livePerso = {
+    id: 1,
+    nom: "Éclaireur",
+    present: true,
+    pv: 8,
+    pvmax: 10,
+    capEau: 2,
+    capEauEffectif: 2,
+    combat: 1,
+  };
+
+  const [frozenCurrentLune] = simulateTimeline(
+    [{ ...livePerso, pv: 10 }],
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+  );
+
+  assert.ok(frozenCurrentLune);
+
+  const timeline = simulateTimeline(
+    [livePerso],
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+          },
+        },
+        frozenTimeline: buildFrozenTimelineSnapshot(frozenCurrentLune),
+      },
+      {
+        id: 2,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: true,
+            nrt: true,
+            med: true,
+            tache: "eau",
+            drogue: null,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    2,
+  );
+
+  assert.equal(timeline[0]?.rows[0]?.pvDebut, 10);
+  assert.equal(timeline[0]?.rows[0]?.pvFin, 7.5);
+  assert.equal(timeline[1]?.rows[0]?.pvDebut, 8);
+});
+
+test("uses the selected global tool bonus for every perso in the lune", () => {
+  const [segment] = simulateTimeline(
+    [
+      {
+        id: 1,
+        nom: "Porteur A",
+        present: true,
+        pv: 5,
+        pvmax: 5,
+        capEau: 2,
+        capEauEffectif: 2,
+      },
+      {
+        id: 2,
+        nom: "Porteur B",
+        present: true,
+        pv: 5,
+        pvmax: 5,
+        capEau: 1,
+        capEauEffectif: 1,
+      },
+    ],
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        toolAssignments: { eau: 1 },
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+          },
+          2: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+    {},
+    [{ id: 1, name: "Pompe", specialite: "eau", bonus: 2 }],
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.rows[0]?.cDebut.eau, 4);
+  assert.equal(segment.rows[1]?.cDebut.eau, 2);
+  assert.equal(segment.stats.stockEau, 6);
+});
+
+test("uses the highest-bonus shared tool by default when no selection is stored", () => {
+  const [segment] = simulateTimeline(
+    [
+      {
+        id: 1,
+        nom: "Porteur A",
+        present: true,
+        pv: 5,
+        pvmax: 5,
+        capEau: 2,
+        capEauEffectif: 2,
+      },
+      {
+        id: 2,
+        nom: "Porteur B",
+        present: true,
+        pv: 5,
+        pvmax: 5,
+        capEau: 1,
+        capEauEffectif: 1,
+      },
+    ],
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+          },
+          2: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+    {},
+    [
+      { id: 1, name: "Seau", specialite: "eau", bonus: 1.2 },
+      { id: 2, name: "Pompe", specialite: "eau", bonus: 2 },
+    ],
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.rows[0]?.cDebut.eau, 4);
+  assert.equal(segment.rows[1]?.cDebut.eau, 2);
+  assert.equal(segment.stats.stockEau, 6);
+});
+
+test("ignores carried tools when the shared tool select is set to none", () => {
+  const [segment] = simulateTimeline(
+    [
+      {
+        id: 1,
+        nom: "Porteur A",
+        present: true,
+        pv: 5,
+        pvmax: 5,
+        capEau: 2,
+        capEauEffectif: 4,
+      },
+    ],
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        toolAssignments: { eau: null },
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+    {},
+    [{ id: 1, name: "Pompe", specialite: "eau", bonus: 2 }],
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.rows[0]?.cDebut.eau, 2);
+  assert.equal(segment.stats.stockEau, 2);
+});
+
 test("uses the updated production caps in the current lune even if effectif values are stale", () => {
   const [segment] = simulateTimeline(
     [
@@ -857,4 +1132,71 @@ test("applies the passed turn results back to persos, carried resources and stoc
   assert.equal(advanced.stocks["nrt"], 0);
   assert.equal(advanced.stocks["med"], 0);
   assert.equal(advanced.persoResources.length, 0);
+});
+
+test("applies the full capacity gain even when a shared tool bonus is active", () => {
+  const persos = [
+    {
+      id: 1,
+      nom: "Porteur d'eau",
+      present: true,
+      pv: 5,
+      pvmax: 5,
+      capEau: 1,
+      capEauEffectif: 1,
+      capNrt: 0,
+      capNrtEffectif: 0,
+      capMed: 0,
+      capMedEffectif: 0,
+      capMat: 0,
+      capMatEffectif: 0,
+      capart: 0,
+      capArtEffectif: 0,
+      combat: 0,
+    },
+  ];
+
+  const [segment] = simulateTimeline(
+    persos,
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+    {},
+    [{ id: 1, name: "Pompe", specialite: "eau", bonus: 1.4 }],
+  );
+
+  assert.ok(segment);
+
+  const advanced = applyTimelineSegmentToState(
+    persos,
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    segment,
+    [],
+    [],
+  );
+
+  assert.equal(advanced.persos[0]?.capEau, 1.1);
+  assert.equal(advanced.persos[0]?.capEauEffectif, 1.1);
 });

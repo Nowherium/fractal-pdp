@@ -1,12 +1,18 @@
+import { useState } from "react";
+
 import TimelineConstructionList from "./TimelineConstructionList";
 import TimelineRowEditor from "./TimelineRowEditor";
 import TimelineStockSummary from "./TimelineStockSummary";
 import Button from "./ui/Button";
 import Toggle from "./ui/Toggle";
 
-import type { Resource } from "../types";
+import type { Outil, Resource, ToolSpecialite } from "../types";
 import { confirmAction } from "../utils/confirmAction";
 import { getPlacedConstructionIdsForLune } from "../utils/stateUtils";
+import {
+  getToolsForSpecialite,
+  toolSpecialiteLabels,
+} from "../utils/toolUtils";
 import type { TimelineSegment } from "../utils/timelineTypes";
 
 const weatherFields: Array<{
@@ -17,6 +23,14 @@ const weatherFields: Array<{
   { key: "nrt", label: "🍗 Nrt" },
   { key: "med", label: "💊 Med" },
   { key: "mat", label: "🧱 Mat" },
+];
+
+const toolAssignmentFields: Array<{ key: ToolSpecialite; label: string }> = [
+  { key: "eau", label: toolSpecialiteLabels.eau },
+  { key: "nrt", label: toolSpecialiteLabels.nrt },
+  { key: "med", label: toolSpecialiteLabels.med },
+  { key: "mat", label: toolSpecialiteLabels.mat },
+  { key: "art", label: toolSpecialiteLabels.art },
 ];
 
 type TimelineRationField =
@@ -50,6 +64,8 @@ interface TimelineSegmentCardProps {
   luneIndex: number;
   currentLune: number;
   availableResources: Resource[];
+  outils: Outil[];
+  hasDefinedConstructions: boolean;
   showAbsentPersos: boolean;
   onShowAbsentPersosChange: (checked: boolean) => void;
   removeLune: (luneIndex: number) => void;
@@ -85,6 +101,8 @@ function TimelineSegmentCard({
   luneIndex,
   currentLune,
   availableResources,
+  outils,
+  hasDefinedConstructions,
   showAbsentPersos,
   onShowAbsentPersosChange,
   removeLune,
@@ -104,6 +122,21 @@ function TimelineSegmentCard({
   const visibleRows = segment.rows.filter(
     (row) => showAbsentPersos || (!row.isAbsent && !row.mortAuDebut),
   );
+  const toolAssignments = segment.lune.toolAssignments ?? {};
+  const toolOptionsBySpecialite = Object.fromEntries(
+    toolAssignmentFields.map((field) => [
+      field.key,
+      getToolsForSpecialite(outils, field.key),
+    ]),
+  ) as Record<ToolSpecialite, Outil[]>;
+  const [isWeatherOpen, setIsWeatherOpen] = useState(true);
+  const [isSharedToolsOpen, setIsSharedToolsOpen] = useState(true);
+  const isCompactView = !isWeatherOpen && !isSharedToolsOpen;
+
+  const handleCompactViewChange = (checked: boolean) => {
+    setIsWeatherOpen(!checked);
+    setIsSharedToolsOpen(!checked);
+  };
 
   return (
     <div
@@ -116,6 +149,12 @@ function TimelineSegmentCard({
           {isPastLune ? " • passée (lecture seule)" : ""}
         </h3>
         <div className='flex flex-wrap items-center gap-2'>
+          <Toggle
+            label='vue compacte'
+            srLabel='Activer la vue compacte pour replier la météo et les outils'
+            checked={isCompactView}
+            onChange={(event) => handleCompactViewChange(event.target.checked)}
+          />
           <Toggle
             label='absents'
             srLabel='Afficher les absents'
@@ -145,38 +184,110 @@ function TimelineSegmentCard({
       </div>
 
       <div className='mt-2.5 block rounded-[4px] border-l-[3px] border-l-accent-orange bg-[#2c2c2c] p-2.5'>
-        <div className='grid w-full grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2 border-t border-border-main pt-2.5'>
-          {weatherFields.map((field) => (
-            <label key={field.key} className='flex flex-col gap-1'>
-              <span>🌦️ {field.label} :</span>
-              <input
-                type='number'
-                className='w-20'
-                value={segment.lune.meteo?.[field.key] ?? 1}
-                min='0'
-                max='1'
-                step='0.05'
-                disabled={isPastLune}
-                onChange={(event) =>
-                  updateLuneGlobal(
-                    actualLuneIndex,
-                    `meteo.${field.key}`,
-                    event.target.value,
-                  )
-                }
-              />
-            </label>
-          ))}
-        </div>
+        <details
+          open={isWeatherOpen}
+          onToggle={(event) => setIsWeatherOpen(event.currentTarget.open)}
+          className='rounded-md border border-border-main/70 bg-[#252525] px-3 py-2'
+        >
+          <summary className='flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-semibold text-[#f1f1f1] transition-colors hover:text-accent-cyan'>
+            <span className='flex items-center gap-2'>
+              <span aria-hidden='true'>🌦️</span>
+              <span>Météo de la lune</span>
+            </span>
+            <span className='flex items-center gap-2 text-[0.78rem] font-normal text-[#9ea7b3]'>
+              <span>Cliquer pour replier ou déplier</span>
+              <span aria-hidden='true'>▾</span>
+            </span>
+          </summary>
+          <div className='mt-2 grid w-full grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2'>
+            {weatherFields.map((field) => (
+              <label key={field.key} className='flex flex-col gap-1'>
+                <span>{field.label} :</span>
+                <input
+                  type='number'
+                  className='w-20'
+                  value={segment.lune.meteo?.[field.key] ?? 1}
+                  min='0'
+                  max='1'
+                  step='0.05'
+                  disabled={isPastLune}
+                  onChange={(event) =>
+                    updateLuneGlobal(
+                      actualLuneIndex,
+                      `meteo.${field.key}`,
+                      event.target.value,
+                    )
+                  }
+                />
+              </label>
+            ))}
+          </div>
+        </details>
 
-        <TimelineConstructionList
-          segment={segment}
-          availableResources={availableResources}
-          placedConstructionIds={placedConstructionIds}
-          actualLuneIndex={actualLuneIndex}
-          isPastLune={isPastLune}
-          toggleConstructionPlacement={toggleConstructionPlacement}
-        />
+        <details
+          open={isSharedToolsOpen}
+          onToggle={(event) => setIsSharedToolsOpen(event.currentTarget.open)}
+          className='mt-3 rounded-md border border-border-main/70 bg-[#252525] px-3 py-2'
+        >
+          <summary className='flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-semibold text-[#f1f1f1] transition-colors hover:text-accent-cyan'>
+            <span className='flex items-center gap-2'>
+              <span aria-hidden='true'>🧰</span>
+              <span>Outils de production partagés</span>
+            </span>
+            <span className='flex items-center gap-2 text-[0.78rem] font-normal text-[#9ea7b3]'>
+              <span>Cliquer pour replier ou déplier</span>
+              <span aria-hidden='true'>▾</span>
+            </span>
+          </summary>
+          <div className='mt-2 grid w-full grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2'>
+            {toolAssignmentFields.map((field) => {
+              const matchingTools = toolOptionsBySpecialite[field.key];
+              const hasExplicitSelection = Object.prototype.hasOwnProperty.call(
+                toolAssignments,
+                field.key,
+              );
+              const selectedToolId = hasExplicitSelection
+                ? toolAssignments[field.key]
+                : (matchingTools[0]?.id ?? "");
+
+              return (
+                <label key={field.key} className='flex flex-col gap-1'>
+                  <span>{field.label} :</span>
+                  <select
+                    className='w-full'
+                    value={String(selectedToolId ?? "")}
+                    disabled={isPastLune || matchingTools.length === 0}
+                    onChange={(event) =>
+                      updateLuneGlobal(
+                        actualLuneIndex,
+                        `toolAssignments.${field.key}`,
+                        event.target.value,
+                      )
+                    }
+                  >
+                    <option value=''>Aucun</option>
+                    {matchingTools.map((outil) => (
+                      <option key={outil.id} value={outil.id}>
+                        {outil.name} (x{Number(outil.bonus ?? 1).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              );
+            })}
+          </div>
+        </details>
+
+        {hasDefinedConstructions ? (
+          <TimelineConstructionList
+            segment={segment}
+            availableResources={availableResources}
+            placedConstructionIds={placedConstructionIds}
+            actualLuneIndex={actualLuneIndex}
+            isPastLune={isPastLune}
+            toggleConstructionPlacement={toggleConstructionPlacement}
+          />
+        ) : null}
 
         <table>
           <thead>
