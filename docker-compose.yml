@@ -76,11 +76,6 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
-    healthcheck: # <-- AJOUT : Test pour vérifier si PostgreSQL accepte les connexions
-      test: ["CMD-SHELL", "pg_isready -U postgres -d fractal"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
 volumes:
   db-data:

@@ -16,10 +16,14 @@ import {
 } from "../utils/groupUtils";
 import { createDefaultPerso } from "../utils/entityDefaults";
 import {
-  defaultRation,
-  normalizePersoFieldValue,
-  normalizeStockQuantity,
-} from "../utils/stateUtils";
+  addPersoToLunes,
+  buildInitialPersoResources,
+  buildPersoResourceUpdate,
+  buildUpdatedPersos,
+  isGroupRelatedPersoField,
+  removePersoFromLunes,
+  removePersoOpenOverrides,
+} from "../utils/persoUtils";
 
 interface UsePersoActionsParams {
   persos: Perso[];
@@ -91,29 +95,15 @@ export const usePersoActions = ({
     rawValue: string | number | boolean | null,
     { persist = true }: PersistOptions = {},
   ) => {
-    const nextPersos = persos.map((perso) => {
-      if (perso.id !== persoId) {
-        return perso;
-      }
-
-      const nextValue = normalizePersoFieldValue(field, rawValue);
-      return {
-        ...perso,
-        [field]: nextValue,
-        ...(field === "poidsMax"
-          ? {
-              poidsMaxEffectif:
-                Number(nextValue) +
-                Number(
-                  sacs.find((sac) => sac.id === perso.equippedBagId)
-                    ?.capacite ?? 0,
-                ),
-            }
-          : {}),
-      };
+    const { nextPersos, updatedPerso } = buildUpdatedPersos({
+      persos,
+      persoId,
+      field,
+      rawValue,
+      sacs,
     });
 
-    if (field === "groupId" || field === "cmd") {
+    if (isGroupRelatedPersoField(field)) {
       const nextGroups = recalculateGroups(nextPersos, groups);
       const capacityError = validateGroupCapacities(nextPersos, nextGroups);
       if (capacityError) {
@@ -124,7 +114,6 @@ export const usePersoActions = ({
     }
 
     setPersos(nextPersos);
-    const updatedPerso = nextPersos.find((perso) => perso.id === persoId);
     if (persist && updatedPerso) {
       savePersoEntity(updatedPerso);
     }
@@ -135,65 +124,16 @@ export const usePersoActions = ({
     resourceId: number,
     rawValue: string | number,
   ) => {
-    const requestedQuantity = normalizeStockQuantity(rawValue);
-    const currentQuantity = normalizeStockQuantity(
-      persoResources.find(
-        (entry) =>
-          entry.perso_id === persoId && entry.resource_id === resourceId,
-      )?.quantity ?? 0,
-    );
-    const resourceCode = String(
-      resources.find((resource) => resource.id === resourceId)?.code ?? "",
-    )
-      .trim()
-      .toLowerCase();
-    const currentCityStock = normalizeStockQuantity(stocks[resourceCode] ?? 0);
-
-    let quantity = requestedQuantity;
-    let nextStocks = stocks;
-
-    if (exchangeCityStocksWithPersos && resourceCode) {
-      const delta = requestedQuantity - currentQuantity;
-
-      if (delta > 0) {
-        const transferable = Math.min(delta, currentCityStock);
-        quantity = normalizeStockQuantity(currentQuantity + transferable);
-        nextStocks = {
-          ...stocks,
-          [resourceCode]: normalizeStockQuantity(
-            currentCityStock - transferable,
-          ),
-        };
-      } else if (delta < 0) {
-        nextStocks = {
-          ...stocks,
-          [resourceCode]: normalizeStockQuantity(
-            currentCityStock + Math.abs(delta),
-          ),
-        };
-      }
-    }
-
-    const remainingEntries = persoResources.filter(
-      (entry) =>
-        !(entry.perso_id === persoId && entry.resource_id === resourceId),
-    );
-
-    const nextPersoResources =
-      quantity === 0
-        ? remainingEntries
-        : [
-            ...remainingEntries,
-            {
-              perso_id: persoId,
-              resource_id: resourceId,
-              quantity: normalizeStockQuantity(quantity),
-            },
-          ].sort(
-            (left, right) =>
-              left.perso_id - right.perso_id ||
-              left.resource_id - right.resource_id,
-          );
+    const { nextPersoResources, nextStocks, resourceCode, cityStockChanged } =
+      buildPersoResourceUpdate({
+        persoId,
+        resourceId,
+        rawValue,
+        persoResources,
+        resources,
+        stocks,
+        exchangeCityStocksWithPersos,
+      });
 
     setPersoResources(nextPersoResources);
     savePersoResourcesEntity(
@@ -201,11 +141,7 @@ export const usePersoActions = ({
       nextPersoResources.filter((entry) => entry.perso_id === persoId),
     );
 
-    if (
-      exchangeCityStocksWithPersos &&
-      resourceCode &&
-      Number(nextStocks[resourceCode] ?? 0) !== currentCityStock
-    ) {
+    if (cityStockChanged && resourceCode) {
       setStocks(nextStocks);
       saveStockEntity(resourceCode, Number(nextStocks[resourceCode] ?? 0));
     }
@@ -213,28 +149,15 @@ export const usePersoActions = ({
 
   const addPerso = () => {
     const newPerso: Perso = createDefaultPerso(nextPersoId);
+    const nextLunes = addPersoToLunes(lunes, newPerso.id);
 
     setPersos((previous) => [...previous, newPerso]);
     setPersoResources((previous) => [
       ...previous,
-      ...resources.map((resource) => ({
-        perso_id: newPerso.id,
-        resource_id: resource.id,
-        quantity: 0,
-      })),
+      ...buildInitialPersoResources(newPerso.id, resources),
     ]);
-
-    const nextLunes = lunes.map((lune) => ({
-      ...lune,
-      rations: {
-        ...lune.rations,
-        [newPerso.id]: defaultRation(),
-      },
-    }));
-
     setLunes(nextLunes);
-    setSelectedPersoId(newPerso.id);
-    setPage("perso");
+    openPersoPage(newPerso.id);
     setNextPersoId((previous) => previous + 1);
     savePersoEntity(newPerso);
     nextLunes.forEach((lune) => saveLuneEntity(lune));
@@ -253,22 +176,10 @@ export const usePersoActions = ({
     setPersoResources((previous) =>
       previous.filter((entry) => entry.perso_id !== removedId),
     );
-    setLunes((previous) =>
-      previous.map((lune) => {
-        const rations = { ...lune.rations };
-        delete rations[removedId];
-        const overrides = { ...lune.overrides };
-        delete overrides[removedId];
-        return { ...lune, rations, overrides };
-      }),
+    setLunes((previous) => removePersoFromLunes(previous, removedId));
+    setOpenOverrides((previous) =>
+      removePersoOpenOverrides(previous, removedId),
     );
-    setOpenOverrides((previous) => {
-      const next = { ...previous };
-      Object.keys(next).forEach((key) => {
-        if (key.endsWith(`-${removedId}`)) delete next[key];
-      });
-      return next;
-    });
     deletePersoEntity(removedId);
   };
 

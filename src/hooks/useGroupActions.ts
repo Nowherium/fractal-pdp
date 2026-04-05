@@ -1,9 +1,13 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { AppPage, Group, PersistOptions, Perso } from "../types";
 import {
-  recalculateGroups,
-  validateGroupCapacities,
-} from "../utils/groupUtils";
+  buildGroupMembersUpdate,
+  buildGroupPresenceUpdate,
+  buildGroupRemoval,
+  buildGroupUpdate,
+  buildSafeGroupChefUpdate,
+  createDefaultGroup,
+} from "../utils/groupActionUtils";
 
 interface UseGroupActionsParams {
   groups: Group[];
@@ -30,6 +34,16 @@ export const useGroupActions = ({
   saveGroupMembersEntity,
   savePersoEntity,
 }: UseGroupActionsParams) => {
+  const persistPersosByIds = (
+    persoIds: number[],
+    candidatePersos: Perso[],
+  ): void => {
+    const persoIdSet = new Set(persoIds);
+    candidatePersos
+      .filter((perso) => persoIdSet.has(perso.id))
+      .forEach((perso) => savePersoEntity(perso));
+  };
+
   const openGroupPage = (groupId: number) => {
     setSelectedGroupId(groupId);
     setPage("group");
@@ -46,17 +60,7 @@ export const useGroupActions = ({
   };
 
   const addGroup = () => {
-    const nextGroupId =
-      groups.reduce(
-        (maxId, group) => Math.max(maxId, Number(group.id) || 0),
-        0,
-      ) + 1;
-
-    const newGroup: Group = {
-      id: nextGroupId,
-      name: `Nouveau groupe ${nextGroupId}`,
-      chef: null,
-    };
+    const newGroup: Group = createDefaultGroup(groups);
 
     setGroups((previous) => [...previous, newGroup]);
     setSelectedGroupId(newGroup.id);
@@ -65,29 +69,17 @@ export const useGroupActions = ({
   };
 
   const removeGroup = (groupId: number) => {
-    const nextGroups = groups.filter((group) => group.id !== groupId);
-    const updatedPersos = persos.map((perso) =>
-      perso.groupId === groupId ? { ...perso, groupId: null } : perso,
-    );
+    const { nextGroups, nextPersos, changedPersoIds } = buildGroupRemoval({
+      groups,
+      persos,
+      groupId,
+    });
 
     setGroups(nextGroups);
-    setPersos(updatedPersos);
+    setPersos(nextPersos);
     setSelectedGroupId((current) => (current === groupId ? null : current));
     setPage("groupes");
-
-    updatedPersos
-      .filter((perso) => perso.groupId === null)
-      .forEach((perso) => {
-        if (
-          persos.some(
-            (currentPerso) =>
-              currentPerso.id === perso.id && currentPerso.groupId === groupId,
-          )
-        ) {
-          savePersoEntity(perso);
-        }
-      });
-
+    persistPersosByIds(changedPersoIds, nextPersos);
     deleteGroupEntity(groupId);
   };
 
@@ -97,22 +89,14 @@ export const useGroupActions = ({
     rawValue: string | number | boolean | null,
     { persist = true }: PersistOptions = {},
   ) => {
-    const nextGroups = groups.map((group) =>
-      group.id !== groupId
-        ? group
-        : {
-            ...group,
-            [field]:
-              field === "chef"
-                ? rawValue === null
-                  ? null
-                  : Number(rawValue)
-                : rawValue,
-          },
-    );
+    const { nextGroups, updatedGroup } = buildGroupUpdate({
+      groups,
+      groupId,
+      field,
+      rawValue,
+    });
 
     setGroups(nextGroups);
-    const updatedGroup = nextGroups.find((group) => group.id === groupId);
     if (persist && updatedGroup) {
       saveGroupEntity(updatedGroup);
     }
@@ -122,26 +106,14 @@ export const useGroupActions = ({
     groupId: number,
     selectedMemberIds: Array<number | string>,
   ) => {
-    const uniqueIds = Array.from(
-      new Set(
-        selectedMemberIds
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id)),
-      ),
-    );
+    const { uniqueIds, nextPersos, nextGroups, capacityError } =
+      buildGroupMembersUpdate({
+        groups,
+        persos,
+        groupId,
+        selectedMemberIds,
+      });
 
-    const nextPersos = persos.map((perso) => {
-      if (uniqueIds.includes(perso.id)) {
-        return { ...perso, groupId };
-      }
-      if (perso.groupId === groupId) {
-        return { ...perso, groupId: null };
-      }
-      return perso;
-    });
-
-    const nextGroups = recalculateGroups(nextPersos, groups);
-    const capacityError = validateGroupCapacities(nextPersos, nextGroups);
     if (capacityError) {
       window.alert(capacityError);
       return;
@@ -153,33 +125,18 @@ export const useGroupActions = ({
   };
 
   const setGroupPresence = (groupId: number, isPresent: boolean) => {
-    const memberIdSet = new Set(
-      persos
-        .filter((perso) => perso.groupId === groupId)
-        .map((perso) => perso.id),
-    );
+    const { nextPersos, changedPersoIds } = buildGroupPresenceUpdate({
+      persos,
+      groupId,
+      isPresent,
+    });
 
-    if (memberIdSet.size === 0) {
+    if (changedPersoIds.length === 0) {
       return;
     }
-
-    const changedPersos = persos.filter(
-      (perso) =>
-        memberIdSet.has(perso.id) && (perso.present !== false) !== isPresent,
-    );
-
-    if (changedPersos.length === 0) {
-      return;
-    }
-
-    const nextPersos = persos.map((perso) =>
-      memberIdSet.has(perso.id) ? { ...perso, present: isPresent } : perso,
-    );
 
     setPersos(nextPersos);
-    nextPersos
-      .filter((perso) => memberIdSet.has(perso.id))
-      .forEach((perso) => savePersoEntity(perso));
+    persistPersosByIds(changedPersoIds, nextPersos);
   };
 
   const handleGroupUpdateSafe = (
@@ -193,36 +150,24 @@ export const useGroupActions = ({
       return;
     }
 
-    const members = persos
-      .filter((perso) => perso.groupId === groupId)
-      .map((perso) => perso.id);
+    const { nextGroups, updatedGroup, capacityError, shouldUpdate } =
+      buildSafeGroupChefUpdate({
+        groups,
+        persos,
+        groupId,
+        rawValue,
+      });
 
-    const nextChef =
-      rawValue === null || rawValue === undefined
-        ? (members[0] ?? null)
-        : Number(rawValue);
-
-    if (nextChef === null || !members.includes(nextChef)) {
+    if (!shouldUpdate) {
       return;
     }
 
-    const nextGroups = groups.map((group) =>
-      group.id !== groupId
-        ? group
-        : {
-            ...group,
-            chef: nextChef,
-          },
-    );
-
-    const capacityError = validateGroupCapacities(persos, nextGroups);
     if (capacityError) {
       window.alert(capacityError);
       return;
     }
 
     setGroups(nextGroups);
-    const updatedGroup = nextGroups.find((group) => group.id === groupId);
     if (updatedGroup) {
       saveGroupEntity(updatedGroup);
     }

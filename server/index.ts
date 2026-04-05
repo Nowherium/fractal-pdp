@@ -34,6 +34,12 @@ import {
 } from "./db";
 
 type DbAction = () => Promise<void>;
+type DbReadAction<T> = () => Promise<T>;
+type IdDbAction = (id: number) => Promise<void>;
+type IdBodyDbAction = (
+  id: number,
+  body: Record<string, unknown>,
+) => Promise<void>;
 
 const PORT = Number(process.env["PORT"]) || 3000;
 const app = express();
@@ -43,18 +49,6 @@ app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
-});
-
-app.get("/api/state", async (_req, res) => {
-  try {
-    const state = await getState();
-    res.json(state);
-  } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ error: "Impossible de lire l'état depuis la base de données" });
-  }
 });
 
 const ensureNumericId = (res: Response, rawId: unknown): number | null => {
@@ -79,6 +73,16 @@ const ensureStockCode = (res: Response, rawCode: unknown): string | null => {
   return stockCode;
 };
 
+const getRequestBody = (body: unknown): Record<string, unknown> =>
+  typeof body === "object" && body !== null
+    ? (body as Record<string, unknown>)
+    : {};
+
+const getBodyPayload = <T>(body: unknown, key: string, fallback: T): T => {
+  const value = getRequestBody(body)[key];
+  return value === undefined ? fallback : (value as T);
+};
+
 const runDbAction = async (
   res: Response,
   action: DbAction,
@@ -95,22 +99,109 @@ const runDbAction = async (
   }
 };
 
+const runDbRead = async <T>(
+  res: Response,
+  action: DbReadAction<T>,
+  fallbackError: string,
+): Promise<void> => {
+  try {
+    res.json(await action());
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : fallbackError,
+    });
+  }
+};
+
 const registerPartialRoute = (path: string, handler: RequestHandler): void => {
   app.patch(path, handler);
   app.put(path, handler);
 };
 
+const registerIdWriteRoute = ({
+  path,
+  errorMessage,
+  action,
+}: {
+  path: string;
+  errorMessage: string;
+  action: IdBodyDbAction;
+}): void => {
+  registerPartialRoute(path, async (req, res) => {
+    const id = ensureNumericId(res, req.params["id"]);
+    if (id === null) return;
+
+    await runDbAction(
+      res,
+      () => action(id, getRequestBody(req.body)),
+      errorMessage,
+    );
+  });
+};
+
+const registerIdDeleteRoute = ({
+  path,
+  errorMessage,
+  action,
+}: {
+  path: string;
+  errorMessage: string;
+  action: IdDbAction;
+}): void => {
+  app.delete(path, async (req, res) => {
+    const id = ensureNumericId(res, req.params["id"]);
+    if (id === null) return;
+
+    await runDbAction(res, () => action(id), errorMessage);
+  });
+};
+
+const buildDefaultState = () => {
+  const defaultLuneId = 1;
+
+  return {
+    stocks: defaultStocks,
+    currentLune: 1,
+    constructions: [],
+    persos: defaultPersos,
+    persoResources: [],
+    armes: [],
+    persoArmes: [],
+    outils: [],
+    persoOutils: [],
+    sacs: [],
+    persoSacs: [],
+    lunes: [
+      {
+        id: defaultLuneId,
+        rations: Object.fromEntries(
+          defaultPersos.map((p) => [p.id, defaultRation()]),
+        ),
+        overrides: {},
+        constructions: [],
+      },
+    ],
+  };
+};
+
+app.get("/api/state", async (_req, res) => {
+  await runDbRead(
+    res,
+    () => getState(),
+    "Impossible de lire l'état depuis la base de données",
+  );
+});
+
 app.put("/api/state", async (req, res) => {
-  try {
-    await insertState(req.body);
-    const state = await getState();
-    res.json(state);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "Impossible de sauvegarder l'état dans la base de données",
-    });
-  }
+  await runDbRead(
+    res,
+    async () => {
+      await insertState(req.body);
+      return getState();
+    },
+    "Impossible de sauvegarder l'état dans la base de données",
+  );
 });
 
 registerPartialRoute("/api/stocks/:code", async (req, res) => {
@@ -148,251 +239,130 @@ registerPartialRoute("/api/constructions", async (req, res) => {
   );
 });
 
-registerPartialRoute("/api/resources/:id", async (req, res) => {
-  const resourceId = ensureNumericId(res, req.params["id"]);
-  if (resourceId === null) return;
-
-  await runDbAction(
-    res,
-    () => upsertResource({ ...(req.body?.resource || {}), id: resourceId }),
-    "Impossible de sauvegarder la ressource",
-  );
+registerIdWriteRoute({
+  path: "/api/resources/:id",
+  errorMessage: "Impossible de sauvegarder la ressource",
+  action: (resourceId, body) =>
+    upsertResource({ ...getBodyPayload(body, "resource", {}), id: resourceId }),
+});
+registerIdDeleteRoute({
+  path: "/api/resources/:id",
+  errorMessage: "Impossible de supprimer la ressource",
+  action: deleteResource,
 });
 
-app.delete("/api/resources/:id", async (req, res) => {
-  const resourceId = ensureNumericId(res, req.params["id"]);
-  if (resourceId === null) return;
-
-  await runDbAction(
-    res,
-    () => deleteResource(resourceId),
-    "Impossible de supprimer la ressource",
-  );
+registerIdWriteRoute({
+  path: "/api/persos/:id",
+  errorMessage: "Impossible de sauvegarder le perso",
+  action: (persoId, body) =>
+    upsertPerso({ ...getBodyPayload(body, "perso", {}), id: persoId }),
+});
+registerIdDeleteRoute({
+  path: "/api/persos/:id",
+  errorMessage: "Impossible de supprimer le perso",
+  action: deletePerso,
 });
 
-registerPartialRoute("/api/persos/:id", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params["id"]);
-  if (persoId === null) return;
-
-  await runDbAction(
-    res,
-    () => upsertPerso({ ...(req.body?.perso || {}), id: persoId }),
-    "Impossible de sauvegarder le perso",
-  );
+registerIdWriteRoute({
+  path: "/api/persos/:id/resources",
+  errorMessage: "Impossible de sauvegarder les ressources du perso",
+  action: (persoId, body) =>
+    replacePersoResources(persoId, getBodyPayload(body, "persoResources", [])),
+});
+registerIdWriteRoute({
+  path: "/api/persos/:id/armes",
+  errorMessage: "Impossible de sauvegarder les armes du perso",
+  action: (persoId, body) =>
+    replacePersoArmes(persoId, getBodyPayload(body, "persoArmes", [])),
+});
+registerIdWriteRoute({
+  path: "/api/persos/:id/outils",
+  errorMessage: "Impossible de sauvegarder les outils du perso",
+  action: (persoId, body) =>
+    replacePersoOutils(persoId, getBodyPayload(body, "persoOutils", [])),
+});
+registerIdWriteRoute({
+  path: "/api/persos/:id/sacs",
+  errorMessage: "Impossible de sauvegarder les sacs du perso",
+  action: (persoId, body) =>
+    replacePersoSacs(persoId, getBodyPayload(body, "persoSacs", [])),
 });
 
-app.delete("/api/persos/:id", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params["id"]);
-  if (persoId === null) return;
-
-  await runDbAction(
-    res,
-    () => deletePerso(persoId),
-    "Impossible de supprimer le perso",
-  );
+registerIdWriteRoute({
+  path: "/api/groups/:id",
+  errorMessage: "Impossible de sauvegarder le groupe",
+  action: (groupId, body) =>
+    upsertGroup({ ...getBodyPayload(body, "group", {}), id: groupId }),
+});
+registerIdDeleteRoute({
+  path: "/api/groups/:id",
+  errorMessage: "Impossible de supprimer le groupe",
+  action: deleteGroup,
+});
+registerIdWriteRoute({
+  path: "/api/groups/:id/members",
+  errorMessage: "Impossible de mettre à jour les membres du groupe",
+  action: (groupId, body) =>
+    replaceGroupMembers(groupId, getBodyPayload(body, "memberIds", [])),
 });
 
-registerPartialRoute("/api/persos/:id/resources", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params["id"]);
-  if (persoId === null) return;
-
-  await runDbAction(
-    res,
-    () => replacePersoResources(persoId, req.body?.persoResources || []),
-    "Impossible de sauvegarder les ressources du perso",
-  );
+registerIdWriteRoute({
+  path: "/api/lunes/:id",
+  errorMessage: "Impossible de sauvegarder cette lune",
+  action: (luneId, body) =>
+    upsertLune({ ...getBodyPayload(body, "lune", {}), id: luneId }),
+});
+registerIdDeleteRoute({
+  path: "/api/lunes/:id",
+  errorMessage: "Impossible de supprimer cette lune",
+  action: deleteLune,
 });
 
-registerPartialRoute("/api/persos/:id/armes", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params["id"]);
-  if (persoId === null) return;
-
-  await runDbAction(
-    res,
-    () => replacePersoArmes(persoId, req.body?.persoArmes || []),
-    "Impossible de sauvegarder les armes du perso",
-  );
+registerIdWriteRoute({
+  path: "/api/armes/:id",
+  errorMessage: "Impossible de sauvegarder l'arme",
+  action: (armeId, body) =>
+    upsertArme({ ...getBodyPayload(body, "arme", {}), id: armeId }),
+});
+registerIdDeleteRoute({
+  path: "/api/armes/:id",
+  errorMessage: "Impossible de supprimer l'arme",
+  action: deleteArme,
 });
 
-registerPartialRoute("/api/persos/:id/outils", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params["id"]);
-  if (persoId === null) return;
-
-  await runDbAction(
-    res,
-    () => replacePersoOutils(persoId, req.body?.persoOutils || []),
-    "Impossible de sauvegarder les outils du perso",
-  );
+registerIdWriteRoute({
+  path: "/api/outils/:id",
+  errorMessage: "Impossible de sauvegarder l'outil",
+  action: (outilId, body) =>
+    upsertOutil({ ...getBodyPayload(body, "outil", {}), id: outilId }),
+});
+registerIdDeleteRoute({
+  path: "/api/outils/:id",
+  errorMessage: "Impossible de supprimer l'outil",
+  action: deleteOutil,
 });
 
-registerPartialRoute("/api/persos/:id/sacs", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params["id"]);
-  if (persoId === null) return;
-
-  await runDbAction(
-    res,
-    () => replacePersoSacs(persoId, req.body?.persoSacs || []),
-    "Impossible de sauvegarder les sacs du perso",
-  );
+registerIdWriteRoute({
+  path: "/api/sacs/:id",
+  errorMessage: "Impossible de sauvegarder le sac",
+  action: (sacId, body) =>
+    upsertSac({ ...getBodyPayload(body, "sac", {}), id: sacId }),
 });
-
-registerPartialRoute("/api/groups/:id", async (req, res) => {
-  const groupId = ensureNumericId(res, req.params["id"]);
-  if (groupId === null) return;
-
-  await runDbAction(
-    res,
-    () => upsertGroup({ ...(req.body?.group || {}), id: groupId }),
-    "Impossible de sauvegarder le groupe",
-  );
-});
-
-app.delete("/api/groups/:id", async (req, res) => {
-  const groupId = ensureNumericId(res, req.params["id"]);
-  if (groupId === null) return;
-
-  await runDbAction(
-    res,
-    () => deleteGroup(groupId),
-    "Impossible de supprimer le groupe",
-  );
-});
-
-registerPartialRoute("/api/groups/:id/members", async (req, res) => {
-  const groupId = ensureNumericId(res, req.params["id"]);
-  if (groupId === null) return;
-
-  await runDbAction(
-    res,
-    () => replaceGroupMembers(groupId, req.body?.memberIds || []),
-    "Impossible de mettre à jour les membres du groupe",
-  );
-});
-
-registerPartialRoute("/api/lunes/:id", async (req, res) => {
-  const luneId = ensureNumericId(res, req.params["id"]);
-  if (luneId === null) return;
-
-  await runDbAction(
-    res,
-    () => upsertLune({ ...(req.body?.lune || {}), id: luneId }),
-    "Impossible de sauvegarder cette lune",
-  );
-});
-
-app.delete("/api/lunes/:id", async (req, res) => {
-  const luneId = ensureNumericId(res, req.params["id"]);
-  if (luneId === null) return;
-
-  await runDbAction(
-    res,
-    () => deleteLune(luneId),
-    "Impossible de supprimer cette lune",
-  );
-});
-
-registerPartialRoute("/api/armes/:id", async (req, res) => {
-  const armeId = ensureNumericId(res, req.params["id"]);
-  if (armeId === null) return;
-
-  await runDbAction(
-    res,
-    () => upsertArme({ ...(req.body?.arme || {}), id: armeId }),
-    "Impossible de sauvegarder l'arme",
-  );
-});
-
-app.delete("/api/armes/:id", async (req, res) => {
-  const armeId = ensureNumericId(res, req.params["id"]);
-  if (armeId === null) return;
-
-  await runDbAction(
-    res,
-    () => deleteArme(armeId),
-    "Impossible de supprimer l'arme",
-  );
-});
-
-registerPartialRoute("/api/outils/:id", async (req, res) => {
-  const outilId = ensureNumericId(res, req.params["id"]);
-  if (outilId === null) return;
-
-  await runDbAction(
-    res,
-    () => upsertOutil({ ...(req.body?.outil || {}), id: outilId }),
-    "Impossible de sauvegarder l'outil",
-  );
-});
-
-app.delete("/api/outils/:id", async (req, res) => {
-  const outilId = ensureNumericId(res, req.params["id"]);
-  if (outilId === null) return;
-
-  await runDbAction(
-    res,
-    () => deleteOutil(outilId),
-    "Impossible de supprimer l'outil",
-  );
-});
-
-registerPartialRoute("/api/sacs/:id", async (req, res) => {
-  const sacId = ensureNumericId(res, req.params["id"]);
-  if (sacId === null) return;
-
-  await runDbAction(
-    res,
-    () => upsertSac({ ...(req.body?.sac || {}), id: sacId }),
-    "Impossible de sauvegarder le sac",
-  );
-});
-
-app.delete("/api/sacs/:id", async (req, res) => {
-  const sacId = ensureNumericId(res, req.params["id"]);
-  if (sacId === null) return;
-
-  await runDbAction(
-    res,
-    () => deleteSac(sacId),
-    "Impossible de supprimer le sac",
-  );
+registerIdDeleteRoute({
+  path: "/api/sacs/:id",
+  errorMessage: "Impossible de supprimer le sac",
+  action: deleteSac,
 });
 
 app.post("/api/reset", async (_req, res) => {
-  try {
-    const defaultLuneId = 1;
-    const defaultState = {
-      stocks: defaultStocks,
-      currentLune: 1,
-      constructions: [],
-      persos: defaultPersos,
-      persoResources: [],
-      armes: [],
-      persoArmes: [],
-      outils: [],
-      persoOutils: [],
-      sacs: [],
-      persoSacs: [],
-      lunes: [
-        {
-          id: defaultLuneId,
-          rations: Object.fromEntries(
-            defaultPersos.map((p) => [p.id, defaultRation()]),
-          ),
-          overrides: {},
-          constructions: [],
-        },
-      ],
-    };
-
-    await insertState(defaultState);
-    const state = await getState();
-    res.json(state);
-  } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ error: "Impossible de réinitialiser la base de données" });
-  }
+  await runDbRead(
+    res,
+    async () => {
+      await insertState(buildDefaultState());
+      return getState();
+    },
+    "Impossible de réinitialiser la base de données",
+  );
 });
 
 const start = async (): Promise<void> => {

@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ChangeEvent } from "react";
+import { useMemo, useState } from "react";
 import SaveBar from "./components/SaveBar";
 import PageTabs from "./components/PageTabs";
 import AppPageContent from "./components/AppPageContent";
@@ -8,20 +7,9 @@ import ExchangeModeToggle from "./components/shared/ExchangeModeToggle";
 import TimelineControls from "./components/TimelineControls";
 import {
   buildConstructionProgressById,
-  createLune,
   defaultRation,
-  getPlacedConstructionIdsForLune,
-  normalizeConstructionPlacements,
-  normalizeCurrentLune,
-  normalizeStockQuantity,
-  syncLuneConstructionPlacements,
 } from "./utils/stateUtils";
 import { simulateTimeline } from "./utils/timelineSimulation";
-import {
-  exportStateData,
-  importStateFile,
-  resetAppData,
-} from "./utils/appDataIO";
 import {
   useAppEntitySaves,
   useInitialAppLoad,
@@ -30,12 +18,14 @@ import { useAppState } from "./hooks/useAppState";
 import { useDerivedPersoState } from "./hooks/useDerivedPersoState";
 import { useAdvanceTurn } from "./hooks/useAdvanceTurn";
 import { useAppActionToasts } from "./hooks/useAppActionToasts";
+import { useAppDataManagement } from "./hooks/useAppDataManagement";
 import { useGroupActions } from "./hooks/useGroupActions";
 import { useInventoryActions } from "./hooks/useInventoryActions";
 import { usePersoActions } from "./hooks/usePersoActions";
 import { useResourceActions } from "./hooks/useResourceActions";
 import { useTimelineActions } from "./hooks/useTimelineActions";
-import type { CityMultipliers, PageTab } from "./types";
+import { useEnsureTimelineLunes } from "./hooks/useEnsureTimelineLunes";
+import type { PageTab } from "./types";
 
 function App() {
   const {
@@ -156,68 +146,14 @@ function App() {
     }, 2600);
   };
 
-  useEffect(() => {
-    const targetCurrentLune = Math.max(1, Number(currentLune ?? 1));
-    const maxLuneId = lunes.reduce(
-      (maxValue, lune) => Math.max(maxValue, Number(lune.id) || 0),
-      0,
-    );
-
-    if (maxLuneId >= targetCurrentLune) {
-      return;
-    }
-
-    const nextLunes = [...lunes];
-
-    for (let luneId = maxLuneId + 1; luneId <= targetCurrentLune; luneId += 1) {
-      const inheritedPlacedConstructionIds = getPlacedConstructionIdsForLune(
-        nextLunes[nextLunes.length - 1],
-      ).filter((id) => constructions.some((item) => item.id === id));
-
-      const newLune = syncLuneConstructionPlacements({
-        ...createLune(persos, luneId),
-        constructionPlacements: normalizeConstructionPlacements(
-          inheritedPlacedConstructionIds,
-          luneId,
-        ),
-      });
-
-      nextLunes.push(newLune);
-      saveLuneEntity(newLune);
-    }
-
-    setLunes(nextLunes);
-  }, [currentLune, lunes, persos, constructions, setLunes, saveLuneEntity]);
-
-  const handleStockChange = (field: string, rawValue: string | number) => {
-    const value = normalizeStockQuantity(rawValue);
-    setStocks((previous: Record<string, number>) => ({
-      ...previous,
-      [field]: value,
-    }));
-    saveStockEntity(field, value);
-  };
-
-  const handleCityMultiplierChange = (
-    field: keyof CityMultipliers,
-    rawValue: string | number,
-  ) => {
-    const parsedValue = Number(rawValue);
-    const value = Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
-
-    setCityMultipliers((previous: CityMultipliers) => {
-      const next = { ...previous, [field]: value };
-      saveCityMultipliersEntity(next);
-      return next;
-    });
-  };
-
-  const handleCurrentLuneChange = (rawValue: string | number) => {
-    const nextCurrentLune = normalizeCurrentLune(rawValue);
-    setVisiblePastLunes(0);
-    setCurrentLune(nextCurrentLune);
-    saveCurrentLuneEntity(nextCurrentLune);
-  };
+  useEnsureTimelineLunes({
+    currentLune,
+    lunes,
+    persos,
+    constructions,
+    setLunes,
+    saveLuneEntity,
+  });
 
   const {
     addResource,
@@ -277,7 +213,8 @@ function App() {
     updateConstruction,
     removeConstruction,
     toggleConstructionPlacement,
-    updateLuneGlobal,
+    updateLuneWeather,
+    updateLuneToolAssignment,
     toggleOverrideMenu,
     setOverride,
     clearOverrides,
@@ -359,43 +296,43 @@ function App() {
     [constructions, lunes, currentLune],
   );
 
-  const exportData = () => {
-    exportStateData({
-      resources,
-      persos,
-      persoResources,
-      constructions,
-      constructionProgress,
-      lunes,
-      currentLune,
-      nextPersoId,
-      stocks,
-      cityMultipliers,
-      groups,
-      armes,
-      persoArmes,
-      outils,
-      persoOutils,
-      sacs,
-      persoSacs,
-    });
-    showToast("Export réussi.");
-  };
-
-  const importData = (event: ChangeEvent<HTMLInputElement>) =>
-    importStateFile(event, {
-      fileInputRef,
-      setCompleteState,
-      onSuccess: () => showToast("Import réussi."),
-    });
-
-  const resetData = async () => {
-    await resetAppData({
-      setCompleteState,
-      setSaveStatus,
-    });
-    showToast("Données réinitialisées.");
-  };
+  const {
+    handleStockChange,
+    handleCityMultiplierChange,
+    handleCurrentLuneChange,
+    exportData,
+    importData,
+    resetData,
+  } = useAppDataManagement({
+    resources,
+    persos,
+    persoResources,
+    constructions,
+    constructionProgress,
+    lunes,
+    currentLune,
+    nextPersoId,
+    stocks,
+    cityMultipliers,
+    groups,
+    armes,
+    persoArmes,
+    outils,
+    persoOutils,
+    sacs,
+    persoSacs,
+    setStocks,
+    setCityMultipliers,
+    setVisiblePastLunes,
+    setCurrentLune,
+    fileInputRef,
+    setCompleteState,
+    setSaveStatus,
+    saveStockEntity,
+    saveCityMultipliersEntity,
+    saveCurrentLuneEntity,
+    showToast,
+  });
 
   const timelineData = useMemo(
     () =>
@@ -687,7 +624,8 @@ function App() {
           constructions,
           timelineData: visibleTimelineData,
           removeLune: handleRemoveLune,
-          updateLuneGlobal,
+          updateLuneWeather,
+          updateLuneToolAssignment,
           updateRation,
           toggleConstructionPlacement,
           toggleOverrideMenu,

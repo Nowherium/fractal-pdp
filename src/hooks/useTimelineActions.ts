@@ -1,5 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { Lune, LuneConstruction, Perso, Ration } from "../types";
+import type {
+  Lune,
+  LuneConstruction,
+  Perso,
+  Ration,
+  ToolSpecialite,
+  WeatherCoefficients,
+} from "../types";
 import { createDefaultConstruction } from "../utils/entityDefaults";
 import {
   createLune,
@@ -337,9 +344,9 @@ export const useTimelineActions = ({
     nextLunes.slice(luneIndex).forEach((lune) => saveLuneEntity(lune));
   };
 
-  const updateLuneGlobal = (
+  const updateLuneWeather = (
     luneIndex: number,
-    field: string,
+    resourceKey: keyof WeatherCoefficients,
     rawValue: string | number,
   ) => {
     if (isPastLuneIndex(luneIndex)) {
@@ -349,38 +356,41 @@ export const useTimelineActions = ({
     const nextLunes = lunes.map((lune, idx) => {
       if (idx !== luneIndex) return lune;
 
-      if (field === "meteo") {
-        return {
-          ...lune,
-          meteo: normalizeWeatherCoefficients(rawValue),
-        };
-      }
+      return {
+        ...lune,
+        meteo: {
+          ...defaultWeatherCoefficients,
+          ...normalizeWeatherCoefficients(lune.meteo),
+          [resourceKey]: normalizeWeatherCoefficient(rawValue),
+        },
+      };
+    });
 
-      if (field.startsWith("meteo.")) {
-        const resourceKey = field.replace("meteo.", "");
-        return {
-          ...lune,
-          meteo: {
-            ...defaultWeatherCoefficients,
-            ...normalizeWeatherCoefficients(lune.meteo),
-            [resourceKey]: normalizeWeatherCoefficient(rawValue),
-          },
-        };
-      }
+    setLunes(nextLunes);
+    if (nextLunes[luneIndex]) {
+      saveLuneEntity(nextLunes[luneIndex]);
+    }
+  };
 
-      if (field.startsWith("toolAssignments.")) {
-        const specialite = field.replace("toolAssignments.", "");
-        const nextToolId = normalizeOptionalGroupId(rawValue);
-        const toolAssignments = { ...(lune.toolAssignments ?? {}) };
+  const updateLuneToolAssignment = (
+    luneIndex: number,
+    specialite: ToolSpecialite,
+    rawValue: string | number,
+  ) => {
+    if (isPastLuneIndex(luneIndex)) {
+      return;
+    }
 
-        toolAssignments[specialite as keyof typeof toolAssignments] =
-          nextToolId;
+    const nextLunes = lunes.map((lune, idx) => {
+      if (idx !== luneIndex) return lune;
 
-        return { ...lune, toolAssignments };
-      }
-
-      const value = Math.max(0, Number(rawValue) || 0);
-      return { ...lune, [field]: value };
+      return {
+        ...lune,
+        toolAssignments: {
+          ...(lune.toolAssignments ?? {}),
+          [specialite]: normalizeOptionalGroupId(rawValue),
+        },
+      };
     });
 
     setLunes(nextLunes);
@@ -473,7 +483,8 @@ export const useTimelineActions = ({
     updateConstruction,
     removeConstruction,
     toggleConstructionPlacement,
-    updateLuneGlobal,
+    updateLuneWeather,
+    updateLuneToolAssignment,
     toggleOverrideMenu,
     setOverride,
     clearOverrides,

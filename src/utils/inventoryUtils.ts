@@ -77,6 +77,77 @@ const countAssignedEntries = <
       (excludedPersoId === null || entry.perso_id !== excludedPersoId),
   ).length;
 
+export const normalizeSelectedInventoryIds = (
+  itemIds: Array<number | string> = [],
+): number[] =>
+  Array.from(
+    new Set(
+      itemIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)),
+    ),
+  );
+
+export const normalizeOptionalInventoryId = (
+  itemId: number | string | null | undefined,
+): number | null => {
+  if (itemId === null || itemId === undefined || itemId === "") {
+    return null;
+  }
+
+  const numericId = Number(itemId);
+  return Number.isFinite(numericId) ? numericId : null;
+};
+
+export const replacePersoAssignedEntries = <
+  TEntry extends InventoryAssignedEntry,
+>(
+  entries: TEntry[] = [],
+  persoId: number,
+  nextEntries: TEntry[],
+): TEntry[] => {
+  const remainingEntries = entries.filter(
+    (entry) => entry.perso_id !== persoId,
+  );
+  return [...remainingEntries, ...nextEntries];
+};
+
+export const getInventoryAvailabilityError = <
+  TItem extends { id: number; name?: string; quantity?: number },
+>({
+  selectedIds,
+  items,
+  excludedPersoId,
+  countAssigned,
+  buildMessage,
+}: {
+  selectedIds: number[];
+  items: TItem[];
+  excludedPersoId: number;
+  countAssigned: (itemId: number, excludedPersoId: number) => number;
+  buildMessage: (
+    item: TItem | undefined,
+    itemId: number,
+    assignedToOthers: number,
+    maxQuantity: number,
+  ) => string;
+}): string | null => {
+  for (const itemId of selectedIds) {
+    const item = items.find((entry) => entry.id === itemId);
+    const maxQuantity = Math.max(0, Math.floor(Number(item?.quantity ?? 1)));
+    const assignedToOthers = countAssigned(itemId, excludedPersoId);
+
+    if (assignedToOthers + 1 > maxQuantity) {
+      return buildMessage(item, itemId, assignedToOthers, maxQuantity);
+    }
+  }
+
+  return null;
+};
+
+export const getNextInventoryItemId = <TItem extends { id: number }>(
+  items: TItem[] = [],
+): number =>
+  items.reduce((maxId, item) => Math.max(maxId, Number(item.id) || 0), 0) + 1;
+
 export const normalizeArmeFieldValue = (
   field: ArmeEditableField,
   rawValue: string | number,

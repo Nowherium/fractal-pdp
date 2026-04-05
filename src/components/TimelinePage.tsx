@@ -14,7 +14,8 @@ function TimelinePage({
   constructions,
   timelineData,
   removeLune,
-  updateLuneGlobal,
+  updateLuneWeather,
+  updateLuneToolAssignment,
   updateRation,
   toggleConstructionPlacement,
   toggleOverrideMenu,
@@ -30,9 +31,14 @@ function TimelinePage({
   constructions: LuneConstruction[];
   timelineData: TimelineSegment[];
   removeLune: (luneIndex: number) => void;
-  updateLuneGlobal: (
+  updateLuneWeather: (
     luneIndex: number,
-    field: string,
+    field: "eau" | "nrt" | "med" | "mat",
+    rawValue: string | number,
+  ) => void;
+  updateLuneToolAssignment: (
+    luneIndex: number,
+    specialite: "eau" | "nrt" | "med" | "mat" | "art",
     rawValue: string | number,
   ) => void;
   updateRation: (
@@ -71,13 +77,11 @@ function TimelinePage({
         Chaque perso peut consommer <strong>une seule drogue par lune</strong>.
         Les cases <strong>Boit</strong>, <strong>Mange</strong> et
         <strong> Med</strong> sont maintenant{" "}
-        <strong>pilotées manuellement</strong>
-        si le stock cumulé <strong>ville + perso</strong> est suffisant. La
+        <strong>pilotées manuellement</strong> si le stock cumulé{" "}
+        <strong>ville + perso</strong> est suffisant. La
         <strong> météo</strong> de chaque lune définit{" "}
-        <strong>4 coefficients</strong>
-        distincts pour `eau`, `nrt`, `med` et `mat`, chacun entre{" "}
-        <strong>0</strong>
-        et <strong>1</strong>.
+        <strong>4 coefficients</strong> distincts pour `nrt`, `eau`, `med` et
+        `mat`, chacun entre <strong>0</strong> et <strong>1</strong>.
       </InfoText>
       <div id='timeline'>
         {timelineData.map((segment, luneIndex) => (
@@ -92,7 +96,8 @@ function TimelinePage({
             showAbsentPersos={showAbsentPersos}
             onShowAbsentPersosChange={setShowAbsentPersos}
             removeLune={removeLune}
-            updateLuneGlobal={updateLuneGlobal}
+            updateLuneWeather={updateLuneWeather}
+            updateLuneToolAssignment={updateLuneToolAssignment}
             updateRation={updateRation}
             toggleConstructionPlacement={toggleConstructionPlacement}
             toggleOverrideMenu={toggleOverrideMenu}

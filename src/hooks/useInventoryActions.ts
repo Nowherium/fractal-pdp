@@ -18,9 +18,14 @@ import {
   countAssignedBagsForSac,
   countAssignedToolsForOutil,
   countAssignedWeaponsForArme,
+  getInventoryAvailabilityError,
+  getNextInventoryItemId,
   normalizeArmeFieldValue,
+  normalizeOptionalInventoryId,
   normalizeOutilFieldValue,
   normalizeSacFieldValue,
+  normalizeSelectedInventoryIds,
+  replacePersoAssignedEntries,
 } from "../utils/inventoryUtils";
 import type {
   ArmeEditableField,
@@ -56,6 +61,110 @@ interface UseInventoryActionsParams {
   savePersoSacsEntity: (persoId: number, nextPersoSacs: PersoSac[]) => void;
 }
 
+const replacePersoInventoryEntries = <TEntry extends { perso_id: number }>(
+  setEntries: Dispatch<SetStateAction<TEntry[]>>,
+  persoId: number,
+  nextEntries: TEntry[],
+) => {
+  setEntries((previous) =>
+    replacePersoAssignedEntries(previous, persoId, nextEntries),
+  );
+};
+
+const addInventoryEntity = <TItem extends { id: number }>({
+  items,
+  setItems,
+  createItem,
+  saveEntity,
+}: {
+  items: TItem[];
+  setItems: Dispatch<SetStateAction<TItem[]>>;
+  createItem: (nextId: number) => TItem;
+  saveEntity: (item: TItem) => void;
+}) => {
+  const newItem = createItem(getNextInventoryItemId(items));
+  setItems((previous) => [...previous, newItem]);
+  saveEntity(newItem);
+};
+
+const updateInventoryEntity = <
+  TItem extends { id: number },
+  TField extends string,
+>({
+  items,
+  index,
+  field,
+  rawValue,
+  persist,
+  normalizeFieldValue,
+  getAssignedCount,
+  quantityErrorMessage,
+  setItems,
+  saveEntity,
+}: {
+  items: TItem[];
+  index: number;
+  field: TField;
+  rawValue: string | number;
+  persist: boolean;
+  normalizeFieldValue: (
+    field: TField,
+    rawValue: string | number,
+  ) => string | number;
+  getAssignedCount?: (itemId: number) => number;
+  quantityErrorMessage?: (assignedCount: number) => string;
+  setItems: Dispatch<SetStateAction<TItem[]>>;
+  saveEntity: (item: TItem) => void;
+}) => {
+  const itemToUpdate = items[index];
+  if (!itemToUpdate) return;
+
+  const nextValue = normalizeFieldValue(field, rawValue);
+  if (field === "quantity" && getAssignedCount && quantityErrorMessage) {
+    const assignedCount = getAssignedCount(itemToUpdate.id);
+
+    if (Number(nextValue) < assignedCount) {
+      window.alert(quantityErrorMessage(assignedCount));
+      return;
+    }
+  }
+
+  const nextItem = {
+    ...itemToUpdate,
+    [field]: nextValue,
+  } as TItem;
+
+  setItems((previous) =>
+    previous.map((item, currentIndex) =>
+      currentIndex !== index ? item : nextItem,
+    ),
+  );
+  if (persist) {
+    saveEntity(nextItem);
+  }
+};
+
+const removeInventoryEntity = <TItem extends { id: number }>({
+  items,
+  index,
+  setItems,
+  deleteEntity,
+}: {
+  items: TItem[];
+  index: number;
+  setItems: Dispatch<SetStateAction<TItem[]>>;
+  deleteEntity: (itemId: number) => void;
+}): TItem | null => {
+  const itemToRemove = items[index];
+  if (!itemToRemove) return null;
+
+  setItems((previous) =>
+    previous.filter((_, currentIndex) => currentIndex !== index),
+  );
+  deleteEntity(itemToRemove.id);
+  return itemToRemove;
+};
+
 export const useInventoryActions = ({
   armes,
   setArmes,
@@ -85,20 +194,9 @@ export const useInventoryActions = ({
     carriedWeaponIds: Array<number | string>,
     equippedWeaponId: number | string | null,
   ) => {
-    const uniqueWeaponIds = Array.from(
-      new Set(
-        carriedWeaponIds
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id)),
-      ),
-    );
-
+    const uniqueWeaponIds = normalizeSelectedInventoryIds(carriedWeaponIds);
     const normalizedEquippedWeaponId =
-      equippedWeaponId === null ||
-      equippedWeaponId === undefined ||
-      equippedWeaponId === ""
-        ? null
-        : Number(equippedWeaponId);
+      normalizeOptionalInventoryId(equippedWeaponId);
 
     if (
       normalizedEquippedWeaponId !== null &&
@@ -108,35 +206,28 @@ export const useInventoryActions = ({
       return;
     }
 
-    for (const armeId of uniqueWeaponIds) {
-      const arme = armes.find((item) => item.id === armeId);
-      const maxQuantity = Math.max(0, Math.floor(Number(arme?.quantity ?? 1)));
-      const assignedToOthers = countAssignedWeaponsForArme(
-        persoArmes,
-        armeId,
-        persoId,
-      );
+    const availabilityError = getInventoryAvailabilityError({
+      selectedIds: uniqueWeaponIds,
+      items: armes,
+      excludedPersoId: persoId,
+      countAssigned: (armeId, excludedPersoId) =>
+        countAssignedWeaponsForArme(persoArmes, armeId, excludedPersoId),
+      buildMessage: (arme, armeId, assignedToOthers, maxQuantity) =>
+        `L'arme "${arme?.name || armeId}" n'est plus disponible (${assignedToOthers}/${maxQuantity} déjà attribuée(s)).`,
+    });
 
-      if (assignedToOthers + 1 > maxQuantity) {
-        window.alert(
-          `L'arme "${arme?.name || armeId}" n'est plus disponible (${assignedToOthers}/${maxQuantity} déjà attribuée(s)).`,
-        );
-        return;
-      }
+    if (availabilityError) {
+      window.alert(availabilityError);
+      return;
     }
 
-    const nextEntries = uniqueWeaponIds.map((armeId) => ({
+    const nextEntries: PersoArme[] = uniqueWeaponIds.map((armeId) => ({
       perso_id: persoId,
       arme_id: armeId,
       equipee: armeId === normalizedEquippedWeaponId,
     }));
 
-    setPersoArmes((previous) => {
-      const remainingEntries = previous.filter(
-        (entry) => entry.perso_id !== persoId,
-      );
-      return [...remainingEntries, ...nextEntries];
-    });
+    replacePersoInventoryEntries(setPersoArmes, persoId, nextEntries);
 
     setPersos((previous) =>
       previous.map((perso) =>
@@ -168,43 +259,28 @@ export const useInventoryActions = ({
     persoId: number,
     carriedToolIds: Array<number | string>,
   ) => {
-    const uniqueToolIds = Array.from(
-      new Set(
-        carriedToolIds
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id)),
-      ),
-    );
+    const uniqueToolIds = normalizeSelectedInventoryIds(carriedToolIds);
+    const availabilityError = getInventoryAvailabilityError({
+      selectedIds: uniqueToolIds,
+      items: outils,
+      excludedPersoId: persoId,
+      countAssigned: (outilId, excludedPersoId) =>
+        countAssignedToolsForOutil(persoOutils, outilId, excludedPersoId),
+      buildMessage: (outil, outilId, assignedToOthers, maxQuantity) =>
+        `L'outil "${outil?.name || outilId}" n'est plus disponible (${assignedToOthers}/${maxQuantity} déjà attribué(s)).`,
+    });
 
-    for (const outilId of uniqueToolIds) {
-      const outil = outils.find((item) => item.id === outilId);
-      const maxQuantity = Math.max(0, Math.floor(Number(outil?.quantity ?? 1)));
-      const assignedToOthers = countAssignedToolsForOutil(
-        persoOutils,
-        outilId,
-        persoId,
-      );
-
-      if (assignedToOthers + 1 > maxQuantity) {
-        window.alert(
-          `L'outil "${outil?.name || outilId}" n'est plus disponible (${assignedToOthers}/${maxQuantity} déjà attribué(s)).`,
-        );
-        return;
-      }
+    if (availabilityError) {
+      window.alert(availabilityError);
+      return;
     }
 
-    const nextEntries = uniqueToolIds.map((outilId) => ({
+    const nextEntries: PersoOutil[] = uniqueToolIds.map((outilId) => ({
       perso_id: persoId,
       outil_id: outilId,
     }));
 
-    setPersoOutils((previous) => {
-      const remainingEntries = previous.filter(
-        (entry) => entry.perso_id !== persoId,
-      );
-      return [...remainingEntries, ...nextEntries];
-    });
-
+    replacePersoInventoryEntries(setPersoOutils, persoId, nextEntries);
     savePersoOutilsEntity(persoId, nextEntries);
   };
 
@@ -213,20 +289,8 @@ export const useInventoryActions = ({
     carriedBagIds: Array<number | string>,
     equippedBagId: number | string | null,
   ) => {
-    const uniqueBagIds = Array.from(
-      new Set(
-        carriedBagIds
-          .map((id) => Number(id))
-          .filter((id) => Number.isFinite(id)),
-      ),
-    );
-
-    const normalizedEquippedBagId =
-      equippedBagId === null ||
-      equippedBagId === undefined ||
-      equippedBagId === ""
-        ? null
-        : Number(equippedBagId);
+    const uniqueBagIds = normalizeSelectedInventoryIds(carriedBagIds);
+    const normalizedEquippedBagId = normalizeOptionalInventoryId(equippedBagId);
 
     if (
       normalizedEquippedBagId !== null &&
@@ -236,35 +300,28 @@ export const useInventoryActions = ({
       return;
     }
 
-    for (const sacId of uniqueBagIds) {
-      const sac = sacs.find((item) => item.id === sacId);
-      const maxQuantity = Math.max(0, Math.floor(Number(sac?.quantity ?? 1)));
-      const assignedToOthers = countAssignedBagsForSac(
-        persoSacs,
-        sacId,
-        persoId,
-      );
+    const availabilityError = getInventoryAvailabilityError({
+      selectedIds: uniqueBagIds,
+      items: sacs,
+      excludedPersoId: persoId,
+      countAssigned: (sacId, excludedPersoId) =>
+        countAssignedBagsForSac(persoSacs, sacId, excludedPersoId),
+      buildMessage: (sac, sacId, assignedToOthers, maxQuantity) =>
+        `Le sac "${sac?.name || sacId}" n'est plus disponible (${assignedToOthers}/${maxQuantity} déjà attribué(s)).`,
+    });
 
-      if (assignedToOthers + 1 > maxQuantity) {
-        window.alert(
-          `Le sac "${sac?.name || sacId}" n'est plus disponible (${assignedToOthers}/${maxQuantity} déjà attribué(s)).`,
-        );
-        return;
-      }
+    if (availabilityError) {
+      window.alert(availabilityError);
+      return;
     }
 
-    const nextEntries = uniqueBagIds.map((sacId) => ({
+    const nextEntries: PersoSac[] = uniqueBagIds.map((sacId) => ({
       perso_id: persoId,
       sac_id: sacId,
       equipe: sacId === normalizedEquippedBagId,
     }));
 
-    setPersoSacs((previous) => {
-      const remainingEntries = previous.filter(
-        (entry) => entry.perso_id !== persoId,
-      );
-      return [...remainingEntries, ...nextEntries];
-    });
+    replacePersoInventoryEntries(setPersoSacs, persoId, nextEntries);
 
     setPersos((previous) =>
       previous.map((perso) =>
@@ -287,14 +344,12 @@ export const useInventoryActions = ({
   };
 
   const addArme = () => {
-    const nextArmeId =
-      armes.reduce((maxId, arme) => Math.max(maxId, Number(arme.id) || 0), 0) +
-      1;
-
-    const newArme: Arme = createDefaultArme(nextArmeId);
-
-    setArmes((previous) => [...previous, newArme]);
-    saveArmeEntity(newArme);
+    addInventoryEntity({
+      items: armes,
+      setItems: setArmes,
+      createItem: createDefaultArme,
+      saveEntity: saveArmeEntity,
+    });
   };
 
   const updateArme = (
@@ -303,46 +358,31 @@ export const useInventoryActions = ({
     rawValue: string | number,
     { persist = true }: PersistOptions = {},
   ) => {
-    const armeToUpdate = armes[index];
-    if (!armeToUpdate) return;
-
-    const nextValue = normalizeArmeFieldValue(field, rawValue);
-    if (field === "quantity") {
-      const assignedCount = countAssignedWeaponsForArme(
-        persoArmes,
-        armeToUpdate.id,
-      );
-
-      if (Number(nextValue) < assignedCount) {
-        window.alert(
-          `Impossible de définir une quantité inférieure aux ${assignedCount} arme(s) déjà attribuée(s).`,
-        );
-        return;
-      }
-    }
-
-    const nextArme = {
-      ...armeToUpdate,
-      [field]: nextValue,
-    };
-
-    setArmes((previous) =>
-      previous.map((arme, currentIndex) =>
-        currentIndex !== index ? arme : nextArme,
-      ),
-    );
-    if (persist) {
-      saveArmeEntity(nextArme);
-    }
+    updateInventoryEntity({
+      items: armes,
+      index,
+      field,
+      rawValue,
+      persist,
+      normalizeFieldValue: normalizeArmeFieldValue,
+      getAssignedCount: (armeId) =>
+        countAssignedWeaponsForArme(persoArmes, armeId),
+      quantityErrorMessage: (assignedCount) =>
+        `Impossible de définir une quantité inférieure aux ${assignedCount} arme(s) déjà attribuée(s).`,
+      setItems: setArmes,
+      saveEntity: saveArmeEntity,
+    });
   };
 
   const removeArme = (index: number) => {
-    const armeToRemove = armes[index];
+    const armeToRemove = removeInventoryEntity({
+      items: armes,
+      index,
+      setItems: setArmes,
+      deleteEntity: deleteArmeEntity,
+    });
     if (!armeToRemove) return;
 
-    setArmes((previous) =>
-      previous.filter((_, currentIndex) => currentIndex !== index),
-    );
     setPersoArmes((previous) =>
       previous.filter((entry) => entry.arme_id !== armeToRemove.id),
     );
@@ -357,20 +397,15 @@ export const useInventoryActions = ({
             },
       ),
     );
-    deleteArmeEntity(armeToRemove.id);
   };
 
   const addOutil = () => {
-    const nextOutilId =
-      outils.reduce(
-        (maxId, outil) => Math.max(maxId, Number(outil.id) || 0),
-        0,
-      ) + 1;
-
-    const newOutil: Outil = createDefaultOutil(nextOutilId);
-
-    setOutils((previous) => [...previous, newOutil]);
-    saveOutilEntity(newOutil);
+    addInventoryEntity({
+      items: outils,
+      setItems: setOutils,
+      createItem: createDefaultOutil,
+      saveEntity: saveOutilEntity,
+    });
   };
 
   const updateOutil = (
@@ -379,60 +414,43 @@ export const useInventoryActions = ({
     rawValue: string | number,
     { persist = true }: PersistOptions = {},
   ) => {
-    const outilToUpdate = outils[index];
-    if (!outilToUpdate) return;
-
-    const nextValue = normalizeOutilFieldValue(field, rawValue);
-    if (field === "quantity") {
-      const assignedCount = countAssignedToolsForOutil(
-        persoOutils,
-        outilToUpdate.id,
-      );
-
-      if (Number(nextValue) < assignedCount) {
-        window.alert(
-          `Impossible de définir une quantité inférieure aux ${assignedCount} outil(s) déjà attribué(s).`,
-        );
-        return;
-      }
-    }
-
-    const nextOutil = {
-      ...outilToUpdate,
-      [field]: nextValue,
-    };
-
-    setOutils((previous) =>
-      previous.map((outil, currentIndex) =>
-        currentIndex !== index ? outil : nextOutil,
-      ),
-    );
-    if (persist) {
-      saveOutilEntity(nextOutil);
-    }
+    updateInventoryEntity({
+      items: outils,
+      index,
+      field,
+      rawValue,
+      persist,
+      normalizeFieldValue: normalizeOutilFieldValue,
+      getAssignedCount: (outilId) =>
+        countAssignedToolsForOutil(persoOutils, outilId),
+      quantityErrorMessage: (assignedCount) =>
+        `Impossible de définir une quantité inférieure aux ${assignedCount} outil(s) déjà attribué(s).`,
+      setItems: setOutils,
+      saveEntity: saveOutilEntity,
+    });
   };
 
   const removeOutil = (index: number) => {
-    const outilToRemove = outils[index];
+    const outilToRemove = removeInventoryEntity({
+      items: outils,
+      index,
+      setItems: setOutils,
+      deleteEntity: deleteOutilEntity,
+    });
     if (!outilToRemove) return;
 
-    setOutils((previous) =>
-      previous.filter((_, currentIndex) => currentIndex !== index),
-    );
     setPersoOutils((previous) =>
       previous.filter((entry) => entry.outil_id !== outilToRemove.id),
     );
-    deleteOutilEntity(outilToRemove.id);
   };
 
   const addSac = () => {
-    const nextSacId =
-      sacs.reduce((maxId, sac) => Math.max(maxId, Number(sac.id) || 0), 0) + 1;
-
-    const newSac: Sac = createDefaultSac(nextSacId);
-
-    setSacs((previous) => [...previous, newSac]);
-    saveSacEntity(newSac);
+    addInventoryEntity({
+      items: sacs,
+      setItems: setSacs,
+      createItem: createDefaultSac,
+      saveEntity: saveSacEntity,
+    });
   };
 
   const updateSac = (
@@ -441,43 +459,30 @@ export const useInventoryActions = ({
     rawValue: string | number,
     { persist = true }: PersistOptions = {},
   ) => {
-    const sacToUpdate = sacs[index];
-    if (!sacToUpdate) return;
-
-    const nextValue = normalizeSacFieldValue(field, rawValue);
-    if (field === "quantity") {
-      const assignedCount = countAssignedBagsForSac(persoSacs, sacToUpdate.id);
-
-      if (Number(nextValue) < assignedCount) {
-        window.alert(
-          `Impossible de définir une quantité inférieure aux ${assignedCount} sac(s) déjà attribué(s).`,
-        );
-        return;
-      }
-    }
-
-    const nextSac = {
-      ...sacToUpdate,
-      [field]: nextValue,
-    };
-
-    setSacs((previous) =>
-      previous.map((sac, currentIndex) =>
-        currentIndex !== index ? sac : nextSac,
-      ),
-    );
-    if (persist) {
-      saveSacEntity(nextSac);
-    }
+    updateInventoryEntity({
+      items: sacs,
+      index,
+      field,
+      rawValue,
+      persist,
+      normalizeFieldValue: normalizeSacFieldValue,
+      getAssignedCount: (sacId) => countAssignedBagsForSac(persoSacs, sacId),
+      quantityErrorMessage: (assignedCount) =>
+        `Impossible de définir une quantité inférieure aux ${assignedCount} sac(s) déjà attribué(s).`,
+      setItems: setSacs,
+      saveEntity: saveSacEntity,
+    });
   };
 
   const removeSac = (index: number) => {
-    const sacToRemove = sacs[index];
+    const sacToRemove = removeInventoryEntity({
+      items: sacs,
+      index,
+      setItems: setSacs,
+      deleteEntity: deleteSacEntity,
+    });
     if (!sacToRemove) return;
 
-    setSacs((previous) =>
-      previous.filter((_, currentIndex) => currentIndex !== index),
-    );
     setPersoSacs((previous) =>
       previous.filter((entry) => entry.sac_id !== sacToRemove.id),
     );
@@ -492,7 +497,6 @@ export const useInventoryActions = ({
             },
       ),
     );
-    deleteSacEntity(sacToRemove.id);
   };
 
   return {
