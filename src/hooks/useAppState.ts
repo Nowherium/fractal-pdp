@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   buildState,
   defaultCityMultipliers,
@@ -11,6 +11,7 @@ import type {
   CityMultipliers,
   Group,
   Lune,
+  LuneConstruction,
   Outil,
   Perso,
   PersoArme,
@@ -73,6 +74,7 @@ const getRouteStateFromLocation = (): AppRouteState => {
       }
       return { ...defaultRouteState, page: "groupes" };
     }
+    case "chantiers":
     case "timeline":
     case "armes":
     case "outils":
@@ -106,6 +108,8 @@ const getPathForRouteState = ({
       return selectedGroupId ? `/groupes/${selectedGroupId}` : "/groupes";
     case "group":
       return selectedGroupId ? `/groupes/${selectedGroupId}/edit` : "/groupes";
+    case "chantiers":
+      return "/chantiers";
     case "timeline":
       return "/timeline";
     case "armes":
@@ -125,6 +129,7 @@ export const useAppState = () => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [persos, setPersos] = useState<Perso[]>([]);
   const [persoResources, setPersoResources] = useState<PersoResource[]>([]);
+  const [constructions, setConstructions] = useState<LuneConstruction[]>([]);
   const [lunes, setLunes] = useState<Lune[]>([]);
   const [stocks, setStocks] = useState<Stocks>(defaultStocks as Stocks);
   const [cityMultipliers, setCityMultipliers] = useState<CityMultipliers>(
@@ -140,6 +145,7 @@ export const useAppState = () => {
   const initialRouteState = getRouteStateFromLocation();
 
   const [nextPersoId, setNextPersoId] = useState<number>(2);
+  const [currentLune, setCurrentLune] = useState<number>(1);
   const [page, setPage] = useState<AppPage>(initialRouteState.page);
   const [selectedPersoId, setSelectedPersoId] = useState<number | null>(
     initialRouteState.selectedPersoId,
@@ -153,7 +159,7 @@ export const useAppState = () => {
   const [saveStatus, setSaveStatus] = useState<string>("(Chargement...)");
   const [ready, setReady] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string>("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isHydratingRef = useRef<boolean>(true);
   const hasSyncedRouteRef = useRef<boolean>(false);
 
@@ -191,13 +197,14 @@ export const useAppState = () => {
     }
   }, [page, selectedPersoId, selectedGroupId]);
 
-  const setCompleteState = (rawState: unknown) => {
+  const setCompleteState = useCallback((rawState: unknown) => {
     isHydratingRef.current = true;
     const state = buildState(rawState);
 
     setResources(state.resources);
     setPersos(state.persos);
     setPersoResources(state.persoResources);
+    setConstructions(state.constructions);
     setLunes(state.lunes);
     setStocks(state.stocks);
     setCityMultipliers(state.cityMultipliers);
@@ -209,11 +216,14 @@ export const useAppState = () => {
     setSacs(state.sacs);
     setPersoSacs(state.persoSacs);
     setNextPersoId(state.nextPersoId);
+    setCurrentLune(state.currentLune);
 
     window.setTimeout(() => {
       isHydratingRef.current = false;
     }, 0);
-  };
+
+    return state;
+  }, []);
 
   return {
     resources,
@@ -222,6 +232,8 @@ export const useAppState = () => {
     setPersos,
     persoResources,
     setPersoResources,
+    constructions,
+    setConstructions,
     lunes,
     setLunes,
     stocks,
@@ -244,6 +256,8 @@ export const useAppState = () => {
     setPersoSacs,
     nextPersoId,
     setNextPersoId,
+    currentLune,
+    setCurrentLune,
     page,
     setPage,
     selectedPersoId,

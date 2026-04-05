@@ -1,9 +1,22 @@
 import type { Group, Perso } from "../types";
+import { formControlClassName } from "../utils/formUtils";
 import {
   getGroupCapacity,
   getGroupLeader,
   getGroupMembers,
 } from "../utils/groupUtils";
+import Button from "./ui/Button";
+import Field from "./ui/Field";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
+
+const formGridClassName =
+  "mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4";
+const fieldInputClassName = formControlClassName;
+const sectionClassName = "mt-6 space-y-2.5";
+const memberListClassName = "flex flex-col gap-2";
+const memberItemClassName =
+  "flex items-center gap-2 rounded-lg border border-border-soft bg-soft-bg px-3 py-2";
 
 function GroupEditPage({
   group,
@@ -12,29 +25,29 @@ function GroupEditPage({
   handleGroupMembersUpdate,
   closePage,
 }: {
-  group?: Group;
+  group?: Group | undefined;
   persos: Perso[];
   handleGroupUpdate: (
     groupId: number,
     field: string,
-    rawValue: string | number | null,
+    rawValue: string | number | boolean | null,
     options?: { persist?: boolean },
   ) => void;
   handleGroupMembersUpdate: (
     groupId: number,
-    selectedMemberIds: number[],
+    selectedMemberIds: Array<number | string>,
   ) => void;
   closePage: () => void;
 }) {
   if (!group) {
     return (
-      <div className='panel'>
-        <button type='button' onClick={closePage}>
+      <Panel>
+        <Button className='mt-0' variant='muted' onClick={closePage}>
           ← Retour aux Groupes
-        </button>
+        </Button>
         <h2>Groupe introuvable</h2>
         <p>Le groupe sélectionné n'existe plus ou a été supprimé.</p>
-      </div>
+      </Panel>
     );
   }
 
@@ -42,7 +55,7 @@ function GroupEditPage({
   const memberIds = memberPersos.map((perso) => perso.id);
   const leader = getGroupLeader(group, persos);
   const groupCapacity = getGroupCapacity(leader);
-  const isAtCapacity = memberPersos.length >= groupCapacity;
+  const leaderCmd = Number(leader?.cmd ?? 0);
 
   const toggleMember = (persoId: number, checked: boolean) => {
     const nextMemberIds = checked
@@ -52,17 +65,16 @@ function GroupEditPage({
   };
 
   return (
-    <div className='panel'>
-      <button type='button' onClick={closePage}>
+    <Panel>
+      <Button className='mt-0' variant='muted' onClick={closePage}>
         ← Retour aux Groupes
-      </button>
+      </Button>
       <h2>Modifier {group.name || "le groupe"}</h2>
 
-      <div className='perso-form'>
-        <label className='perso-field'>
-          <span className='perso-field-label'>Nom du groupe</span>
+      <div className={formGridClassName}>
+        <Field label='Nom du groupe'>
           <input
-            className='perso-field-input'
+            className={fieldInputClassName}
             type='text'
             value={group.name}
             onChange={(event) =>
@@ -76,12 +88,11 @@ function GroupEditPage({
               })
             }
           />
-        </label>
+        </Field>
 
-        <label className='perso-field'>
-          <span className='perso-field-label'>Chef du groupe</span>
+        <Field label='Chef du groupe'>
           <select
-            className='perso-field-input'
+            className={fieldInputClassName}
             value={group.chef ?? ""}
             onChange={(event) =>
               handleGroupUpdate(
@@ -94,7 +105,22 @@ function GroupEditPage({
             <option value=''>Sélectionner</option>
             {memberPersos.map((perso) => {
               const optionCapacity = getGroupCapacity(perso);
-              const isTooSmall = memberPersos.length > optionCapacity;
+              const optionCmd = Number(perso.cmd ?? 0);
+              let isTooSmall = false;
+
+              if (!group.overrideCapacity) {
+                if (memberPersos.length > optionCapacity) {
+                  isTooSmall = true;
+                  if (
+                    memberPersos.length === 2 &&
+                    optionCmd < 1 &&
+                    memberPersos.some((m) => m.id !== perso.id && m.esclave)
+                  ) {
+                    isTooSmall = false;
+                  }
+                }
+              }
+
               return (
                 <option key={perso.id} value={perso.id} disabled={isTooSmall}>
                   {perso.nom} (cap. {optionCapacity})
@@ -102,30 +128,71 @@ function GroupEditPage({
               );
             })}
           </select>
-        </label>
+        </Field>
+
+        <Field label='Forcer la limite (Override)'>
+          <label className='mt-2 flex cursor-pointer items-center gap-2'>
+            <input
+              type='checkbox'
+              className='h-4 w-4 accent-green-500'
+              checked={!!group.overrideCapacity}
+              onChange={(event) =>
+                handleGroupUpdate(
+                  group.id,
+                  "overrideCapacity",
+                  event.target.checked,
+                  {
+                    persist: true,
+                  },
+                )
+              }
+            />
+            <span className='text-sm text-[#f1f1f1]'>
+              Ignorer la limite de commandement
+            </span>
+          </label>
+        </Field>
       </div>
 
-      <div className='perso-form-section'>
+      <div className={sectionClassName}>
         <h3>Membres du groupe</h3>
-        <p className='info-text'>
+        <InfoText>
           Coche un perso pour l'ajouter à ce groupe. Le décocher le retire du
           groupe et le laisse sans groupe.
           <br />
-          Capacité actuelle: {memberPersos.length}/{groupCapacity} membres
-          (`cmd` du leader + 1).
-        </p>
+          Capacité actuelle: {memberPersos.length}/{groupCapacity} membres (
+          <code className='font-mono'>cmd</code> du leader + 1).
+        </InfoText>
 
         {persos.length === 0 ? (
           <p>Aucun perso disponible.</p>
         ) : (
-          <div className='group-members-list'>
+          <div className={memberListClassName}>
             {persos.map((perso) => {
               const isMember = memberIds.includes(perso.id);
-              const disableCheck = !isMember && isAtCapacity;
+
+              let disableCheck = false;
+              if (!isMember && !group.overrideCapacity) {
+                const hypotheticalSize = memberPersos.length + 1;
+
+                if (hypotheticalSize > groupCapacity) {
+                  disableCheck = true;
+
+                  if (
+                    hypotheticalSize === 2 &&
+                    leaderCmd < 1 &&
+                    perso.esclave
+                  ) {
+                    disableCheck = false;
+                  }
+                }
+              }
+
               return (
-                <label key={perso.id} className='group-member-item'>
+                <label key={perso.id} className={memberItemClassName}>
                   <input
                     type='checkbox'
+                    className='h-4 w-4 cursor-pointer accent-green-500'
                     checked={isMember}
                     disabled={disableCheck}
                     onChange={(event) =>
@@ -133,7 +200,12 @@ function GroupEditPage({
                     }
                   />
                   <span>
-                    {perso.nom} (#{perso.id})
+                    {perso.nom} (#{perso.id}){" "}
+                    {perso.esclave && (
+                      <span className='ml-1 text-xs text-gray-400'>
+                        (Esclave)
+                      </span>
+                    )}
                   </span>
                 </label>
               );
@@ -141,7 +213,7 @@ function GroupEditPage({
           </div>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 

@@ -2,7 +2,12 @@ import type { RefObject } from "react";
 import { resetState, saveState } from "./api";
 import { buildFallbackState, buildState } from "./stateUtils";
 
-export const exportStateData = (state) => {
+type ResetAppDataParams = {
+  setCompleteState: (state: unknown) => void;
+  setSaveStatus: (status: string) => void;
+};
+
+export const exportStateData = (state: unknown) => {
   const data = JSON.stringify(state, null, 2);
   const blob = new Blob([data], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -21,9 +26,11 @@ export const importStateFile = (
   {
     fileInputRef,
     setCompleteState,
+    onSuccess,
   }: {
     fileInputRef: RefObject<HTMLInputElement>;
     setCompleteState: (state: unknown) => void;
+    onSuccess?: () => void;
   },
 ) => {
   const file = event.target.files?.[0];
@@ -44,7 +51,8 @@ export const importStateFile = (
       const importedState = buildState(parsed);
       setCompleteState(importedState);
       await saveState(importedState);
-    } catch (_error) {
+      onSuccess?.();
+    } catch {
       window.alert("Fichier invalide ou corrompu !");
     }
   };
@@ -55,9 +63,10 @@ export const importStateFile = (
   }
 };
 
-export const resetAppData = async ({ setCompleteState, setSaveStatus }) => {
-  if (!window.confirm("Effacer TOUTES les données ?")) return;
-
+export const resetAppData = async ({
+  setCompleteState,
+  setSaveStatus,
+}: ResetAppDataParams) => {
   try {
     const data = await resetState();
     setCompleteState(data);

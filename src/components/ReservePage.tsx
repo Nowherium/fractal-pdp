@@ -1,3 +1,9 @@
+import Field from "./ui/Field";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
+
+import { formControlClassName } from "../utils/formUtils";
+
 import type {
   Arme,
   CityMultipliers,
@@ -10,6 +16,7 @@ import type {
   Stocks,
 } from "../types";
 import { sortResources } from "../utils/resourceOrder";
+import { normalizeStockQuantity } from "../utils/stateUtils";
 
 const formatWeight = (value: number | string | null | undefined) =>
   Number(value ?? 0).toFixed(2);
@@ -24,6 +31,10 @@ const cityBonusFields: Array<{ key: keyof CityMultipliers; label: string }> = [
   { key: "med", label: "💊 Med" },
   { key: "mat", label: "🧱 Mat" },
 ];
+
+const cardGridClassName =
+  "grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3";
+const fieldInputClassName = `${formControlClassName} text-right`;
 
 type ReserveItem = {
   id: number;
@@ -144,7 +155,7 @@ function ReservePage({
     items: ReserveItem[],
     emptyLabel: string,
   ) => (
-    <div style={{ marginTop: "1rem" }}>
+    <div className='mt-4'>
       <h3>{title}</h3>
       {items.length === 0 ? (
         <p>{emptyLabel}</p>
@@ -174,27 +185,19 @@ function ReservePage({
   );
 
   return (
-    <div className='panel'>
+    <Panel>
       <h2>1. Ville</h2>
-      <p className='info-text'>
+      <InfoText>
         La ville applique ici des <strong>multiplicateurs de production</strong>{" "}
         pour tous les persos. <strong>1</strong> = normal, <strong>1.2</strong>{" "}
         = +20 %, <strong>0</strong> = aucune production.
-      </p>
+      </InfoText>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "12px",
-          marginBottom: "1rem",
-        }}
-      >
+      <div className={`${cardGridClassName} mb-4`}>
         {cityBonusFields.map((field) => (
-          <label key={field.key} className='perso-field'>
-            <span className='perso-field-label'>Bonus {field.label}</span>
+          <Field key={field.key} label={`Bonus ${field.label}`}>
             <input
-              className='perso-field-input'
+              className={fieldInputClassName}
               type='number'
               min='0'
               step='0.05'
@@ -203,53 +206,42 @@ function ReservePage({
                 handleCityMultiplierChange(field.key, event.target.value)
               }
             />
-          </label>
+          </Field>
         ))}
       </div>
 
       <h3>Réserve centrale</h3>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "12px",
-        }}
-      >
+      <div className={cardGridClassName}>
         {orderedResources.map((resource) => (
-          <label key={resource.code} className='perso-field'>
-            <span className='perso-field-label'>
-              Stock {resource.code.toUpperCase()}{" "}
-              <span
-                title={getResourceDisplayName(resource)}
-                aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
-                style={{
-                  display: "inline-block",
-                  marginLeft: "0.25rem",
-                  width: "1.1rem",
-                  height: "1.1rem",
-                  lineHeight: "1.1rem",
-                  textAlign: "center",
-                  fontSize: "0.85rem",
-                  cursor: "help",
-                }}
-              >
-                ❔
-              </span>
-            </span>
+          <Field
+            key={resource.code}
+            label={
+              <>
+                Stock {resource.code.toUpperCase()}{" "}
+                <span
+                  title={getResourceDisplayName(resource)}
+                  aria-label={`Nom complet: ${getResourceDisplayName(resource)}`}
+                  className='ml-1 inline-block h-[1.1rem] w-[1.1rem] cursor-help text-center text-[0.85rem] leading-[1.1rem]'
+                >
+                  ❔
+                </span>
+              </>
+            }
+          >
             <input
-              className='perso-field-input'
+              className={fieldInputClassName}
               type='number'
-              value={stocks[resource.code] ?? 0}
-              step='1'
+              value={normalizeStockQuantity(stocks[resource.code] ?? 0)}
+              step='0.1'
               onChange={(event) =>
                 handleStockChange(resource.code, event.target.value)
               }
             />
-          </label>
+          </Field>
         ))}
       </div>
 
-      <p className='info-text' style={{ marginTop: "1rem" }}>
+      <InfoText className='mt-4'>
         <strong>Poids total des ressources :</strong>{" "}
         {formatWeight(totalResourcesWeight)}
         <br />
@@ -258,7 +250,7 @@ function ReservePage({
         <br />
         <strong>Poids total de la réserve centrale :</strong>{" "}
         {formatWeight(totalReserveWeight)}
-      </p>
+      </InfoText>
 
       {renderReserveItems(
         "Armes en réserve",
@@ -275,7 +267,7 @@ function ReservePage({
         reserveSacs,
         "Aucun sac en réserve.",
       )}
-    </div>
+    </Panel>
   );
 }
 

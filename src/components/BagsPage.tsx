@@ -1,7 +1,13 @@
 import type { Sac } from "../types";
+import { confirmAction } from "../utils/confirmAction";
+import { formControlClassName, toFormInputValue } from "../utils/formUtils";
+import type { SacEditableField } from "../utils/inventoryUtils";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 const bagFields: Array<{
-  key: string;
+  key: SacEditableField;
   label: string;
   type: "text" | "number";
   step?: string;
@@ -10,12 +16,9 @@ const bagFields: Array<{
   { key: "pv", label: "PV", type: "number", step: "1" },
   { key: "pvmax", label: "PV Max", type: "number", step: "1" },
   { key: "poids", label: "Poids", type: "number", step: "0.1" },
-  { key: "capacite", label: "Capacité", type: "number", step: "0.1" },
+  { key: "capacite", label: "Capacité", type: "number", step: "1" },
   { key: "quantity", label: "Quantité", type: "number", step: "1" },
 ];
-
-const toInputValue = (value: unknown, fallback: string | number = "") =>
-  typeof value === "string" || typeof value === "number" ? value : fallback;
 
 function BagsPage({
   sacs,
@@ -27,20 +30,20 @@ function BagsPage({
   addSac: () => void;
   updateSac: (
     index: number,
-    field: string,
+    field: SacEditableField,
     rawValue: string | number,
     options?: { persist?: boolean },
   ) => void;
   removeSac: (index: number) => void;
 }) {
   return (
-    <div className='panel'>
+    <Panel>
       <h2>7. Administration des sacs</h2>
-      <p className='info-text'>
+      <InfoText>
         Gère ici les sacs disponibles pour les personnages. Un perso peut en
         porter plusieurs, un seul sac équipé ajoute sa capacité au poids max, et
         le poids de chaque sac porté compte dans le poids total.
-      </p>
+      </InfoText>
 
       {sacs.length === 0 ? (
         <p>Aucun sac défini pour le moment.</p>
@@ -63,11 +66,11 @@ function BagsPage({
                 {bagFields.map((field) => (
                   <td key={field.key}>
                     <input
-                      className='perso-field-input'
+                      className={`${formControlClassName} ${field.type === "number" ? "text-right" : ""}`}
                       type={field.type}
                       step={field.step}
                       min={field.key === "name" ? undefined : 0}
-                      value={toInputValue(sac[field.key])}
+                      value={toFormInputValue(sac[field.key])}
                       onChange={(event) =>
                         updateSac(
                           index,
@@ -90,13 +93,19 @@ function BagsPage({
                   </td>
                 ))}
                 <td>
-                  <button
-                    className='btn-del'
-                    type='button'
-                    onClick={() => removeSac(index)}
+                  <Button
+                    className='mt-0'
+                    size='sm'
+                    variant='danger'
+                    onClick={() =>
+                      confirmAction(
+                        `Supprimer le sac ${sac.name || "sélectionné"} ?`,
+                        () => removeSac(index),
+                      )
+                    }
                   >
                     Supprimer
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -104,10 +113,10 @@ function BagsPage({
         </table>
       )}
 
-      <button className='btn-add' type='button' onClick={addSac}>
+      <Button className='mt-3' variant='success' onClick={addSac}>
         + Ajouter un sac
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 

@@ -1,6 +1,12 @@
 import type { Dispatch, SetStateAction } from "react";
 
-import type { Lune, PersoResource, Resource, Stocks } from "../types";
+import type {
+  Lune,
+  LuneConstruction,
+  PersoResource,
+  Resource,
+  Stocks,
+} from "../types";
 
 const normalizeResourceCode = (value: string | number | null | undefined) =>
   String(value ?? "")
@@ -20,6 +26,7 @@ export const useResourceActions = ({
   resources,
   stocks,
   persoResources,
+  constructions,
   lunes,
   setResources,
   setStocks,
@@ -29,6 +36,7 @@ export const useResourceActions = ({
   resources: Resource[];
   stocks: Stocks;
   persoResources: PersoResource[];
+  constructions: LuneConstruction[];
   lunes: Lune[];
   setResources: Dispatch<SetStateAction<Resource[]>>;
   setStocks: Dispatch<SetStateAction<Stocks>>;
@@ -111,6 +119,18 @@ export const useResourceActions = ({
       };
     }
 
+    const isUsedByConstruction = constructions.some(
+      (construction) =>
+        String(construction.resourceCode ?? "").toLowerCase() === resourceCode,
+    );
+
+    if (isUsedByConstruction) {
+      return {
+        canDelete: false,
+        reason: "Encore utilisée par un chantier global.",
+      };
+    }
+
     return {
       canDelete: true,
       reason: "Suppression autorisée.",
@@ -139,7 +159,7 @@ export const useResourceActions = ({
           String(resource.code ?? "").toLowerCase() === nextCode,
       )
     ) {
-      window.alert(`Le code ressource \"${nextCode}\" est déjà utilisé.`);
+      window.alert(`Le code ressource "${nextCode}" est déjà utilisé.`);
       return;
     }
 
@@ -185,13 +205,13 @@ export const useResourceActions = ({
 
     if (!guard.canDelete) {
       window.alert(
-        `Impossible de supprimer \"${resourceCode}\" : ${guard.reason}`,
+        `Impossible de supprimer "${resourceCode}" : ${guard.reason}`,
       );
       return;
     }
 
     const confirmed = window.confirm(
-      `Supprimer définitivement la ressource \"${resourceToRemove.name || resourceCode}\" ?`,
+      `Supprimer définitivement la ressource "${resourceToRemove.name || resourceCode}" ?`,
     );
     if (!confirmed) return;
 

@@ -1,20 +1,69 @@
+import type { Dispatch, SetStateAction } from "react";
+import type {
+  AppPage,
+  Group,
+  Lune,
+  PersistOptions,
+  Perso,
+  PersoResource,
+  Resource,
+  Sac,
+  Stocks,
+} from "../types";
 import {
   recalculateGroups,
   validateGroupCapacities,
 } from "../utils/groupUtils";
-import { defaultRation, normalizePersoFieldValue } from "../utils/stateUtils";
+import { createDefaultPerso } from "../utils/entityDefaults";
+import {
+  defaultRation,
+  normalizePersoFieldValue,
+  normalizeStockQuantity,
+} from "../utils/stateUtils";
+
+interface UsePersoActionsParams {
+  persos: Perso[];
+  groups: Group[];
+  resources: Resource[];
+  sacs: Sac[];
+  stocks: Stocks;
+  exchangeCityStocksWithPersos: boolean;
+  persoResources: PersoResource[];
+  lunes: Lune[];
+  nextPersoId: number;
+  setPersos: Dispatch<SetStateAction<Perso[]>>;
+  setGroups: Dispatch<SetStateAction<Group[]>>;
+  setPersoResources: Dispatch<SetStateAction<PersoResource[]>>;
+  setStocks: Dispatch<SetStateAction<Stocks>>;
+  setLunes: Dispatch<SetStateAction<Lune[]>>;
+  setPage: Dispatch<SetStateAction<AppPage>>;
+  setSelectedPersoId: Dispatch<SetStateAction<number | null>>;
+  setOpenOverrides: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setNextPersoId: Dispatch<SetStateAction<number>>;
+  savePersoEntity: (perso: Perso) => void;
+  deletePersoEntity: (persoId: number) => void;
+  savePersoResourcesEntity: (
+    persoId: number,
+    nextPersoResources: PersoResource[],
+  ) => void;
+  saveStockEntity: (code: string, quantity: number) => void;
+  saveLuneEntity: (lune: Lune) => void;
+}
 
 export const usePersoActions = ({
   persos,
   groups,
   resources,
   sacs,
+  stocks,
+  exchangeCityStocksWithPersos,
   persoResources,
   lunes,
   nextPersoId,
   setPersos,
   setGroups,
   setPersoResources,
+  setStocks,
   setLunes,
   setPage,
   setSelectedPersoId,
@@ -23,9 +72,10 @@ export const usePersoActions = ({
   savePersoEntity,
   deletePersoEntity,
   savePersoResourcesEntity,
+  saveStockEntity,
   saveLuneEntity,
-}) => {
-  const openPersoPage = (persoId) => {
+}: UsePersoActionsParams) => {
+  const openPersoPage = (persoId: number) => {
     setSelectedPersoId(persoId);
     setPage("perso");
   };
@@ -36,10 +86,10 @@ export const usePersoActions = ({
   };
 
   const handlePersoUpdateById = (
-    persoId,
-    field,
-    rawValue,
-    { persist = true } = {},
+    persoId: number,
+    field: string,
+    rawValue: string | number | boolean | null,
+    { persist = true }: PersistOptions = {},
   ) => {
     const nextPersos = persos.map((perso) => {
       if (perso.id !== persoId) {
@@ -80,8 +130,49 @@ export const usePersoActions = ({
     }
   };
 
-  const handlePersoResourceUpdate = (persoId, resourceId, rawValue) => {
-    const quantity = Math.max(0, Number(rawValue) || 0);
+  const handlePersoResourceUpdate = (
+    persoId: number,
+    resourceId: number,
+    rawValue: string | number,
+  ) => {
+    const requestedQuantity = normalizeStockQuantity(rawValue);
+    const currentQuantity = normalizeStockQuantity(
+      persoResources.find(
+        (entry) =>
+          entry.perso_id === persoId && entry.resource_id === resourceId,
+      )?.quantity ?? 0,
+    );
+    const resourceCode = String(
+      resources.find((resource) => resource.id === resourceId)?.code ?? "",
+    )
+      .trim()
+      .toLowerCase();
+    const currentCityStock = normalizeStockQuantity(stocks[resourceCode] ?? 0);
+
+    let quantity = requestedQuantity;
+    let nextStocks = stocks;
+
+    if (exchangeCityStocksWithPersos && resourceCode) {
+      const delta = requestedQuantity - currentQuantity;
+
+      if (delta > 0) {
+        const transferable = Math.min(delta, currentCityStock);
+        quantity = normalizeStockQuantity(currentQuantity + transferable);
+        nextStocks = {
+          ...stocks,
+          [resourceCode]: normalizeStockQuantity(
+            currentCityStock - transferable,
+          ),
+        };
+      } else if (delta < 0) {
+        nextStocks = {
+          ...stocks,
+          [resourceCode]: normalizeStockQuantity(
+            currentCityStock + Math.abs(delta),
+          ),
+        };
+      }
+    }
 
     const remainingEntries = persoResources.filter(
       (entry) =>
@@ -96,7 +187,7 @@ export const usePersoActions = ({
             {
               perso_id: persoId,
               resource_id: resourceId,
-              quantity,
+              quantity: normalizeStockQuantity(quantity),
             },
           ].sort(
             (left, right) =>
@@ -109,25 +200,19 @@ export const usePersoActions = ({
       persoId,
       nextPersoResources.filter((entry) => entry.perso_id === persoId),
     );
+
+    if (
+      exchangeCityStocksWithPersos &&
+      resourceCode &&
+      Number(nextStocks[resourceCode] ?? 0) !== currentCityStock
+    ) {
+      setStocks(nextStocks);
+      saveStockEntity(resourceCode, Number(nextStocks[resourceCode] ?? 0));
+    }
   };
 
   const addPerso = () => {
-    const newPerso = {
-      id: nextPersoId,
-      nom: "Nouveau",
-      pvmax: 10,
-      pv: 10,
-      capEau: 1,
-      capNrt: 1,
-      capMed: 0,
-      capMat: 1,
-      capart: 0,
-      cmd: 0,
-      combat: 0,
-      poidsMax: 20,
-      poidsMaxEffectif: 20,
-      groupId: groups[0]?.id ?? null,
-    };
+    const newPerso: Perso = createDefaultPerso(nextPersoId);
 
     setPersos((previous) => [...previous, newPerso]);
     setPersoResources((previous) => [
@@ -155,7 +240,7 @@ export const usePersoActions = ({
     nextLunes.forEach((lune) => saveLuneEntity(lune));
   };
 
-  const removePerso = (index) => {
+  const removePerso = (index: number) => {
     const persoToRemove = persos[index];
     if (!persoToRemove) return;
 

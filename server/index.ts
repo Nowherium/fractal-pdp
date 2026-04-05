@@ -1,4 +1,5 @@
 import express from "express";
+import type { RequestHandler, Response } from "express";
 import cors from "cors";
 import {
   initDb,
@@ -6,6 +7,8 @@ import {
   insertState,
   updateStock,
   updateCityMultipliers,
+  updateCurrentLune,
+  updateConstructions,
   upsertResource,
   deleteResource,
   upsertLune,
@@ -18,6 +21,7 @@ import {
   replacePersoSacs,
   upsertGroup,
   replaceGroupMembers,
+  deleteGroup,
   upsertArme,
   deleteArme,
   upsertOutil,
@@ -27,9 +31,11 @@ import {
   defaultStocks,
   defaultPersos,
   defaultRation,
-} from "./db.js";
+} from "./db";
 
-const PORT = process.env.PORT || 3000;
+type DbAction = () => Promise<void>;
+
+const PORT = Number(process.env["PORT"]) || 3000;
 const app = express();
 
 app.use(cors());
@@ -51,7 +57,7 @@ app.get("/api/state", async (_req, res) => {
   }
 });
 
-const ensureNumericId = (res, rawId) => {
+const ensureNumericId = (res: Response, rawId: unknown): number | null => {
   const id = Number(rawId);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "Identifiant invalide" });
@@ -60,7 +66,7 @@ const ensureNumericId = (res, rawId) => {
   return id;
 };
 
-const ensureStockCode = (res, rawCode) => {
+const ensureStockCode = (res: Response, rawCode: unknown): string | null => {
   const stockCode = String(rawCode || "")
     .trim()
     .toLowerCase();
@@ -73,19 +79,23 @@ const ensureStockCode = (res, rawCode) => {
   return stockCode;
 };
 
-const runDbAction = async (res, action, fallbackError) => {
+const runDbAction = async (
+  res: Response,
+  action: DbAction,
+  fallbackError: string,
+): Promise<void> => {
   try {
     await action();
     res.json({ ok: true });
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      error: error.message || fallbackError,
+      error: error instanceof Error ? error.message : fallbackError,
     });
   }
 };
 
-const registerPartialRoute = (path, handler) => {
+const registerPartialRoute = (path: string, handler: RequestHandler): void => {
   app.patch(path, handler);
   app.put(path, handler);
 };
@@ -104,7 +114,7 @@ app.put("/api/state", async (req, res) => {
 });
 
 registerPartialRoute("/api/stocks/:code", async (req, res) => {
-  const stockCode = ensureStockCode(res, req.params.code);
+  const stockCode = ensureStockCode(res, req.params["code"]);
   if (stockCode === null) return;
 
   await runDbAction(
@@ -122,8 +132,24 @@ registerPartialRoute("/api/city-multipliers", async (req, res) => {
   );
 });
 
+registerPartialRoute("/api/current-lune", async (req, res) => {
+  await runDbAction(
+    res,
+    () => updateCurrentLune(req.body?.currentLune),
+    "Impossible de sauvegarder la lune courante",
+  );
+});
+
+registerPartialRoute("/api/constructions", async (req, res) => {
+  await runDbAction(
+    res,
+    () => updateConstructions(req.body?.constructions || []),
+    "Impossible de sauvegarder les chantiers",
+  );
+});
+
 registerPartialRoute("/api/resources/:id", async (req, res) => {
-  const resourceId = ensureNumericId(res, req.params.id);
+  const resourceId = ensureNumericId(res, req.params["id"]);
   if (resourceId === null) return;
 
   await runDbAction(
@@ -134,7 +160,7 @@ registerPartialRoute("/api/resources/:id", async (req, res) => {
 });
 
 app.delete("/api/resources/:id", async (req, res) => {
-  const resourceId = ensureNumericId(res, req.params.id);
+  const resourceId = ensureNumericId(res, req.params["id"]);
   if (resourceId === null) return;
 
   await runDbAction(
@@ -145,7 +171,7 @@ app.delete("/api/resources/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -156,7 +182,7 @@ registerPartialRoute("/api/persos/:id", async (req, res) => {
 });
 
 app.delete("/api/persos/:id", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -167,7 +193,7 @@ app.delete("/api/persos/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id/resources", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -178,7 +204,7 @@ registerPartialRoute("/api/persos/:id/resources", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id/armes", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -189,7 +215,7 @@ registerPartialRoute("/api/persos/:id/armes", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id/outils", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -200,7 +226,7 @@ registerPartialRoute("/api/persos/:id/outils", async (req, res) => {
 });
 
 registerPartialRoute("/api/persos/:id/sacs", async (req, res) => {
-  const persoId = ensureNumericId(res, req.params.id);
+  const persoId = ensureNumericId(res, req.params["id"]);
   if (persoId === null) return;
 
   await runDbAction(
@@ -211,7 +237,7 @@ registerPartialRoute("/api/persos/:id/sacs", async (req, res) => {
 });
 
 registerPartialRoute("/api/groups/:id", async (req, res) => {
-  const groupId = ensureNumericId(res, req.params.id);
+  const groupId = ensureNumericId(res, req.params["id"]);
   if (groupId === null) return;
 
   await runDbAction(
@@ -221,8 +247,19 @@ registerPartialRoute("/api/groups/:id", async (req, res) => {
   );
 });
 
+app.delete("/api/groups/:id", async (req, res) => {
+  const groupId = ensureNumericId(res, req.params["id"]);
+  if (groupId === null) return;
+
+  await runDbAction(
+    res,
+    () => deleteGroup(groupId),
+    "Impossible de supprimer le groupe",
+  );
+});
+
 registerPartialRoute("/api/groups/:id/members", async (req, res) => {
-  const groupId = ensureNumericId(res, req.params.id);
+  const groupId = ensureNumericId(res, req.params["id"]);
   if (groupId === null) return;
 
   await runDbAction(
@@ -233,7 +270,7 @@ registerPartialRoute("/api/groups/:id/members", async (req, res) => {
 });
 
 registerPartialRoute("/api/lunes/:id", async (req, res) => {
-  const luneId = ensureNumericId(res, req.params.id);
+  const luneId = ensureNumericId(res, req.params["id"]);
   if (luneId === null) return;
 
   await runDbAction(
@@ -244,7 +281,7 @@ registerPartialRoute("/api/lunes/:id", async (req, res) => {
 });
 
 app.delete("/api/lunes/:id", async (req, res) => {
-  const luneId = ensureNumericId(res, req.params.id);
+  const luneId = ensureNumericId(res, req.params["id"]);
   if (luneId === null) return;
 
   await runDbAction(
@@ -255,7 +292,7 @@ app.delete("/api/lunes/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/armes/:id", async (req, res) => {
-  const armeId = ensureNumericId(res, req.params.id);
+  const armeId = ensureNumericId(res, req.params["id"]);
   if (armeId === null) return;
 
   await runDbAction(
@@ -266,7 +303,7 @@ registerPartialRoute("/api/armes/:id", async (req, res) => {
 });
 
 app.delete("/api/armes/:id", async (req, res) => {
-  const armeId = ensureNumericId(res, req.params.id);
+  const armeId = ensureNumericId(res, req.params["id"]);
   if (armeId === null) return;
 
   await runDbAction(
@@ -277,7 +314,7 @@ app.delete("/api/armes/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/outils/:id", async (req, res) => {
-  const outilId = ensureNumericId(res, req.params.id);
+  const outilId = ensureNumericId(res, req.params["id"]);
   if (outilId === null) return;
 
   await runDbAction(
@@ -288,7 +325,7 @@ registerPartialRoute("/api/outils/:id", async (req, res) => {
 });
 
 app.delete("/api/outils/:id", async (req, res) => {
-  const outilId = ensureNumericId(res, req.params.id);
+  const outilId = ensureNumericId(res, req.params["id"]);
   if (outilId === null) return;
 
   await runDbAction(
@@ -299,7 +336,7 @@ app.delete("/api/outils/:id", async (req, res) => {
 });
 
 registerPartialRoute("/api/sacs/:id", async (req, res) => {
-  const sacId = ensureNumericId(res, req.params.id);
+  const sacId = ensureNumericId(res, req.params["id"]);
   if (sacId === null) return;
 
   await runDbAction(
@@ -310,7 +347,7 @@ registerPartialRoute("/api/sacs/:id", async (req, res) => {
 });
 
 app.delete("/api/sacs/:id", async (req, res) => {
-  const sacId = ensureNumericId(res, req.params.id);
+  const sacId = ensureNumericId(res, req.params["id"]);
   if (sacId === null) return;
 
   await runDbAction(
@@ -322,9 +359,11 @@ app.delete("/api/sacs/:id", async (req, res) => {
 
 app.post("/api/reset", async (_req, res) => {
   try {
-    const defaultLuneId = Date.now();
+    const defaultLuneId = 1;
     const defaultState = {
       stocks: defaultStocks,
+      currentLune: 1,
+      constructions: [],
       persos: defaultPersos,
       persoResources: [],
       armes: [],
@@ -336,11 +375,11 @@ app.post("/api/reset", async (_req, res) => {
       lunes: [
         {
           id: defaultLuneId,
-          coutMat: 0,
           rations: Object.fromEntries(
             defaultPersos.map((p) => [p.id, defaultRation()]),
           ),
           overrides: {},
+          constructions: [],
         },
       ],
     };
@@ -356,7 +395,7 @@ app.post("/api/reset", async (_req, res) => {
   }
 });
 
-const start = async () => {
+const start = async (): Promise<void> => {
   try {
     await initDb();
     app.listen(PORT, () => {

@@ -6,8 +6,11 @@
 https://fractal.dev.local {
   tls internal
 
-  route {
-    reverse_proxy /api/* backend:3000
-    reverse_proxy /* frontend:5173
+  handle /api/* {
+    reverse_proxy backend:3000
+  }
+
+  handle {
+    reverse_proxy frontend:5173
   }
 }

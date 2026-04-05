@@ -1,16 +1,56 @@
 import { useEffect } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type {
   Arme,
   Outil,
+  Perso,
+  PersoArme,
+  PersoOutil,
   PersoResource,
   PersoSac,
-  PersoOutil,
-  PersoArme,
   Resource,
   Sac,
+  ToolSpecialite,
 } from "../types";
+import { normalizeProductionCapacity } from "../utils/stateUtils";
+
+type ToolMultiplierBySpecialite = Record<ToolSpecialite, number>;
+
+const defaultToolMultipliers: ToolMultiplierBySpecialite = {
+  eau: 1,
+  nrt: 1,
+  mat: 1,
+  art: 1,
+};
+
+const normalizeToolSpecialite = (
+  specialite: Outil["specialite"],
+): ToolSpecialite => {
+  if (specialite === "nrt" || specialite === "mat" || specialite === "art") {
+    return specialite;
+  }
+
+  return "eau";
+};
+
+const sumItemWeights = <T extends { poids?: number }>(items: T[]): number =>
+  items.reduce((total, item) => total + Number(item.poids ?? 0), 0);
+
+interface UseDerivedPersoStateParams {
+  persos: Perso[];
+  resources: Resource[];
+  armes: Arme[];
+  persoArmes: PersoArme[];
+  outils: Outil[];
+  persoOutils: PersoOutil[];
+  sacs: Sac[];
+  persoSacs: PersoSac[];
+  persoResources: PersoResource[];
+  setPersos: Dispatch<SetStateAction<Perso[]>>;
+}
 
 export const useDerivedPersoState = ({
+  persos,
   resources,
   armes,
   persoArmes,
@@ -20,24 +60,34 @@ export const useDerivedPersoState = ({
   persoSacs,
   persoResources,
   setPersos,
-}) => {
+}: UseDerivedPersoStateParams) => {
   useEffect(() => {
-    const resourcesById = new Map(
+    if (persos.length === 0) {
+      return;
+    }
+    const resourcesById = new Map<number, Resource>(
       resources.map((resource) => [resource.id, resource]),
     );
-    const armesById = new Map(armes.map((arme) => [arme.id, arme]));
-    const outilsById = new Map(outils.map((outil) => [outil.id, outil]));
-    const sacsById = new Map(sacs.map((sac) => [sac.id, sac]));
+    const armesById = new Map<number, Arme>(
+      armes.map((arme) => [arme.id, arme]),
+    );
+    const outilsById = new Map<number, Outil>(
+      outils.map((outil) => [outil.id, outil]),
+    );
+    const sacsById = new Map<number, Sac>(sacs.map((sac) => [sac.id, sac]));
 
-    setPersos((previous) =>
-      previous.map((perso) => {
+    setPersos((previous) => {
+      let hasChanges = false;
+
+      const nextPersos = previous.map((perso) => {
         const equippedEntry = persoArmes.find(
           (entry) => entry.perso_id === perso.id && entry.equipee,
         );
         const nextEquippedWeaponId = equippedEntry?.arme_id ?? null;
-        const equippedArme = armesById.get(nextEquippedWeaponId) as
-          | Arme
-          | undefined;
+        const equippedArme =
+          nextEquippedWeaponId === null
+            ? undefined
+            : armesById.get(nextEquippedWeaponId);
         const nextCombatEffectif =
           nextEquippedWeaponId === null
             ? Number(perso.combat ?? 0)
@@ -47,31 +97,32 @@ export const useDerivedPersoState = ({
           (entry) => entry.perso_id === perso.id && entry.equipe,
         );
         const nextEquippedBagId = equippedBagEntry?.sac_id ?? null;
-        const equippedSac = sacsById.get(nextEquippedBagId) as Sac | undefined;
+        const equippedSac =
+          nextEquippedBagId === null
+            ? undefined
+            : sacsById.get(nextEquippedBagId);
         const nextPoidsMaxEffectif =
           Number(perso.poidsMax ?? 20) + Number(equippedSac?.capacite ?? 0);
 
         const carriedWeapons = persoArmes
           .filter((entry) => entry.perso_id === perso.id)
           .map((entry) => armesById.get(entry.arme_id))
-          .filter(Boolean);
+          .filter((arme): arme is Arme => Boolean(arme));
 
         const carriedTools = persoOutils
           .filter((entry) => entry.perso_id === perso.id)
           .map((entry) => outilsById.get(entry.outil_id))
-          .filter(Boolean);
+          .filter((outil): outil is Outil => Boolean(outil));
 
         const carriedBags = persoSacs
           .filter((entry) => entry.perso_id === perso.id)
           .map((entry) => sacsById.get(entry.sac_id))
-          .filter(Boolean);
+          .filter((sac): sac is Sac => Boolean(sac));
 
         const carriedResourcesWeight = persoResources
           .filter((entry) => entry.perso_id === perso.id)
           .reduce((total, entry) => {
-            const resource = resourcesById.get(entry.resource_id) as
-              | Resource
-              | undefined;
+            const resource = resourcesById.get(entry.resource_id);
             const unitWeight = resource?.code === "crd" ? 0 : 1;
             return (
               total +
@@ -79,37 +130,39 @@ export const useDerivedPersoState = ({
             );
           }, 0);
 
-        const multiplierBySpecialite = carriedTools.reduce(
-          (acc, outil) => ({
-            ...acc,
-            [outil.specialite]:
-              Number(acc[outil.specialite] ?? 1) * Number(outil.bonus ?? 1),
-          }),
-          { eau: 1, nrt: 1, mat: 1, art: 1 },
-        );
+        const multiplierBySpecialite =
+          carriedTools.reduce<ToolMultiplierBySpecialite>(
+            (acc, outil) => {
+              const specialite = normalizeToolSpecialite(outil.specialite);
 
-        const nextCapEauEffectif =
-          Number(perso.capEau ?? 0) * Number(multiplierBySpecialite.eau ?? 1);
-        const nextCapNrtEffectif =
-          Number(perso.capNrt ?? 0) * Number(multiplierBySpecialite.nrt ?? 1);
-        const nextCapMedEffectif = Number(perso.capMed ?? 0);
-        const nextCapMatEffectif =
-          Number(perso.capMat ?? 0) * Number(multiplierBySpecialite.mat ?? 1);
-        const nextCapArtEffectif =
-          Number(perso.capart ?? 0) * Number(multiplierBySpecialite.art ?? 1);
+              return {
+                ...acc,
+                [specialite]:
+                  Number(acc[specialite] ?? 1) * Number(outil.bonus ?? 1),
+              };
+            },
+            { ...defaultToolMultipliers },
+          );
+
+        const nextCapEauEffectif = normalizeProductionCapacity(
+          Number(perso.capEau ?? 0) * Number(multiplierBySpecialite.eau ?? 1),
+        );
+        const nextCapNrtEffectif = normalizeProductionCapacity(
+          Number(perso.capNrt ?? 0) * Number(multiplierBySpecialite.nrt ?? 1),
+        );
+        const nextCapMedEffectif = normalizeProductionCapacity(
+          Number(perso.capMed ?? 0),
+        );
+        const nextCapMatEffectif = normalizeProductionCapacity(
+          Number(perso.capMat ?? 0) * Number(multiplierBySpecialite.mat ?? 1),
+        );
+        const nextCapArtEffectif = normalizeProductionCapacity(
+          Number(perso.capart ?? 0) * Number(multiplierBySpecialite.art ?? 1),
+        );
         const nextPoidsTotal =
-          carriedWeapons.reduce(
-            (total, arme) => total + Number(arme?.poids ?? 0),
-            0,
-          ) +
-          carriedTools.reduce(
-            (total, outil) => total + Number(outil?.poids ?? 0),
-            0,
-          ) +
-          carriedBags.reduce(
-            (total, sac) => total + Number(sac?.poids ?? 0),
-            0,
-          ) +
+          sumItemWeights(carriedWeapons) +
+          sumItemWeights(carriedTools) +
+          sumItemWeights(carriedBags) +
           carriedResourcesWeight;
 
         if (
@@ -128,6 +181,8 @@ export const useDerivedPersoState = ({
           return perso;
         }
 
+        hasChanges = true;
+
         return {
           ...perso,
           equippedWeaponId: nextEquippedWeaponId,
@@ -141,9 +196,12 @@ export const useDerivedPersoState = ({
           poidsMaxEffectif: nextPoidsMaxEffectif,
           poidsTotal: nextPoidsTotal,
         };
-      }),
-    );
+      });
+
+      return hasChanges ? nextPersos : previous;
+    });
   }, [
+    persos,
     resources,
     armes,
     persoArmes,

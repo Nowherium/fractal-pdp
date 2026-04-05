@@ -1,20 +1,22 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import SaveBar from "./components/SaveBar";
 import PageTabs from "./components/PageTabs";
-import ReservePage from "./components/ReservePage";
-import ResourcesPage from "./components/ResourcesPage";
-import EffectifPage from "./components/EffectifPage";
-import PersoPage from "./components/PersoPage";
-import GroupPage from "./components/GroupPage";
-import GroupEditPage from "./components/GroupEditPage";
-import GroupViewPage from "./components/GroupViewPage";
-import TimelinePage from "./components/TimelinePage";
-import WeaponsPage from "./components/WeaponsPage";
-import ToolsPage from "./components/ToolsPage";
-import BagsPage from "./components/BagsPage";
-import { defaultRation } from "./utils/stateUtils";
-import { simulateTimeline } from "./utils/timelineUtils";
+import AppPageContent from "./components/AppPageContent";
+import ToastViewport from "./components/ui/ToastViewport";
+import ExchangeModeToggle from "./components/shared/ExchangeModeToggle";
+import TimelineControls from "./components/TimelineControls";
+import {
+  buildConstructionProgressById,
+  createLune,
+  defaultRation,
+  getPlacedConstructionIdsForLune,
+  normalizeConstructionPlacements,
+  normalizeCurrentLune,
+  normalizeStockQuantity,
+  syncLuneConstructionPlacements,
+} from "./utils/stateUtils";
+import { simulateTimeline } from "./utils/timelineSimulation";
 import {
   exportStateData,
   importStateFile,
@@ -26,6 +28,8 @@ import {
 } from "./hooks/useAppPersistence";
 import { useAppState } from "./hooks/useAppState";
 import { useDerivedPersoState } from "./hooks/useDerivedPersoState";
+import { useAdvanceTurn } from "./hooks/useAdvanceTurn";
+import { useAppActionToasts } from "./hooks/useAppActionToasts";
 import { useGroupActions } from "./hooks/useGroupActions";
 import { useInventoryActions } from "./hooks/useInventoryActions";
 import { usePersoActions } from "./hooks/usePersoActions";
@@ -41,6 +45,8 @@ function App() {
     setPersos,
     persoResources,
     setPersoResources,
+    constructions,
+    setConstructions,
     lunes,
     setLunes,
     stocks,
@@ -63,6 +69,8 @@ function App() {
     setPersoSacs,
     nextPersoId,
     setNextPersoId,
+    currentLune,
+    setCurrentLune,
     page,
     setPage,
     selectedPersoId,
@@ -91,12 +99,15 @@ function App() {
 
   const {
     saveCityMultipliersEntity,
+    saveCurrentLuneEntity,
+    saveConstructionsEntity,
     saveResourceEntity,
     deleteResourceEntity,
     savePersoEntity,
     deletePersoEntity,
     savePersoResourcesEntity,
     saveGroupEntity,
+    deleteGroupEntity,
     saveGroupMembersEntity,
     saveArmeEntity,
     deleteArmeEntity,
@@ -117,6 +128,7 @@ function App() {
   });
 
   useDerivedPersoState({
+    persos,
     resources,
     armes,
     persoArmes,
@@ -128,8 +140,57 @@ function App() {
     setPersos,
   });
 
+  const [visiblePastLunes, setVisiblePastLunes] = useState<number>(0);
+  const [exchangeCityStocksWithPersos, setExchangeCityStocksWithPersos] =
+    useState(false);
+  const [showEffectifStocks, setShowEffectifStocks] = useState(false);
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string }>>(
+    [],
+  );
+
+  const showToast = (message: string) => {
+    const id = Date.now() + Math.random();
+    setToasts((previous) => [...previous, { id, message }]);
+    window.setTimeout(() => {
+      setToasts((previous) => previous.filter((toast) => toast.id !== id));
+    }, 2600);
+  };
+
+  useEffect(() => {
+    const targetCurrentLune = Math.max(1, Number(currentLune ?? 1));
+    const maxLuneId = lunes.reduce(
+      (maxValue, lune) => Math.max(maxValue, Number(lune.id) || 0),
+      0,
+    );
+
+    if (maxLuneId >= targetCurrentLune) {
+      return;
+    }
+
+    const nextLunes = [...lunes];
+
+    for (let luneId = maxLuneId + 1; luneId <= targetCurrentLune; luneId += 1) {
+      const inheritedPlacedConstructionIds = getPlacedConstructionIdsForLune(
+        nextLunes[nextLunes.length - 1],
+      ).filter((id) => constructions.some((item) => item.id === id));
+
+      const newLune = syncLuneConstructionPlacements({
+        ...createLune(persos, luneId),
+        constructionPlacements: normalizeConstructionPlacements(
+          inheritedPlacedConstructionIds,
+          luneId,
+        ),
+      });
+
+      nextLunes.push(newLune);
+      saveLuneEntity(newLune);
+    }
+
+    setLunes(nextLunes);
+  }, [currentLune, lunes, persos, constructions, setLunes, saveLuneEntity]);
+
   const handleStockChange = (field: string, rawValue: string | number) => {
-    const value = Number(rawValue) || 0;
+    const value = normalizeStockQuantity(rawValue);
     setStocks((previous: Record<string, number>) => ({
       ...previous,
       [field]: value,
@@ -151,6 +212,13 @@ function App() {
     });
   };
 
+  const handleCurrentLuneChange = (rawValue: string | number) => {
+    const nextCurrentLune = normalizeCurrentLune(rawValue);
+    setVisiblePastLunes(0);
+    setCurrentLune(nextCurrentLune);
+    saveCurrentLuneEntity(nextCurrentLune);
+  };
+
   const {
     addResource,
     updateResource,
@@ -160,6 +228,7 @@ function App() {
     resources,
     stocks,
     persoResources,
+    constructions,
     lunes,
     setResources,
     setStocks,
@@ -179,12 +248,15 @@ function App() {
     groups,
     resources,
     sacs,
+    stocks,
+    exchangeCityStocksWithPersos,
     persoResources,
     lunes,
     nextPersoId,
     setPersos,
     setGroups,
     setPersoResources,
+    setStocks,
     setLunes,
     setPage,
     setSelectedPersoId,
@@ -193,6 +265,7 @@ function App() {
     savePersoEntity,
     deletePersoEntity,
     savePersoResourcesEntity,
+    saveStockEntity,
     saveLuneEntity,
   });
 
@@ -200,17 +273,25 @@ function App() {
     addLune,
     removeLune,
     updateRation,
+    addConstruction,
+    updateConstruction,
+    removeConstruction,
+    toggleConstructionPlacement,
     updateLuneGlobal,
     toggleOverrideMenu,
     setOverride,
     clearOverrides,
   } = useTimelineActions({
     persos,
+    constructions,
     lunes,
+    currentLune,
+    setConstructions,
     setLunes,
     setOpenOverrides,
     saveLuneEntity,
     deleteLuneEntity,
+    saveConstructionsEntity,
   });
 
   const {
@@ -218,8 +299,10 @@ function App() {
     openGroupViewPage,
     closeGroupPage,
     addGroup,
+    removeGroup,
     handleGroupMembersUpdate,
     handleGroupUpdateSafe,
+    setGroupPresence,
   } = useGroupActions({
     groups,
     persos,
@@ -228,7 +311,9 @@ function App() {
     setSelectedGroupId,
     setPage,
     saveGroupEntity,
+    deleteGroupEntity,
     saveGroupMembersEntity,
+    savePersoEntity,
   });
 
   const {
@@ -269,12 +354,20 @@ function App() {
     savePersoSacsEntity,
   });
 
-  const exportData = () =>
+  const constructionProgress = useMemo(
+    () => buildConstructionProgressById(constructions, lunes, currentLune),
+    [constructions, lunes, currentLune],
+  );
+
+  const exportData = () => {
     exportStateData({
       resources,
       persos,
       persoResources,
+      constructions,
+      constructionProgress,
       lunes,
+      currentLune,
       nextPersoId,
       stocks,
       cityMultipliers,
@@ -286,18 +379,23 @@ function App() {
       sacs,
       persoSacs,
     });
+    showToast("Export réussi.");
+  };
 
   const importData = (event: ChangeEvent<HTMLInputElement>) =>
     importStateFile(event, {
       fileInputRef,
       setCompleteState,
+      onSuccess: () => showToast("Import réussi."),
     });
 
-  const resetData = () =>
-    resetAppData({
+  const resetData = async () => {
+    await resetAppData({
       setCompleteState,
       setSaveStatus,
     });
+    showToast("Données réinitialisées.");
+  };
 
   const timelineData = useMemo(
     () =>
@@ -306,26 +404,155 @@ function App() {
         lunes,
         stocks,
         defaultRation,
+        constructions,
         resources,
         persoResources,
         cityMultipliers,
+        currentLune,
+        constructionProgress,
       ),
-    [persos, lunes, stocks, resources, persoResources, cityMultipliers],
+    [
+      persos,
+      lunes,
+      stocks,
+      constructions,
+      resources,
+      persoResources,
+      cityMultipliers,
+      currentLune,
+      constructionProgress,
+    ],
   );
+
+  const currentTimelineSegment = useMemo(
+    () =>
+      timelineData.find(
+        (segment) => Number(segment.lune.id) === Number(currentLune),
+      ) || null,
+    [timelineData, currentLune],
+  );
+
+  const earliestVisibleLune = Math.max(
+    1,
+    Number(currentLune ?? 1) - visiblePastLunes,
+  );
+
+  const visibleTimelineData = useMemo(
+    () =>
+      timelineData
+        .map((segment, actualIndex) => ({ ...segment, actualIndex }))
+        .filter(
+          (segment) => Number(segment.lune.id) >= Number(earliestVisibleLune),
+        ),
+    [timelineData, earliestVisibleLune],
+  );
+
+  const {
+    handleAddResource,
+    handleRemoveResource,
+    handleAddPerso,
+    handleRemovePerso,
+    handleAddGroup,
+    handleRemoveGroup,
+    handleAddConstruction,
+    handleRemoveConstruction,
+    handleAddLune,
+    handleRemoveLune,
+    handleAddArme,
+    handleRemoveArme,
+    handleAddOutil,
+    handleRemoveOutil,
+    handleAddSac,
+    handleRemoveSac,
+  } = useAppActionToasts({
+    resources,
+    persos,
+    groups,
+    constructions,
+    lunes,
+    armes,
+    outils,
+    sacs,
+    addResource,
+    removeResource,
+    addPerso,
+    removePerso,
+    addGroup,
+    removeGroup,
+    addConstruction,
+    removeConstruction,
+    addLune,
+    removeLune,
+    addArme,
+    removeArme,
+    addOutil,
+    removeOutil,
+    addSac,
+    removeSac,
+    showToast,
+  });
+
+  const hasNoPersos = persos.length === 0;
+  const currentLuneValue = Math.max(1, Number(currentLune ?? 1));
+  const maxVisiblePastLunes = Math.max(0, currentLuneValue - 1);
+  const areTurnControlsDisabled = hasNoPersos;
+  const timelineControlsDisabledTitle = areTurnControlsDisabled
+    ? "Aucun perso dans les effectifs."
+    : undefined;
+  const canShowMorePastLunes = visiblePastLunes < maxVisiblePastLunes;
+  const canShowLessPastLunes = visiblePastLunes > 0;
+
+  const handleShowPastLunes = () => {
+    setVisiblePastLunes((previous) =>
+      Math.min(maxVisiblePastLunes, previous + 1),
+    );
+  };
+
+  const handleHidePastLunes = () => {
+    setVisiblePastLunes((previous) => Math.max(0, previous - 1));
+  };
+
+  const handleBackToCurrentLune = () => {
+    setVisiblePastLunes(0);
+  };
+
+  const { handleAdvanceTurn } = useAdvanceTurn({
+    hasNoPersos,
+    currentTimelineSegment,
+    persos,
+    stocks,
+    persoResources,
+    resources,
+    lunes,
+    currentLune,
+    addLune,
+    setPersos,
+    setPersoResources,
+    setStocks,
+    setVisiblePastLunes,
+    setCurrentLune,
+    savePersoEntity,
+    savePersoResourcesEntity,
+    saveStockEntity,
+    saveCurrentLuneEntity,
+    showToast,
+  });
 
   const pages: PageTab[] = [
     { key: "reserve", label: "1. Ville" },
     { key: "effectif", label: "2. Effectif" },
     { key: "groupes", label: "3. Groupe" },
-    { key: "timeline", label: "4. Ligne du temps" },
-    { key: "armes", label: "5. Armes" },
-    { key: "outils", label: "6. Outils" },
-    { key: "sacs", label: "7. Sacs" },
-    { key: "resources", label: "8. Ressources" },
+    { key: "chantiers", label: "4. Chantiers" },
+    { key: "timeline", label: "5. Ligne du temps" },
+    { key: "armes", label: "6. Armes" },
+    { key: "outils", label: "7. Outils" },
+    { key: "sacs", label: "8. Sacs" },
+    { key: "resources", label: "9. Ressources" },
   ];
 
   return (
     <>
+      <ToastViewport toasts={toasts} />
       <h1>Fractal - Planificateur de Faction (V9)</h1>
       <SaveBar
         saveStatus={saveStatus}
@@ -335,135 +562,154 @@ function App() {
         fileInputRef={fileInputRef}
       />
 
-      {loadError ? <div className='info-text'>{loadError}</div> : null}
+      {loadError ? (
+        <div className='mb-2.5 text-[0.85em] italic text-[#888]'>
+          {loadError}
+        </div>
+      ) : null}
+
+      <TimelineControls
+        visiblePastLunes={visiblePastLunes}
+        canShowMorePastLunes={canShowMorePastLunes}
+        canShowLessPastLunes={canShowLessPastLunes}
+        currentLune={currentLune}
+        areTurnControlsDisabled={areTurnControlsDisabled}
+        disabledTitle={timelineControlsDisabledTitle}
+        onShowPastLunes={handleShowPastLunes}
+        onHidePastLunes={handleHidePastLunes}
+        onBackToCurrentLune={handleBackToCurrentLune}
+        onCurrentLuneChange={(value) => handleCurrentLuneChange(value)}
+        onAdvanceTurn={handleAdvanceTurn}
+      />
 
       <PageTabs pages={pages} currentPage={page} setPage={setPage} />
 
-      {page === "reserve" && (
-        <ReservePage
-          resources={resources}
-          stocks={stocks}
-          cityMultipliers={cityMultipliers}
-          handleStockChange={handleStockChange}
-          handleCityMultiplierChange={handleCityMultiplierChange}
-          armes={armes}
-          persoArmes={persoArmes}
-          outils={outils}
-          persoOutils={persoOutils}
-          sacs={sacs}
-          persoSacs={persoSacs}
-        />
-      )}
+      <ExchangeModeToggle
+        checked={exchangeCityStocksWithPersos}
+        onChange={setExchangeCityStocksWithPersos}
+      />
 
-      {page === "resources" && (
-        <ResourcesPage
-          resources={resources}
-          addResource={addResource}
-          updateResource={updateResource}
-          removeResource={removeResource}
-          getResourceDeleteGuard={getResourceDeleteGuard}
-        />
-      )}
-
-      {page === "effectif" && (
-        <EffectifPage
-          persos={persos}
-          removePerso={removePerso}
-          addPerso={addPerso}
-          openPersoPage={openPersoPage}
-        />
-      )}
-
-      {page === "groupes" && (
-        <GroupPage
-          groups={groups}
-          persos={persos}
-          openGroupPage={openGroupPage}
-          openGroupViewPage={openGroupViewPage}
-          addGroup={addGroup}
-        />
-      )}
-
-      {page === "group-view" && (
-        <GroupViewPage
-          group={groups.find((g: { id: number }) => g.id === selectedGroupId)}
-          persos={persos}
-          openEditPage={openGroupPage}
-          closePage={closeGroupPage}
-        />
-      )}
-
-      {page === "group" && (
-        <GroupEditPage
-          group={groups.find((g: { id: number }) => g.id === selectedGroupId)}
-          persos={persos}
-          handleGroupUpdate={handleGroupUpdateSafe}
-          handleGroupMembersUpdate={handleGroupMembersUpdate}
-          closePage={closeGroupPage}
-        />
-      )}
-
-      {page === "perso" && (
-        <PersoPage
-          perso={persos.find((p: { id: number }) => p.id === selectedPersoId)}
-          resources={resources}
-          groups={groups}
-          armes={armes}
-          persoArmes={persoArmes}
-          outils={outils}
-          persoOutils={persoOutils}
-          sacs={sacs}
-          persoSacs={persoSacs}
-          persoResources={persoResources}
-          handlePersoUpdate={handlePersoUpdateById}
-          handlePersoResourceUpdate={handlePersoResourceUpdate}
-          handlePersoWeaponsUpdate={handlePersoWeaponsUpdate}
-          handlePersoToolsUpdate={handlePersoToolsUpdate}
-          handlePersoBagsUpdate={handlePersoBagsUpdate}
-          closePage={closePersoPage}
-        />
-      )}
-
-      {page === "timeline" && (
-        <TimelinePage
-          timelineData={timelineData}
-          removeLune={removeLune}
-          updateLuneGlobal={updateLuneGlobal}
-          updateRation={updateRation}
-          toggleOverrideMenu={toggleOverrideMenu}
-          openOverrides={openOverrides}
-          setOverride={setOverride}
-          clearOverrides={clearOverrides}
-          addLune={addLune}
-        />
-      )}
-
-      {page === "armes" && (
-        <WeaponsPage
-          armes={armes}
-          addArme={addArme}
-          updateArme={updateArme}
-          removeArme={removeArme}
-        />
-      )}
-
-      {page === "outils" && (
-        <ToolsPage
-          outils={outils}
-          addOutil={addOutil}
-          updateOutil={updateOutil}
-          removeOutil={removeOutil}
-        />
-      )}
-
-      {page === "sacs" && (
-        <BagsPage
-          sacs={sacs}
-          addSac={addSac}
-          updateSac={updateSac}
-          removeSac={removeSac}
-        />
-      )}
+      <AppPageContent
+        page={page}
+        reserveProps={{
+          resources,
+          stocks,
+          cityMultipliers,
+          handleStockChange,
+          handleCityMultiplierChange,
+          armes,
+          persoArmes,
+          outils,
+          persoOutils,
+          sacs,
+          persoSacs,
+        }}
+        resourcesProps={{
+          resources,
+          addResource: handleAddResource,
+          updateResource,
+          removeResource: handleRemoveResource,
+          getResourceDeleteGuard,
+        }}
+        effectifProps={{
+          persos,
+          resources,
+          persoResources,
+          removePerso: handleRemovePerso,
+          addPerso: handleAddPerso,
+          openPersoPage,
+          updatePersoPresence: (persoId, isPresent) =>
+            handlePersoUpdateById(persoId, "present", isPresent),
+          handlePersoResourceUpdate,
+          showStocks: showEffectifStocks,
+          setShowStocks: setShowEffectifStocks,
+        }}
+        groupProps={{
+          list: {
+            groups,
+            persos,
+            openGroupPage,
+            openGroupViewPage,
+            addGroup: handleAddGroup,
+            removeGroup: handleRemoveGroup,
+            setGroupPresence,
+          },
+          edit: {
+            persos,
+            handleGroupUpdate: handleGroupUpdateSafe,
+            handleGroupMembersUpdate,
+            closePage: closeGroupPage,
+          },
+          view: {
+            persos,
+            openEditPage: openGroupPage,
+            closePage: closeGroupPage,
+          },
+          groups,
+          selectedGroupId,
+        }}
+        persoProps={{
+          persos,
+          selectedPersoId,
+          resources,
+          groups,
+          armes,
+          persoArmes,
+          outils,
+          persoOutils,
+          sacs,
+          persoSacs,
+          persoResources,
+          handlePersoUpdate: handlePersoUpdateById,
+          handlePersoResourceUpdate,
+          handlePersoWeaponsUpdate,
+          handlePersoToolsUpdate,
+          handlePersoBagsUpdate,
+          closePage: closePersoPage,
+        }}
+        chantiersProps={{
+          constructions,
+          resources,
+          constructionProgress,
+          constructionStates: currentTimelineSegment?.constructionStates || {},
+          addConstruction: handleAddConstruction,
+          updateConstruction,
+          removeConstruction: handleRemoveConstruction,
+        }}
+        timelineProps={{
+          currentLune,
+          resources,
+          constructions,
+          timelineData: visibleTimelineData,
+          removeLune: handleRemoveLune,
+          updateLuneGlobal,
+          updateRation,
+          toggleConstructionPlacement,
+          toggleOverrideMenu,
+          openOverrides,
+          setOverride,
+          clearOverrides,
+          addLune: handleAddLune,
+        }}
+        weaponsProps={{
+          armes,
+          addArme: handleAddArme,
+          updateArme,
+          removeArme: handleRemoveArme,
+        }}
+        toolsProps={{
+          outils,
+          addOutil: handleAddOutil,
+          updateOutil,
+          removeOutil: handleRemoveOutil,
+        }}
+        bagsProps={{
+          sacs,
+          addSac: handleAddSac,
+          updateSac,
+          removeSac: handleRemoveSac,
+        }}
+      />
     </>
   );
 }

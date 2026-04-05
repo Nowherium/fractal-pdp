@@ -1,8 +1,10 @@
 import type { Resource } from "../types";
+import { confirmAction } from "../utils/confirmAction";
+import { formControlClassName, toFormInputValue } from "../utils/formUtils";
 import { compareResources } from "../utils/resourceOrder";
-
-const toInputValue = (value: unknown, fallback = "") =>
-  typeof value === "string" || typeof value === "number" ? value : fallback;
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
 function ResourcesPage({
   resources,
@@ -30,16 +32,16 @@ function ResourcesPage({
     .sort((left, right) => compareResources(left.resource, right.resource));
 
   return (
-    <div className='panel'>
+    <Panel>
       <h2>8. Administration des ressources</h2>
-      <p className='info-text'>
+      <InfoText>
         Gère ici la table `resources` : code interne + nom affiché.
         <br />
         Les quantités de stock restent éditables dans la page Réserve centrale.
         <br />
         La suppression est bloquée si la ressource est protégée, encore stockée,
         portée, ou planifiée comme drogue.
-      </p>
+      </InfoText>
 
       {resources.length === 0 ? (
         <p>Aucune ressource définie pour le moment.</p>
@@ -62,9 +64,9 @@ function ResourcesPage({
                   <td>{resource.id}</td>
                   <td>
                     <input
-                      className='perso-field-input'
+                      className={formControlClassName}
                       type='text'
-                      value={toInputValue(resource.code)}
+                      value={toFormInputValue(resource.code)}
                       onChange={(event) =>
                         updateResource(index, "code", event.target.value, {
                           persist: false,
@@ -79,9 +81,9 @@ function ResourcesPage({
                   </td>
                   <td>
                     <input
-                      className='perso-field-input'
+                      className={formControlClassName}
                       type='text'
-                      value={toInputValue(resource.name, resource.code)}
+                      value={toFormInputValue(resource.name, resource.code)}
                       onChange={(event) =>
                         updateResource(index, "name", event.target.value, {
                           persist: false,
@@ -95,28 +97,25 @@ function ResourcesPage({
                     />
                   </td>
                   <td>
-                    <button
-                      className='btn-del'
-                      type='button'
-                      onClick={() => removeResource(index)}
+                    <Button
+                      className='mt-0'
+                      size='sm'
+                      variant='danger'
+                      onClick={() =>
+                        confirmAction(
+                          `Supprimer la ressource ${resource.name || resource.code?.toUpperCase() || "sélectionnée"} ?`,
+                          () => removeResource(index),
+                        )
+                      }
                       disabled={!deleteGuard.canDelete}
                       title={deleteGuard.reason}
-                      style={{
-                        opacity: deleteGuard.canDelete ? 1 : 0.5,
-                        cursor: deleteGuard.canDelete
-                          ? "pointer"
-                          : "not-allowed",
-                      }}
                     >
                       Supprimer
-                    </button>
+                    </Button>
                     {!deleteGuard.canDelete ? (
-                      <div
-                        className='info-text'
-                        style={{ marginTop: "0.35rem", fontSize: "0.75rem" }}
-                      >
+                      <InfoText className='mt-[0.35rem] text-[0.75rem] [margin-bottom:0]'>
                         {deleteGuard.reason}
-                      </div>
+                      </InfoText>
                     ) : null}
                   </td>
                 </tr>
@@ -126,10 +125,10 @@ function ResourcesPage({
         </table>
       )}
 
-      <button className='btn-add' type='button' onClick={addResource}>
+      <Button className='mt-3' variant='success' onClick={addResource}>
         + Ajouter une ressource
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 

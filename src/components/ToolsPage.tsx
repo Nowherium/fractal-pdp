@@ -1,6 +1,12 @@
-import type { Outil } from "../types";
+import type { Outil, ToolSpecialite } from "../types";
+import { confirmAction } from "../utils/confirmAction";
+import { formControlClassName, toFormInputValue } from "../utils/formUtils";
+import type { OutilEditableField } from "../utils/inventoryUtils";
+import Button from "./ui/Button";
+import InfoText from "./ui/InfoText";
+import Panel from "./ui/Panel";
 
-const specialites: Array<{ value: string; label: string }> = [
+const specialites: Array<{ value: ToolSpecialite; label: string }> = [
   { value: "eau", label: "💧 Eau" },
   { value: "nrt", label: "🍗 Nrt" },
   { value: "mat", label: "🧱 Mat" },
@@ -8,7 +14,7 @@ const specialites: Array<{ value: string; label: string }> = [
 ];
 
 const toolFields: Array<{
-  key: string;
+  key: OutilEditableField;
   label: string;
   type: "text" | "select" | "number";
   step?: string;
@@ -22,9 +28,6 @@ const toolFields: Array<{
   { key: "quantity", label: "Quantité", type: "number", step: "1" },
 ];
 
-const toInputValue = (value: unknown, fallback: string | number = "") =>
-  typeof value === "string" || typeof value === "number" ? value : fallback;
-
 function ToolsPage({
   outils,
   addOutil,
@@ -35,19 +38,19 @@ function ToolsPage({
   addOutil: () => void;
   updateOutil: (
     index: number,
-    field: string,
+    field: OutilEditableField,
     rawValue: string | number,
     options?: { persist?: boolean },
   ) => void;
   removeOutil: (index: number) => void;
 }) {
   return (
-    <div className='panel'>
+    <Panel>
       <h2>6. Administration des outils</h2>
-      <p className='info-text'>
+      <InfoText>
         Gère ici les outils de production disponibles pour les personnages. Le
         champ bonus est un multiplicateur : par exemple `1.2` signifie x1,2.
-      </p>
+      </InfoText>
 
       {outils.length === 0 ? (
         <p>Aucun outil défini pour le moment.</p>
@@ -72,8 +75,8 @@ function ToolsPage({
                   <td key={field.key}>
                     {field.type === "select" ? (
                       <select
-                        className='perso-field-input'
-                        value={toInputValue(outil[field.key], "eau")}
+                        className={formControlClassName}
+                        value={toFormInputValue(outil[field.key], "eau")}
                         onChange={(event) =>
                           updateOutil(index, field.key, event.target.value)
                         }
@@ -89,7 +92,7 @@ function ToolsPage({
                       </select>
                     ) : (
                       <input
-                        className='perso-field-input'
+                        className={`${formControlClassName} ${field.type === "number" ? "text-right" : ""}`}
                         type={field.type}
                         step={field.step}
                         min={
@@ -99,7 +102,7 @@ function ToolsPage({
                             ? 0
                             : undefined
                         }
-                        value={toInputValue(outil[field.key])}
+                        value={toFormInputValue(outil[field.key])}
                         onChange={(event) =>
                           updateOutil(
                             index,
@@ -128,13 +131,19 @@ function ToolsPage({
                   </td>
                 ))}
                 <td>
-                  <button
-                    className='btn-del'
-                    type='button'
-                    onClick={() => removeOutil(index)}
+                  <Button
+                    className='mt-0'
+                    size='sm'
+                    variant='danger'
+                    onClick={() =>
+                      confirmAction(
+                        `Supprimer l'outil ${outil.name || "sélectionné"} ?`,
+                        () => removeOutil(index),
+                      )
+                    }
                   >
                     Supprimer
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -142,10 +151,10 @@ function ToolsPage({
         </table>
       )}
 
-      <button className='btn-add' type='button' onClick={addOutil}>
+      <Button className='mt-3' variant='success' onClick={addOutil}>
         + Ajouter un outil
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }
 

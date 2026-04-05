@@ -1,3 +1,5 @@
+import Button from "./ui/Button";
+
 import type { AppPage, PageTab } from "../types";
 
 function PageTabs({
@@ -10,32 +12,21 @@ function PageTabs({
   setPage: (page: AppPage) => void;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: "10px",
-        flexWrap: "wrap",
-        margin: "20px 0",
-      }}
-    >
-      {pages.map((pageItem) => (
-        <button
-          key={pageItem.key}
-          type='button'
-          onClick={() => setPage(pageItem.key)}
-          style={{
-            marginBottom: "6px",
-            padding: "10px 16px",
-            border: "1px solid #444",
-            borderRadius: "6px",
-            background: currentPage === pageItem.key ? "#00bcd4" : "#111",
-            color: currentPage === pageItem.key ? "#000" : "#fff",
-            cursor: "pointer",
-          }}
-        >
-          {pageItem.label}
-        </button>
-      ))}
+    <div className='my-5 flex flex-wrap gap-2.5'>
+      {pages.map((pageItem) => {
+        const isActive = currentPage === pageItem.key;
+
+        return (
+          <Button
+            key={pageItem.key}
+            variant={isActive ? "tab-active" : "tab"}
+            className='mb-1.5 mt-0 rounded-md'
+            onClick={() => setPage(pageItem.key)}
+          >
+            {pageItem.label}
+          </Button>
+        );
+      })}
     </div>
   );
 }

@@ -5,6 +5,7 @@ export type AppPage =
   | "group"
   | "group-view"
   | "perso"
+  | "chantiers"
   | "timeline"
   | "armes"
   | "outils"
@@ -16,6 +17,14 @@ export interface AppRouteState {
   selectedPersoId: number | null;
   selectedGroupId: number | null;
 }
+
+export type PersistOptions = {
+  persist?: boolean;
+};
+
+export type ResourceStatKey = "eau" | "nrt" | "med" | "mat";
+export type PersoCapacityKey = ResourceStatKey | "art";
+export type ToolSpecialite = Exclude<PersoCapacityKey, "med">;
 
 export interface CityMultipliers {
   eau: number;
@@ -43,6 +52,7 @@ export interface Resource {
 export interface Perso {
   id: number;
   nom: string;
+  present?: boolean;
   pvmax?: number;
   pv?: number;
   capEau?: number;
@@ -50,6 +60,11 @@ export interface Perso {
   capMed?: number;
   capMat?: number;
   capart?: number;
+  capEauEffectif?: number;
+  capNrtEffectif?: number;
+  capMedEffectif?: number;
+  capMatEffectif?: number;
+  capArtEffectif?: number;
   cmd?: number;
   groupId?: number | null;
   equippedWeaponId?: number | null;
@@ -59,6 +74,7 @@ export interface Perso {
   poidsMax?: number;
   poidsMaxEffectif?: number;
   poidsTotal?: number;
+  esclave?: boolean;
   [key: string]: unknown;
 }
 
@@ -72,6 +88,7 @@ export interface Group {
   id: number;
   name: string;
   chef: number | null;
+  overrideCapacity?: boolean;
   [key: string]: unknown;
 }
 
@@ -107,7 +124,7 @@ export interface Outil {
   poids?: number;
   pv?: number;
   pvmax?: number;
-  specialite?: string;
+  specialite?: ToolSpecialite;
   [key: string]: unknown;
 }
 
@@ -139,12 +156,61 @@ export interface Ration {
   med: boolean;
   tache: string;
   drogue: string | null;
+  constructionId?: string | null;
+}
+
+export type ConstructionStatus = "todo" | "in-progress" | "done";
+
+export interface ConstructionDefinition {
+  id: string;
+  name: string;
+  resourceCode: string;
+  resourceCost: number;
+  buildersRequired: number;
+  rewardType: PersoCapacityKey | "combat";
+}
+
+export interface ConstructionProgress {
+  constructionId: string;
+  status: ConstructionStatus;
+  costPaid?: boolean;
+  remainingBuilders?: number;
+  startedAtLune?: number | null;
+  completedAtLune?: number | null;
+}
+
+export type ConstructionProgressById = Record<string, ConstructionProgress>;
+
+export interface LuneConstruction extends ConstructionDefinition {
+  status?: ConstructionStatus;
+  costPaid?: boolean;
+  remainingBuilders?: number;
+  carriedOver?: boolean;
+}
+
+export interface LunePlacement {
+  luneId: number;
+  constructionId: string;
+  isPlaced: boolean;
+}
+
+export interface LuneOverride {
+  present?: boolean;
+  pv?: number;
+  capEau?: number;
+  capNrt?: number;
+  capMed?: number;
+  capMat?: number;
+  capArt?: number;
+  combat?: number;
+  [key: string]: number | boolean | undefined;
 }
 
 export interface Lune {
   id: number;
-  coutMat: number;
   meteo: WeatherCoefficients;
   rations: Record<string, Ration>;
-  overrides: Record<string, Record<string, number>>;
+  overrides: Record<string, LuneOverride>;
+  constructionPlacements: LunePlacement[];
+  constructions: LuneConstruction[];
 }
