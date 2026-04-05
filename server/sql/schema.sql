@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS cities (
   mult_med numeric NOT NULL DEFAULT 1,
   mult_mat numeric NOT NULL DEFAULT 1,
   current_lune integer NOT NULL DEFAULT 1,
+  terrains jsonb NOT NULL DEFAULT '[]'::jsonb,
+  current_terrain_id integer,
   constructions jsonb NOT NULL DEFAULT '[]'::jsonb
 );
 
@@ -118,6 +120,7 @@ CREATE TABLE IF NOT EXISTS lunes (
   meteo_med numeric NOT NULL DEFAULT 1,
   meteo_mat numeric NOT NULL DEFAULT 1,
   constructions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  auto_assign boolean NOT NULL DEFAULT true,
   tool_assignments jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 
@@ -143,6 +146,18 @@ CREATE TABLE IF NOT EXISTS overrides (
 -- Compatibility migrations for already-initialized databases.
 -- `CREATE TABLE IF NOT EXISTS` does not add new columns to existing tables,
 -- so recent additions still need explicit idempotent ALTERs here.
+ALTER TABLE cities
+  ADD COLUMN IF NOT EXISTS terrains jsonb,
+  ADD COLUMN IF NOT EXISTS current_terrain_id integer;
+
+UPDATE cities
+SET terrains = COALESCE(terrains, '[]'::jsonb)
+WHERE terrains IS NULL;
+
+ALTER TABLE cities
+  ALTER COLUMN terrains SET DEFAULT '[]'::jsonb,
+  ALTER COLUMN terrains SET NOT NULL;
+
 ALTER TABLE groups
   ADD COLUMN IF NOT EXISTS override_capacity boolean;
 
@@ -164,6 +179,17 @@ WHERE esclave IS NULL;
 ALTER TABLE persos
   ALTER COLUMN esclave SET DEFAULT false,
   ALTER COLUMN esclave SET NOT NULL;
+
+ALTER TABLE lunes
+  ADD COLUMN IF NOT EXISTS auto_assign boolean;
+
+UPDATE lunes
+SET auto_assign = COALESCE(auto_assign, false)
+WHERE auto_assign IS NULL;
+
+ALTER TABLE lunes
+  ALTER COLUMN auto_assign SET DEFAULT true,
+  ALTER COLUMN auto_assign SET NOT NULL;
 
 ALTER TABLE lunes
   ADD COLUMN IF NOT EXISTS tool_assignments jsonb;

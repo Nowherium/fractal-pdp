@@ -21,6 +21,7 @@ import type {
   Resource,
   Stocks,
   Sac,
+  Terrain,
 } from "../types";
 
 const defaultRouteState: AppRouteState = {
@@ -80,6 +81,7 @@ const getRouteStateFromLocation = (): AppRouteState => {
     case "outils":
     case "sacs":
     case "resources":
+    case "terrains":
       return {
         page: section as AppPage,
         selectedPersoId: null,
@@ -120,6 +122,8 @@ const getPathForRouteState = ({
       return "/sacs";
     case "resources":
       return "/resources";
+    case "terrains":
+      return "/terrains";
     default:
       return "/";
   }
@@ -135,6 +139,8 @@ export const useAppState = () => {
   const [cityMultipliers, setCityMultipliers] = useState<CityMultipliers>(
     defaultCityMultipliers as CityMultipliers,
   );
+  const [terrains, setTerrains] = useState<Terrain[]>([]);
+  const [currentTerrainId, setCurrentTerrainId] = useState<number | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [armes, setArmes] = useState<Arme[]>([]);
   const [persoArmes, setPersoArmes] = useState<PersoArme[]>([]);
@@ -208,6 +214,8 @@ export const useAppState = () => {
     setLunes(state.lunes);
     setStocks(state.stocks);
     setCityMultipliers(state.cityMultipliers);
+    setTerrains(state.terrains);
+    setCurrentTerrainId(state.currentTerrainId);
     setGroups(state.groups);
     setArmes(state.armes);
     setPersoArmes(state.persoArmes);
@@ -240,6 +248,10 @@ export const useAppState = () => {
     setStocks,
     cityMultipliers,
     setCityMultipliers,
+    terrains,
+    setTerrains,
+    currentTerrainId,
+    setCurrentTerrainId,
     groups,
     setGroups,
     armes,

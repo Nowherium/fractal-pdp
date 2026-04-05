@@ -53,8 +53,10 @@ function GroupPage({
       <h2>3. Groupe</h2>
       <InfoText>
         Liste des groupes connus. Chaque groupe affiche son chef et peut être
-        consulté ou modifié. La colonne <strong>Présents</strong> permet de
-        basculer tout le groupe en présent/absent.
+        consulté ou modifié. Les colonnes de stats montrent les
+        <strong> caractéristiques brutes</strong> du groupe. La colonne
+        <strong> Présents</strong> permet de basculer tout le groupe en
+        présent/absent.
       </InfoText>
       {groups.length === 0 ? (
         <p>Aucun groupe défini pour le moment.</p>
@@ -78,7 +80,7 @@ function GroupPage({
           <tbody>
             {groups.map((group) => {
               const members = getGroupMembers(persos, group.id);
-              const totals = calculateGroupTotals(members);
+              const totals = calculateGroupTotals(members, { rawStats: true });
               const livingMembers = members.filter(
                 (member) => !isPersoCadavre(member),
               );

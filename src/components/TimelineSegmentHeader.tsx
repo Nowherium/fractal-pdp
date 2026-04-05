@@ -8,8 +8,10 @@ interface TimelineSegmentHeaderProps {
   isPastLune: boolean;
   isLockedLune: boolean;
   isCompactView: boolean;
+  autoAssign: boolean;
   showAbsentPersos: boolean;
   onCompactViewChange: (checked: boolean) => void;
+  onAutoAssignChange: (checked: boolean) => void;
   onShowAbsentPersosChange: (checked: boolean) => void;
   onRemove: () => void;
 }
@@ -19,8 +21,10 @@ function TimelineSegmentHeader({
   isPastLune,
   isLockedLune,
   isCompactView,
+  autoAssign,
   showAbsentPersos,
   onCompactViewChange,
+  onAutoAssignChange,
   onShowAbsentPersosChange,
   onRemove,
 }: TimelineSegmentHeaderProps) {
@@ -36,6 +40,13 @@ function TimelineSegmentHeader({
           srLabel='Activer la vue compacte pour replier la météo et les outils'
           checked={isCompactView}
           onChange={(event) => onCompactViewChange(event.target.checked)}
+        />
+        <Toggle
+          label='affectation auto'
+          srLabel='Activer l’affectation automatique selon la meilleure production'
+          checked={autoAssign}
+          disabled={isPastLune}
+          onChange={(event) => onAutoAssignChange(event.target.checked)}
         />
         <Toggle
           label='absents'

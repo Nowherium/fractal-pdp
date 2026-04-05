@@ -4,8 +4,8 @@ import {
   getGroupCapacity,
   getGroupLeader,
   getGroupMembers,
-  getPersoCapacityValue,
-  getPersoCombatValue,
+  getPersoRawCapacityValue,
+  getPersoRawCombatValue,
   getPersoWeightLimit,
   getPersoWeightValue,
   isPersoCadavre,
@@ -49,7 +49,7 @@ function GroupViewPage({
 
   const memberPersos = getGroupMembers(persos, group.id);
   const leader = getGroupLeader(group, persos);
-  const totals = calculateGroupTotals(memberPersos);
+  const totals = calculateGroupTotals(memberPersos, { rawStats: true });
   const groupCapacity = getGroupCapacity(leader);
 
   return (
@@ -70,6 +70,9 @@ function GroupViewPage({
         <strong>
           {memberPersos.length} / {groupCapacity}
         </strong>
+        <br />
+        Les stats ci-dessous correspondent aux <strong>valeurs brutes</strong>
+        des membres.
       </InfoText>
 
       {memberPersos.length === 0 ? (
@@ -108,12 +111,22 @@ function GroupViewPage({
                     {perso.id === group.chef ? "Leader" : "Membre"}
                     {isPersoCadavre(perso) ? " (cadavre)" : ""}
                   </td>
-                  <td>{formatNumber(getPersoCapacityValue(perso, "eau"))}</td>
-                  <td>{formatNumber(getPersoCapacityValue(perso, "nrt"))}</td>
-                  <td>{formatNumber(getPersoCapacityValue(perso, "med"))}</td>
-                  <td>{formatNumber(getPersoCapacityValue(perso, "mat"))}</td>
-                  <td>{formatNumber(getPersoCapacityValue(perso, "art"))}</td>
-                  <td>{formatNumber(getPersoCombatValue(perso))}</td>
+                  <td>
+                    {formatNumber(getPersoRawCapacityValue(perso, "eau"))}
+                  </td>
+                  <td>
+                    {formatNumber(getPersoRawCapacityValue(perso, "nrt"))}
+                  </td>
+                  <td>
+                    {formatNumber(getPersoRawCapacityValue(perso, "med"))}
+                  </td>
+                  <td>
+                    {formatNumber(getPersoRawCapacityValue(perso, "mat"))}
+                  </td>
+                  <td>
+                    {formatNumber(getPersoRawCapacityValue(perso, "art"))}
+                  </td>
+                  <td>{formatNumber(getPersoRawCombatValue(perso))}</td>
                   <td
                     className={isPersoOverweight(perso) ? "danger" : undefined}
                   >
@@ -139,27 +152,27 @@ function GroupViewPage({
 
           <div className={statGridClassName}>
             <div className={statCardClassName}>
-              <span className={statLabelClassName}>Production totale Eau</span>
+              <span className={statLabelClassName}>Capacité brute Eau</span>
               <strong>{formatNumber(totals.eau)}</strong>
             </div>
             <div className={statCardClassName}>
-              <span className={statLabelClassName}>Production totale Nrt</span>
+              <span className={statLabelClassName}>Capacité brute Nrt</span>
               <strong>{formatNumber(totals.nrt)}</strong>
             </div>
             <div className={statCardClassName}>
-              <span className={statLabelClassName}>Production totale Med</span>
+              <span className={statLabelClassName}>Capacité brute Med</span>
               <strong>{formatNumber(totals.med)}</strong>
             </div>
             <div className={statCardClassName}>
-              <span className={statLabelClassName}>Production totale Mat</span>
+              <span className={statLabelClassName}>Capacité brute Mat</span>
               <strong>{formatNumber(totals.mat)}</strong>
             </div>
             <div className={statCardClassName}>
-              <span className={statLabelClassName}>Production totale Art</span>
+              <span className={statLabelClassName}>Capacité brute Art</span>
               <strong>{formatNumber(totals.art)}</strong>
             </div>
             <div className={statCardClassName}>
-              <span className={statLabelClassName}>Combat total</span>
+              <span className={statLabelClassName}>Combat brut</span>
               <strong>{formatNumber(totals.combat)}</strong>
             </div>
             <div className={statCardClassName}>

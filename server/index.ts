@@ -7,6 +7,8 @@ import {
   insertState,
   updateStock,
   updateCityMultipliers,
+  updateTerrains,
+  updateCurrentTerrainId,
   updateCurrentLune,
   updateConstructions,
   upsertResource,
@@ -163,6 +165,8 @@ const buildDefaultState = () => {
   return {
     stocks: defaultStocks,
     currentLune: 1,
+    terrains: [],
+    currentTerrainId: null,
     constructions: [],
     persos: defaultPersos,
     persoResources: [],
@@ -223,11 +227,27 @@ registerPartialRoute("/api/city-multipliers", async (req, res) => {
   );
 });
 
+registerPartialRoute("/api/current-terrain", async (req, res) => {
+  await runDbAction(
+    res,
+    () => updateCurrentTerrainId(req.body?.currentTerrainId),
+    "Impossible de sauvegarder le terrain actuel",
+  );
+});
+
 registerPartialRoute("/api/current-lune", async (req, res) => {
   await runDbAction(
     res,
     () => updateCurrentLune(req.body?.currentLune),
     "Impossible de sauvegarder la lune courante",
+  );
+});
+
+registerPartialRoute("/api/terrains", async (req, res) => {
+  await runDbAction(
+    res,
+    () => updateTerrains(req.body?.terrains || []),
+    "Impossible de sauvegarder les terrains",
   );
 });
 

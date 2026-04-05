@@ -97,7 +97,14 @@ function TimelineRowEditor({
   updateRation: (
     luneIndex: number,
     persoId: number,
-    field: "tache" | "eau" | "nrt" | "med" | "drogue" | "constructionId",
+    field:
+      | "tache"
+      | "eau"
+      | "nrt"
+      | "med"
+      | "dehors"
+      | "drogue"
+      | "constructionId",
     value: string | boolean,
   ) => void;
   setOverride: (
@@ -109,7 +116,12 @@ function TimelineRowEditor({
   clearOverrides: (luneIndex: number, persoId: number) => void;
 }) {
   const isRowLocked = isTimelineRowLocked(row, isPastLune);
+  const isAutoAssignEnabled = Boolean(segment.lune.autoAssign);
   const overrideKey = `${actualLuneIndex}-${row.persoId}`;
+  const taskSelectValue =
+    typeof row.ration.tache === "string" && row.ration.tache.trim() !== ""
+      ? row.ration.tache
+      : "autre";
   const constructionOptions = (segment.lune.constructions ?? []).filter(
     (construction) => {
       const isPlacedThisLune = placedConstructionIds.includes(construction.id);
@@ -128,10 +140,30 @@ function TimelineRowEditor({
           {row.isAbsent ? <div className='inactive-note'>Absent</div> : null}
         </td>
         <td>{row.pvDisplayDebut}</td>
+        <td className='text-center'>
+          <input
+            type='checkbox'
+            className={`h-[18px] w-[18px] accent-cyan-500 ${isRowLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+            aria-label={`Dehors pour ${row.nom}`}
+            title='Ignore les bonus ville + terrain pour cette lune'
+            checked={
+              !row.isAbsent && !row.mortAuDebut && Boolean(row.ration.dehors)
+            }
+            disabled={isRowLocked}
+            onChange={(event) =>
+              updateRation(
+                actualLuneIndex,
+                row.persoId,
+                "dehors",
+                event.target.checked,
+              )
+            }
+          />
+        </td>
         <td className='bg-[#112222]'>
           <select
             className='w-full'
-            value={row.isAbsent ? "" : row.ration.tache}
+            value={row.isAbsent ? "autre" : taskSelectValue}
             disabled={isRowLocked}
             onChange={(event) =>
               updateRation(
@@ -142,13 +174,18 @@ function TimelineRowEditor({
               )
             }
           >
-            <option value=''>Repos / Autre</option>
+            <option value='autre'>Repos / Autre</option>
             <option value='nrt'>🍗 Nrt ({row.cDebut.nrt.toFixed(2)})</option>
             <option value='eau'>💧 Eau ({row.cDebut.eau.toFixed(2)})</option>
             <option value='med'>💊 Med ({row.cDebut.med.toFixed(2)})</option>
             <option value='mat'>🧱 Mat ({row.cDebut.mat.toFixed(2)})</option>
             <option value='construire'>🛠️ Construire</option>
           </select>
+          {isAutoAssignEnabled && !row.isAbsent && !row.mortAuDebut ? (
+            <div className='mt-1 text-[0.72rem] font-medium text-accent-cyan'>
+              Suggestion auto : meilleure prod
+            </div>
+          ) : null}
           {row.ration.tache === "construire" ? (
             <select
               className='mt-[0.35rem] w-full'

@@ -122,6 +122,7 @@ const timelinePageProps = {
   ],
   removeLune: () => undefined,
   updateLuneWeather: () => undefined,
+  toggleLuneAutoAssign: () => undefined,
   updateLuneToolAssignment: () => undefined,
   updateRation: () => undefined,
   toggleConstructionPlacement: () => undefined,
@@ -205,6 +206,77 @@ test("renders the compact-view toggle before the absents toggle", () => {
   assert.match(markup, /vue compacte[\s\S]*absents/i);
 });
 
+test("renders the affectation auto toggle in each lune header", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, {
+      ...timelinePageProps,
+      timelineData: [
+        {
+          ...timelinePageProps.timelineData[0]!,
+          lune: {
+            ...timelinePageProps.timelineData[0]!.lune,
+            autoAssign: true,
+          } as never,
+        },
+      ],
+    }),
+  );
+
+  assert.match(markup, /affectation auto/i);
+});
+
+test("keeps task selection editable even when affectation auto is enabled", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, {
+      ...timelinePageProps,
+      timelineData: [
+        {
+          ...timelinePageProps.timelineData[0]!,
+          lune: {
+            ...timelinePageProps.timelineData[0]!.lune,
+            autoAssign: true,
+          } as never,
+        },
+      ],
+    }),
+  );
+
+  assert.doesNotMatch(
+    markup,
+    /<td class="bg\[#112222\]"><select class="w-full" disabled=""/,
+  );
+});
+
+test("renders a Dehors column with one checkbox per visible perso", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, timelinePageProps),
+  );
+
+  assert.match(markup, /PV Début[\s\S]*Dehors[\s\S]*TÂCHE/);
+  assert.match(markup, /aria-label="Dehors pour Présent"/);
+  assert.doesNotMatch(markup, /aria-label="Dehors pour Absent"/);
+});
+
+test("keeps Repos / Autre as an explicit manual option under affectation auto", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, {
+      ...timelinePageProps,
+      timelineData: [
+        {
+          ...timelinePageProps.timelineData[0]!,
+          lune: {
+            ...timelinePageProps.timelineData[0]!.lune,
+            autoAssign: true,
+          } as never,
+        },
+      ],
+    }),
+  );
+
+  assert.match(markup, /<option value="autre"[^>]*>Repos \/ Autre<\/option>/);
+  assert.doesNotMatch(markup, /<option value="">Repos \/ Autre<\/option>/);
+});
+
 test("renders global tool selects for each production specialty", () => {
   const markup = renderToStaticMarkup(
     createElement(TimelinePage, timelinePageProps),
@@ -280,6 +352,28 @@ test("preselects the highest-bonus shared tool by default", () => {
     markup,
     /<option[^>]*value="6"[^>]*selected=""[^>]*>Seau \(x1\.10\)<\/option>/,
   );
+});
+
+test("renders an Exporter button at the bottom-right of the current lune only", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, {
+      ...timelinePageProps,
+      currentLune: 2,
+      timelineData: [
+        timelinePageProps.timelineData[0]!,
+        {
+          ...timelinePageProps.timelineData[0]!,
+          lune: {
+            ...timelinePageProps.timelineData[0]!.lune,
+            id: 2,
+          },
+        },
+      ],
+    }),
+  );
+
+  assert.match(markup, /Exporter/);
+  assert.match(markup, /justify-end[\s\S]*Exporter/);
 });
 
 test("prevents negative values in timeline override number inputs", () => {

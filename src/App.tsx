@@ -23,8 +23,10 @@ import { useGroupActions } from "./hooks/useGroupActions";
 import { useInventoryActions } from "./hooks/useInventoryActions";
 import { usePersoActions } from "./hooks/usePersoActions";
 import { useResourceActions } from "./hooks/useResourceActions";
+import { useTerrainActions } from "./hooks/useTerrainActions";
 import { useTimelineActions } from "./hooks/useTimelineActions";
 import { useEnsureTimelineLunes } from "./hooks/useEnsureTimelineLunes";
+import { combineCityAndTerrainMultipliers } from "./utils/terrainUtils";
 import type { PageTab } from "./types";
 
 function App() {
@@ -43,6 +45,10 @@ function App() {
     setStocks,
     cityMultipliers,
     setCityMultipliers,
+    terrains,
+    setTerrains,
+    currentTerrainId,
+    setCurrentTerrainId,
     groups,
     setGroups,
     armes,
@@ -89,6 +95,8 @@ function App() {
 
   const {
     saveCityMultipliersEntity,
+    saveTerrainsEntity,
+    saveCurrentTerrainEntity,
     saveCurrentLuneEntity,
     saveConstructionsEntity,
     saveResourceEntity,
@@ -172,6 +180,15 @@ function App() {
     deleteResourceEntity,
   });
 
+  const { addTerrain, updateTerrain, removeTerrain } = useTerrainActions({
+    terrains,
+    currentTerrainId,
+    setTerrains,
+    setCurrentTerrainId,
+    saveTerrainsEntity,
+    saveCurrentTerrainEntity,
+  });
+
   const {
     openPersoPage,
     closePersoPage,
@@ -214,6 +231,7 @@ function App() {
     removeConstruction,
     toggleConstructionPlacement,
     updateLuneWeather,
+    toggleLuneAutoAssign,
     updateLuneToolAssignment,
     toggleOverrideMenu,
     setOverride,
@@ -299,6 +317,7 @@ function App() {
   const {
     handleStockChange,
     handleCityMultiplierChange,
+    handleCurrentTerrainChange,
     handleCurrentLuneChange,
     exportData,
     importData,
@@ -314,6 +333,8 @@ function App() {
     nextPersoId,
     stocks,
     cityMultipliers,
+    terrains,
+    currentTerrainId,
     groups,
     armes,
     persoArmes,
@@ -323,6 +344,7 @@ function App() {
     persoSacs,
     setStocks,
     setCityMultipliers,
+    setCurrentTerrainId,
     setVisiblePastLunes,
     setCurrentLune,
     fileInputRef,
@@ -330,9 +352,20 @@ function App() {
     setSaveStatus,
     saveStockEntity,
     saveCityMultipliersEntity,
+    saveCurrentTerrainEntity,
     saveCurrentLuneEntity,
     showToast,
   });
+
+  const selectedTerrain = useMemo(
+    () => terrains.find((terrain) => terrain.id === currentTerrainId) ?? null,
+    [terrains, currentTerrainId],
+  );
+
+  const effectiveCityMultipliers = useMemo(
+    () => combineCityAndTerrainMultipliers(cityMultipliers, selectedTerrain),
+    [cityMultipliers, selectedTerrain],
+  );
 
   const timelineData = useMemo(
     () =>
@@ -344,7 +377,7 @@ function App() {
         constructions,
         resources,
         persoResources,
-        cityMultipliers,
+        effectiveCityMultipliers,
         currentLune,
         constructionProgress,
         outils,
@@ -356,7 +389,7 @@ function App() {
       constructions,
       resources,
       persoResources,
-      cityMultipliers,
+      effectiveCityMultipliers,
       currentLune,
       constructionProgress,
       outils,
@@ -489,6 +522,7 @@ function App() {
     { key: "outils", label: "7. Outils" },
     { key: "sacs", label: "8. Sacs" },
     { key: "resources", label: "9. Ressources" },
+    { key: "terrains", label: "10. Terrains" },
   ];
 
   return (
@@ -536,8 +570,11 @@ function App() {
           resources,
           stocks,
           cityMultipliers,
+          terrains,
+          currentTerrainId,
           handleStockChange,
           handleCityMultiplierChange,
+          handleCurrentTerrainChange,
           armes,
           persoArmes,
           outils,
@@ -625,6 +662,7 @@ function App() {
           timelineData: visibleTimelineData,
           removeLune: handleRemoveLune,
           updateLuneWeather,
+          toggleLuneAutoAssign,
           updateLuneToolAssignment,
           updateRation,
           toggleConstructionPlacement,
@@ -651,6 +689,12 @@ function App() {
           addSac: handleAddSac,
           updateSac,
           removeSac: handleRemoveSac,
+        }}
+        terrainsProps={{
+          terrains,
+          addTerrain,
+          updateTerrain,
+          removeTerrain,
         }}
       />
     </>

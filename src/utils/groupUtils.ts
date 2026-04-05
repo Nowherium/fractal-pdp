@@ -44,6 +44,13 @@ export const getPersoCombatValue = (
     ? 0
     : Number(perso?.combatEffectif ?? perso?.combat ?? 0);
 
+export const getPersoRawCombatValue = (
+  perso: Partial<Perso> | null | undefined,
+): number =>
+  isPersoCadavre(perso)
+    ? 0
+    : Number(perso?.combat ?? perso?.combatEffectif ?? 0);
+
 export const getPersoWeightValue = (
   perso: Partial<Perso> | null | undefined,
 ): number => Number(perso?.poidsTotal ?? 0);
@@ -80,19 +87,54 @@ export const getPersoCapacityValue = (
   }
 };
 
-export const calculateGroupTotals = (persos: Perso[] = []) =>
-  persos.reduce(
+export const getPersoRawCapacityValue = (
+  perso: Partial<Perso> | null | undefined,
+  type: PersoCapacityKey,
+): number => {
+  if (isPersoCadavre(perso)) {
+    return 0;
+  }
+
+  switch (type) {
+    case "eau":
+      return Number(perso?.capEau ?? perso?.capEauEffectif ?? 0);
+    case "nrt":
+      return Number(perso?.capNrt ?? perso?.capNrtEffectif ?? 0);
+    case "med":
+      return Number(perso?.capMed ?? perso?.capMedEffectif ?? 0);
+    case "mat":
+      return Number(perso?.capMat ?? perso?.capMatEffectif ?? 0);
+    case "art":
+      return Number(perso?.capart ?? perso?.capArtEffectif ?? 0);
+    default:
+      return 0;
+  }
+};
+
+export const calculateGroupTotals = (
+  persos: Perso[] = [],
+  options: { rawStats?: boolean } = {},
+) => {
+  const getCapacity = options.rawStats
+    ? getPersoRawCapacityValue
+    : getPersoCapacityValue;
+  const getCombat = options.rawStats
+    ? getPersoRawCombatValue
+    : getPersoCombatValue;
+
+  return persos.reduce(
     (acc, perso) => ({
-      eau: acc.eau + getPersoCapacityValue(perso, "eau"),
-      nrt: acc.nrt + getPersoCapacityValue(perso, "nrt"),
-      med: acc.med + getPersoCapacityValue(perso, "med"),
-      mat: acc.mat + getPersoCapacityValue(perso, "mat"),
-      art: acc.art + getPersoCapacityValue(perso, "art"),
+      eau: acc.eau + getCapacity(perso, "eau"),
+      nrt: acc.nrt + getCapacity(perso, "nrt"),
+      med: acc.med + getCapacity(perso, "med"),
+      mat: acc.mat + getCapacity(perso, "mat"),
+      art: acc.art + getCapacity(perso, "art"),
       poids: acc.poids + getPersoWeightValue(perso),
-      combat: acc.combat + getPersoCombatValue(perso),
+      combat: acc.combat + getCombat(perso),
     }),
     { eau: 0, nrt: 0, med: 0, mat: 0, art: 0, poids: 0, combat: 0 },
   );
+};
 
 export const recalculateGroups = (
   nextPersos: Perso[] = [],

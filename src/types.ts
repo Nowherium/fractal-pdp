@@ -10,7 +10,8 @@ export type AppPage =
   | "armes"
   | "outils"
   | "sacs"
-  | "resources";
+  | "resources"
+  | "terrains";
 
 export interface AppRouteState {
   page: AppPage;
@@ -31,6 +32,11 @@ export interface CityMultipliers {
   nrt: number;
   med: number;
   mat: number;
+}
+
+export interface Terrain extends CityMultipliers {
+  id: number;
+  name: string;
 }
 
 export interface WeatherCoefficients {
@@ -154,6 +160,7 @@ export interface Ration {
   eau: boolean;
   nrt: boolean;
   med: boolean;
+  dehors?: boolean;
   tache: string;
   drogue: string | null;
   constructionId?: string | null;
@@ -224,6 +231,7 @@ export interface Lune {
   overrides: Record<string, LuneOverride>;
   constructionPlacements: LunePlacement[];
   constructions: LuneConstruction[];
+  autoAssign?: boolean;
   toolAssignments?: TimelineToolAssignments;
   frozenTimeline?: FrozenTimelineData | null;
 }

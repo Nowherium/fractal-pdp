@@ -58,6 +58,9 @@ type DbRow = {
   data?: unknown;
   constructions?: unknown;
   tool_assignments?: unknown;
+  auto_assign?: unknown;
+  terrains?: unknown;
+  current_terrain_id?: unknown;
   meteo?: unknown;
   meteo_eau?: unknown;
   meteo_nrt?: unknown;
@@ -676,6 +679,7 @@ const buildLunes = (
       overrides: overridesByLune[Number(row.id)] || {},
       constructionPlacements,
       constructions: [],
+      autoAssign: normalizeBoolean(row.auto_assign, false),
       toolAssignments: normalizeLuneToolAssignments(row.tool_assignments),
       frozenTimeline,
     };

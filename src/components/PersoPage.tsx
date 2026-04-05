@@ -33,8 +33,8 @@ const persoFields: Array<{
   type: "number";
   step?: string;
 }> = [
-  { key: "capEau", label: "Capacité Eau", type: "number" },
   { key: "capNrt", label: "Capacité Nrt", type: "number" },
+  { key: "capEau", label: "Capacité Eau", type: "number" },
   { key: "capMed", label: "Capacité Med", type: "number" },
   { key: "capMat", label: "Capacité Mat", type: "number" },
   { key: "capart", label: "Capacité Art", type: "number" },

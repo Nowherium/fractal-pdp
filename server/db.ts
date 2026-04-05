@@ -4,6 +4,8 @@ export { getState, insertState } from "./db/state";
 export {
   updateStock,
   updateCityMultipliers,
+  updateTerrains,
+  updateCurrentTerrainId,
   updateCurrentLune,
   updateConstructions,
 } from "./db/city";

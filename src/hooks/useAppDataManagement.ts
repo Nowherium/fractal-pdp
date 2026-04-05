@@ -21,6 +21,7 @@ import type {
   Resource,
   Sac,
   Stocks,
+  Terrain,
 } from "../types";
 import {
   exportStateData,
@@ -43,6 +44,8 @@ interface UseAppDataManagementParams {
   nextPersoId: number;
   stocks: Stocks;
   cityMultipliers: CityMultipliers;
+  terrains: Terrain[];
+  currentTerrainId: number | null;
   groups: Group[];
   armes: Arme[];
   persoArmes: PersoArme[];
@@ -52,6 +55,7 @@ interface UseAppDataManagementParams {
   persoSacs: PersoSac[];
   setStocks: Dispatch<SetStateAction<Stocks>>;
   setCityMultipliers: Dispatch<SetStateAction<CityMultipliers>>;
+  setCurrentTerrainId: Dispatch<SetStateAction<number | null>>;
   setVisiblePastLunes: Dispatch<SetStateAction<number>>;
   setCurrentLune: Dispatch<SetStateAction<number>>;
   fileInputRef: RefObject<HTMLInputElement>;
@@ -59,6 +63,7 @@ interface UseAppDataManagementParams {
   setSaveStatus: Dispatch<SetStateAction<string>>;
   saveStockEntity: (code: string, quantity: number) => void;
   saveCityMultipliersEntity: (cityMultipliers: CityMultipliers) => void;
+  saveCurrentTerrainEntity: (currentTerrainId: number | null) => void;
   saveCurrentLuneEntity: (currentLune: number) => void;
   showToast: (message: string) => void;
 }
@@ -74,6 +79,8 @@ export const useAppDataManagement = ({
   nextPersoId,
   stocks,
   cityMultipliers,
+  terrains,
+  currentTerrainId,
   groups,
   armes,
   persoArmes,
@@ -83,6 +90,7 @@ export const useAppDataManagement = ({
   persoSacs,
   setStocks,
   setCityMultipliers,
+  setCurrentTerrainId,
   setVisiblePastLunes,
   setCurrentLune,
   fileInputRef,
@@ -90,6 +98,7 @@ export const useAppDataManagement = ({
   setSaveStatus,
   saveStockEntity,
   saveCityMultipliersEntity,
+  saveCurrentTerrainEntity,
   saveCurrentLuneEntity,
   showToast,
 }: UseAppDataManagementParams) => {
@@ -119,6 +128,22 @@ export const useAppDataManagement = ({
     [saveCityMultipliersEntity, setCityMultipliers],
   );
 
+  const handleCurrentTerrainChange = useCallback(
+    (rawValue: string | number) => {
+      const parsedValue = Number(rawValue);
+      const nextTerrainId =
+        rawValue === "" || rawValue === null || rawValue === undefined
+          ? null
+          : Number.isFinite(parsedValue)
+            ? parsedValue
+            : null;
+
+      setCurrentTerrainId(nextTerrainId);
+      saveCurrentTerrainEntity(nextTerrainId);
+    },
+    [saveCurrentTerrainEntity, setCurrentTerrainId],
+  );
+
   const handleCurrentLuneChange = useCallback(
     (rawValue: string | number) => {
       const nextCurrentLune = normalizeCurrentLune(rawValue);
@@ -141,6 +166,8 @@ export const useAppDataManagement = ({
       nextPersoId,
       stocks,
       cityMultipliers,
+      terrains,
+      currentTerrainId,
       groups,
       armes,
       persoArmes,
@@ -168,6 +195,8 @@ export const useAppDataManagement = ({
     sacs,
     showToast,
     stocks,
+    terrains,
+    currentTerrainId,
     outils,
   ]);
 
@@ -192,6 +221,7 @@ export const useAppDataManagement = ({
   return {
     handleStockChange,
     handleCityMultiplierChange,
+    handleCurrentTerrainChange,
     handleCurrentLuneChange,
     exportData,
     importData,

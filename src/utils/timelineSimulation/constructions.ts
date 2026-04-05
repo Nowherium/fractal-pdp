@@ -4,6 +4,7 @@ import type {
   ConstructionProgressSnapshot,
   ConstructionState,
   LuneTotals,
+  PersoDrugStocks,
   ProcessPersoResult,
   RuntimeConstructionProgress,
   SimulatedConstruction,
@@ -123,11 +124,17 @@ export const projectStocksForLune = (
 ): StockSnapshot => ({
   ...resourceStocks,
   eau:
-    Number(resourceStocks["eau"] ?? 0) + luneTotals.eau - luneTotals.consoEau,
+    Number(resourceStocks["eau"] ?? 0) +
+    luneTotals.eau -
+    luneTotals.cityConsoEau,
   nrt:
-    Number(resourceStocks["nrt"] ?? 0) + luneTotals.nrt - luneTotals.consoNrt,
+    Number(resourceStocks["nrt"] ?? 0) +
+    luneTotals.nrt -
+    luneTotals.cityConsoNrt,
   med:
-    Number(resourceStocks["med"] ?? 0) + luneTotals.med - luneTotals.consoMed,
+    Number(resourceStocks["med"] ?? 0) +
+    luneTotals.med -
+    luneTotals.cityConsoMed,
   mat: Number(resourceStocks["mat"] ?? 0) + luneTotals.mat,
 });
 
@@ -151,6 +158,7 @@ export const processConstructionProgress = ({
   constructionProgressById,
   capCourantes,
   combatCourants,
+  luneTotals,
 }: {
   constructionsForLune: SimulatedConstruction[];
   constructionAssignments: ConstructionAssignment[];
@@ -158,6 +166,7 @@ export const processConstructionProgress = ({
   constructionProgressById: Record<string, RuntimeConstructionProgress>;
   capCourantes: SimulationState["capCourantes"];
   combatCourants: SimulationState["combatCourants"];
+  luneTotals: LuneTotals;
 }): Record<string, ConstructionState> => {
   const assignmentsByConstructionId = groupAssignmentsByConstructionId(
     constructionAssignments,
@@ -206,6 +215,28 @@ export const processConstructionProgress = ({
     ) {
       projectedStocks[resourceCode] = availableResource - resourceCost;
       availableResource = Number(projectedStocks[resourceCode] ?? 0);
+
+      switch (resourceCode) {
+        case "eau":
+          luneTotals.consoEau += resourceCost;
+          luneTotals.cityConsoEau += resourceCost;
+          break;
+        case "nrt":
+          luneTotals.consoNrt += resourceCost;
+          luneTotals.cityConsoNrt += resourceCost;
+          break;
+        case "med":
+          luneTotals.consoMed += resourceCost;
+          luneTotals.cityConsoMed += resourceCost;
+          break;
+        case "mat":
+          luneTotals.consoMat += resourceCost;
+          luneTotals.cityConsoMat += resourceCost;
+          break;
+        default:
+          break;
+      }
+
       costPaid = true;
       started = true;
     }
@@ -294,20 +325,67 @@ export const processConstructionProgress = ({
   return constructionStates;
 };
 
+const buildCarriedStockSnapshot = (
+  carriedResourcesByPerso: PersoDrugStocks = {},
+): StockSnapshot => {
+  const totals = { eau: 0, nrt: 0, med: 0, mat: 0 };
+
+  Object.values(carriedResourcesByPerso).forEach((carriedResources) => {
+    totals["eau"] += Number(carriedResources?.["eau"] ?? 0);
+    totals["nrt"] += Number(carriedResources?.["nrt"] ?? 0);
+    totals["med"] += Number(carriedResources?.["med"] ?? 0);
+    totals["mat"] += Number(carriedResources?.["mat"] ?? 0);
+  });
+
+  return createStockSnapshot(totals);
+};
+
 export const buildStockStats = (
   projectedStocks: Record<string, number>,
   previousStocks: Record<string, number> = {},
+  luneTotals?: LuneTotals,
+  startingCarriedResources: PersoDrugStocks = {},
+  endingCarriedResources: PersoDrugStocks = {},
 ): TimelineStats => {
-  const nextStocks = createStockSnapshot(projectedStocks);
-  const startingStocks = createStockSnapshot(previousStocks);
+  const nextCityStocks = createStockSnapshot(projectedStocks);
+  const startingCityStocks = createStockSnapshot(previousStocks);
+  const startingCarriedStocks = buildCarriedStockSnapshot(
+    startingCarriedResources,
+  );
+  const endingCarriedStocks = buildCarriedStockSnapshot(endingCarriedResources);
+  const nextStocks = {
+    eau: nextCityStocks.eau + endingCarriedStocks.eau,
+    nrt: nextCityStocks.nrt + endingCarriedStocks.nrt,
+    med: nextCityStocks.med + endingCarriedStocks.med,
+    mat: nextCityStocks.mat + endingCarriedStocks.mat,
+  };
+  const startingStocks = {
+    eau: startingCityStocks.eau + startingCarriedStocks.eau,
+    nrt: startingCityStocks.nrt + startingCarriedStocks.nrt,
+    med: startingCityStocks.med + startingCarriedStocks.med,
+    mat: startingCityStocks.mat + startingCarriedStocks.mat,
+  };
+  const totals = luneTotals ?? createEmptyLuneTotals();
 
   return {
+    startEau: startingStocks.eau,
+    prodEau: totals.eau,
+    consoEau: totals.consoEau,
     stockEau: nextStocks.eau,
     deltaEau: nextStocks.eau - startingStocks.eau,
+    startNrt: startingStocks.nrt,
+    prodNrt: totals.nrt,
+    consoNrt: totals.consoNrt,
     stockNrt: nextStocks.nrt,
     deltaNrt: nextStocks.nrt - startingStocks.nrt,
+    startMed: startingStocks.med,
+    prodMed: totals.med,
+    consoMed: totals.consoMed,
     stockMed: nextStocks.med,
     deltaMed: nextStocks.med - startingStocks.med,
+    startMat: startingStocks.mat,
+    prodMat: totals.mat,
+    consoMat: totals.consoMat,
     stockMat: nextStocks.mat,
     deltaMat: nextStocks.mat - startingStocks.mat,
     classEau: nextStocks.eau < 0 ? "danger" : "safe",
@@ -325,6 +403,11 @@ export const createEmptyLuneTotals = (): LuneTotals => ({
   consoEau: 0,
   consoNrt: 0,
   consoMed: 0,
+  consoMat: 0,
+  cityConsoEau: 0,
+  cityConsoNrt: 0,
+  cityConsoMed: 0,
+  cityConsoMat: 0,
 });
 
 export const accumulatePersoResult = (
@@ -338,4 +421,9 @@ export const accumulatePersoResult = (
   luneTotals.consoEau += result.consumption.eau;
   luneTotals.consoNrt += result.consumption.nrt;
   luneTotals.consoMed += result.consumption.med;
+  luneTotals.consoMat += result.consumption.mat;
+  luneTotals.cityConsoEau += result.cityConsumption.eau;
+  luneTotals.cityConsoNrt += result.cityConsumption.nrt;
+  luneTotals.cityConsoMed += result.cityConsumption.med;
+  luneTotals.cityConsoMat += result.cityConsumption.mat;
 };

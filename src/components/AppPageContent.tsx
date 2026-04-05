@@ -4,6 +4,7 @@ import ReservePage from "./ReservePage";
 import ResourcesPage from "./ResourcesPage";
 import EffectifPage from "./EffectifPage";
 import PersoPage from "./PersoPage";
+import TerrainsPage from "./TerrainsPage";
 import GroupPage from "./GroupPage";
 import GroupEditPage from "./GroupEditPage";
 import GroupViewPage from "./GroupViewPage";
@@ -20,8 +21,11 @@ type ReserveDomainProps = Pick<
   | "resources"
   | "stocks"
   | "cityMultipliers"
+  | "terrains"
+  | "currentTerrainId"
   | "handleStockChange"
   | "handleCityMultiplierChange"
+  | "handleCurrentTerrainChange"
   | "armes"
   | "persoArmes"
   | "outils"
@@ -105,6 +109,7 @@ type TimelineDomainProps = Pick<
   | "timelineData"
   | "removeLune"
   | "updateLuneWeather"
+  | "toggleLuneAutoAssign"
   | "updateLuneToolAssignment"
   | "updateRation"
   | "toggleConstructionPlacement"
@@ -118,6 +123,7 @@ type TimelineDomainProps = Pick<
 type WeaponsDomainProps = ComponentProps<typeof WeaponsPage>;
 type ToolsDomainProps = ComponentProps<typeof ToolsPage>;
 type BagsDomainProps = ComponentProps<typeof BagsPage>;
+type TerrainsDomainProps = ComponentProps<typeof TerrainsPage>;
 
 interface AppPageContentProps {
   page: AppPage;
@@ -131,6 +137,7 @@ interface AppPageContentProps {
   weaponsProps: WeaponsDomainProps;
   toolsProps: ToolsDomainProps;
   bagsProps: BagsDomainProps;
+  terrainsProps: TerrainsDomainProps;
 }
 
 function AppPageContent({
@@ -145,12 +152,15 @@ function AppPageContent({
   weaponsProps,
   toolsProps,
   bagsProps,
+  terrainsProps,
 }: AppPageContentProps) {
   switch (page) {
     case "reserve":
       return <ReservePage {...reserveProps} />;
     case "resources":
       return <ResourcesPage {...resourcesProps} />;
+    case "terrains":
+      return <TerrainsPage {...terrainsProps} />;
     case "effectif":
       return <EffectifPage {...effectifProps} />;
     case "groupes":

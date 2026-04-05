@@ -14,9 +14,11 @@ import type {
   Resource,
   Sac,
   Stocks,
+  Terrain,
 } from "../types";
 import { sortResources } from "../utils/resourceOrder";
 import { normalizeStockQuantity } from "../utils/stateUtils";
+import { formatTerrainOptionLabel } from "../utils/terrainUtils";
 
 const formatWeight = (value: number | string | null | undefined) =>
   Number(value ?? 0).toFixed(2);
@@ -48,8 +50,11 @@ function ReservePage({
   resources,
   stocks,
   cityMultipliers,
+  terrains,
+  currentTerrainId,
   handleStockChange,
   handleCityMultiplierChange,
+  handleCurrentTerrainChange,
   armes,
   persoArmes,
   outils,
@@ -60,11 +65,14 @@ function ReservePage({
   resources: Resource[];
   stocks: Stocks;
   cityMultipliers: CityMultipliers;
+  terrains: Terrain[];
+  currentTerrainId: number | null;
   handleStockChange: (field: string, rawValue: string | number) => void;
   handleCityMultiplierChange: (
     field: keyof CityMultipliers,
     rawValue: string | number,
   ) => void;
+  handleCurrentTerrainChange: (rawValue: string | number) => void;
   armes: Arme[];
   persoArmes: PersoArme[];
   outils: Outil[];
@@ -190,9 +198,26 @@ function ReservePage({
       <InfoText>
         La ville applique ici des <strong>multiplicateurs de production</strong>{" "}
         pour tous les persos. <strong>1</strong> = normal, <strong>1.2</strong>{" "}
-        = +20 %, <strong>0</strong> = aucune production.
+        = +20 %, <strong>0</strong> = aucune production. Le terrain actif se
+        cumule avec les <strong>bonus bâtiments</strong>.
       </InfoText>
 
+      <Field label='Terrain actuel' className='mb-4'>
+        <select
+          className={fieldInputClassName}
+          value={currentTerrainId ?? ""}
+          onChange={(event) => handleCurrentTerrainChange(event.target.value)}
+        >
+          <option value=''>Aucun terrain sélectionné</option>
+          {terrains.map((terrain) => (
+            <option key={terrain.id} value={terrain.id}>
+              {formatTerrainOptionLabel(terrain)}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <h3>Bonus bâtiments</h3>
       <div className={`${cardGridClassName} mb-4`}>
         {cityBonusFields.map((field) => (
           <Field key={field.key} label={`Bonus ${field.label}`}>

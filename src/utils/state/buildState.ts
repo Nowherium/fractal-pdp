@@ -5,6 +5,7 @@ import type {
   Resource,
   Stocks,
 } from "../../types";
+import { normalizeCurrentTerrainId, normalizeTerrains } from "../terrainUtils";
 import {
   buildConstructionProgressById,
   mergeConstructionProgressIntoConstructions,
@@ -72,6 +73,8 @@ export const buildFallbackState = () => {
     currentLune: 1,
     stocks: defaultStocks,
     cityMultipliers: defaultCityMultipliers,
+    terrains: [],
+    currentTerrainId: null,
     nextPersoId: 1,
     groups: [],
     armes: [],
@@ -124,6 +127,13 @@ export const buildState = (rawState: unknown = {}) => {
       : {};
 
   const persos = normalizePersos(rawPersos);
+  const terrains = normalizeTerrains(
+    Array.isArray(source.terrains) ? source.terrains : [],
+  );
+  const currentTerrainId = normalizeCurrentTerrainId(
+    source.currentTerrainId,
+    terrains,
+  );
   const lunes = normalizeLunes(rawLunes, persos);
   const currentLune = normalizeCurrentLune(source.currentLune);
   const rawConstructions = Array.isArray(source.constructions)
@@ -151,6 +161,8 @@ export const buildState = (rawState: unknown = {}) => {
     currentLune,
     stocks: { ...buildStocks(resources), ...rawStocks },
     cityMultipliers: normalizeCityMultipliers(rawCityMultipliers),
+    terrains,
+    currentTerrainId,
     nextPersoId: Number.isFinite(nextPersoIdCandidate)
       ? nextPersoIdCandidate
       : getDefaultNextPersoId(persos),

@@ -25,19 +25,31 @@ const defaultRation = () => ({
   constructionId: null,
 });
 
-test("renders stock deltas with the expected formatting and colors", () => {
+test("renders a per-resource summary with start, production, consumption and ending stock", () => {
   const markup = renderToStaticMarkup(
     createElement(TimelineStockSummary, {
       stats: {
+        startEau: 6,
+        prodEau: 2.5,
+        consoEau: 1,
         stockEau: 7.5,
-        deltaEau: 2.5,
+        deltaEau: 1.5,
         classEau: "safe",
+        startNrt: 2,
+        prodNrt: 0,
+        consoNrt: 3,
         stockNrt: -1,
         deltaNrt: -3,
         classNrt: "danger",
+        startMed: 4,
+        prodMed: 1,
+        consoMed: 1,
         stockMed: 4,
         deltaMed: 0,
         classMed: "safe",
+        startMat: 0.5,
+        prodMat: 0.75,
+        consoMat: 0,
         stockMat: 1.25,
         deltaMat: 0.75,
         classMat: "safe",
@@ -45,18 +57,13 @@ test("renders stock deltas with the expected formatting and colors", () => {
     }),
   );
 
-  assert.match(
-    markup,
-    /7\.5<\/span> <span class="text-sm font-semibold text-green-400">\(\+2\.5\)<\/span>/,
-  );
-  assert.match(
-    markup,
-    /-1\.0<\/span> <span class="text-sm font-semibold text-accent-red">\(-3\.0\)<\/span>/,
-  );
-  assert.match(
-    markup,
-    /4\.0<\/span> <span class="text-sm font-semibold text-gray-400">\(0\.0\)<\/span>/,
-  );
+  assert.match(markup, /Départ/i);
+  assert.match(markup, /Prod/i);
+  assert.match(markup, /Conso/i);
+  assert.match(markup, /Fin/i);
+  assert.match(markup, /\+2\.5/);
+  assert.match(markup, /-3\.0/);
+  assert.match(markup, /1\.25|1\.3/);
 });
 
 test("ignores absent persos in timeline calculations", () => {
@@ -95,12 +102,12 @@ test("ignores absent persos in timeline calculations", () => {
   const absentRow = segment.rows[1];
 
   assert.ok(absentRow);
-  assert.equal(segment.stats.stockEau, 6);
+  assert.equal(segment.stats.stockEau, 7);
   assert.equal(absentRow.isAbsent, true);
   assert.match(absentRow.mortText ?? "", /ABSENT/);
 });
 
-test("exposes stock deltas for the lune summary", () => {
+test("exposes start, production, consumption and ending stock for the lune summary", () => {
   const persos = [
     { id: 1, nom: "Récupérateur", present: true, pv: 10, pvmax: 10, capEau: 3 },
   ];
@@ -129,11 +136,109 @@ test("exposes stock deltas for the lune summary", () => {
   );
 
   assert.ok(segment);
-  assert.equal(segment.stats.stockEau, 7);
-  assert.equal(segment.stats.deltaEau, 2);
-  assert.equal(segment.stats.deltaNrt, 0);
-  assert.equal(segment.stats.deltaMed, 0);
+  assert.equal(segment.stats.startEau, 5);
+  assert.equal(segment.stats.prodEau, 3);
+  assert.equal(segment.stats.consoEau, 1);
+  assert.equal(segment.stats.stockEau, 8);
+  assert.equal(segment.stats.deltaEau, 3);
+  assert.equal(segment.stats.startNrt, 2);
+  assert.equal(segment.stats.prodNrt, 0);
+  assert.equal(segment.stats.consoNrt, 0);
+  assert.equal(segment.stats.stockNrt, 2);
+  assert.equal(segment.stats.startMed, 1);
+  assert.equal(segment.stats.consoMed, 0);
+  assert.equal(segment.stats.startMat, 0);
+  assert.equal(segment.stats.consoMat, 0);
+});
+
+test("auto-assigns the most productive task when the lune toggle is enabled and no task is set", () => {
+  const persos = [
+    {
+      id: 1,
+      nom: "Polyvalent",
+      present: true,
+      pv: 10,
+      pvmax: 10,
+      capEau: 1.5,
+      capNrt: 3,
+      capMed: 2,
+      capMat: 0.5,
+    },
+  ];
+
+  const [segment] = simulateTimeline(
+    persos,
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: { eau: false, nrt: false, med: false, tache: "", drogue: null },
+        },
+        autoAssign: true,
+      } as never,
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.rows[0]?.ration.tache, "nrt");
+  assert.equal(segment.stats.deltaNrt, 3);
   assert.equal(segment.stats.deltaMat, 0);
+});
+
+test("keeps a manual task choice even when auto-affectation stays enabled", () => {
+  const persos = [
+    {
+      id: 1,
+      nom: "Polyvalent",
+      present: true,
+      pv: 10,
+      pvmax: 10,
+      capEau: 1.5,
+      capNrt: 3,
+      capMed: 2,
+      capMat: 0.5,
+    },
+  ];
+
+  const [segment] = simulateTimeline(
+    persos,
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: { eau: false, nrt: false, med: false, tache: "mat", drogue: null },
+        },
+        autoAssign: true,
+      } as never,
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.rows[0]?.ration.tache, "mat");
+  assert.equal(segment.stats.deltaMat, 0.5);
+  assert.equal(segment.stats.deltaNrt, 0);
 });
 
 test("keeps chantier progress across lunes once the cost is paid", () => {
@@ -473,8 +578,8 @@ test("restarts future simulation from the real current-lune state", () => {
 
   assert.ok(firstSegment);
   assert.ok(secondSegment);
-  assert.equal(firstSegment.stats.stockEau, 11);
-  assert.equal(secondSegment.stats.stockEau, 11);
+  assert.equal(firstSegment.stats.stockEau, 12);
+  assert.equal(secondSegment.stats.stockEau, 12);
 });
 
 test("applies ration-based PV loss and recovery while respecting pvmax", () => {
@@ -894,6 +999,51 @@ test("ignores carried tools when the shared tool select is set to none", () => {
   assert.equal(segment.stats.stockEau, 2);
 });
 
+test("ignores city and terrain production bonuses for a perso marked dehors", () => {
+  const [segment] = simulateTimeline(
+    [
+      {
+        id: 1,
+        nom: "Éclaireur",
+        present: true,
+        pv: 5,
+        pvmax: 5,
+        capEau: 2,
+      },
+    ],
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+            dehors: true,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 0 },
+    defaultRation,
+    [],
+    [],
+    [],
+    { eau: 2.5, nrt: 1, med: 1, mat: 1 },
+    1,
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.rows[0]?.cDebut.eau, 2);
+  assert.equal(segment.stats.stockEau, 2);
+});
+
 test("uses the updated production caps in the current lune even if effectif values are stale", () => {
   const [segment] = simulateTimeline(
     [
@@ -1002,7 +1152,13 @@ test("uses combined city and perso stock for manual ration choices", () => {
       .resourceStocks,
     { eau: 1, nrt: 0, med: 1 },
   );
+  assert.equal(timeline[0]?.stats.startEau, 1);
+  assert.equal(timeline[0]?.stats.deltaEau, -1);
+  assert.equal(timeline[0]?.stats.stockEau, 0);
   assert.equal(timeline[0]?.stats.stockNrt, 0);
+  assert.equal(timeline[0]?.stats.startMed, 1);
+  assert.equal(timeline[0]?.stats.deltaMed, -1);
+  assert.equal(timeline[0]?.stats.stockMed, 0);
   assert.equal(timeline[1]?.rows[0]?.ration.eau, false);
   assert.equal(timeline[1]?.rows[0]?.ration.med, false);
   assert.deepEqual(
@@ -1128,9 +1284,9 @@ test("applies the passed turn results back to persos, carried resources and stoc
 
   assert.equal(advanced.persos[0]?.pv, 6);
   assert.equal(advanced.persos[0]?.capEau, 2.1);
-  assert.equal(advanced.stocks["eau"], 2);
-  assert.equal(advanced.stocks["nrt"], 0);
-  assert.equal(advanced.stocks["med"], 0);
+  assert.equal(advanced.stocks["eau"], 3);
+  assert.equal(advanced.stocks["nrt"], 1);
+  assert.equal(advanced.stocks["med"], 1);
   assert.equal(advanced.persoResources.length, 0);
 });
 

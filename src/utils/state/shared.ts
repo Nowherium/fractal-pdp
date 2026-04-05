@@ -4,6 +4,7 @@ import type {
   Perso,
   Ration,
   Resource,
+  Terrain,
   Stocks,
   WeatherCoefficients,
 } from "../../types";
@@ -18,6 +19,8 @@ export type RawState = {
   currentLune?: unknown;
   stocks?: unknown;
   cityMultipliers?: unknown;
+  terrains?: unknown;
+  currentTerrainId?: unknown;
   nextPersoId?: unknown;
   groups?: unknown;
   armes?: unknown;
@@ -102,10 +105,34 @@ export const normalizeWeatherCoefficients = (
   };
 };
 
+export const normalizeLuneAutoAssign = (
+  value: unknown,
+  fallback = false,
+): boolean => {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (["false", "0", "off", "no", "non"].includes(normalized)) {
+      return false;
+    }
+
+    if (["true", "1", "on", "yes", "oui"].includes(normalized)) {
+      return true;
+    }
+  }
+
+  return Boolean(value);
+};
+
 export const defaultRation = (): Ration => ({
   eau: true,
   nrt: true,
   med: true,
+  dehors: false,
   tache: "",
   drogue: null,
   constructionId: null,
@@ -204,3 +231,5 @@ export const buildStocks = (
 
 export const getDefaultNextPersoId = (persos: Perso[] = []): number =>
   Math.max(1, ...persos.map((perso) => perso.id + 1));
+
+export type TerrainInput = Partial<Terrain>;

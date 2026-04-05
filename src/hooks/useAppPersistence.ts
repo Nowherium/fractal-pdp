@@ -11,6 +11,7 @@ import type {
   Lune,
   LuneConstruction,
   Outil,
+  Terrain,
   Perso,
   PersoArme,
   PersoOutil,
@@ -79,6 +80,14 @@ export const useAppEntitySaves = ({
     saveCityMultipliersEntity: (cityMultipliers: CityMultipliers) =>
       queueSave(`city-multipliers`, `/api/city-multipliers`, {
         cityMultipliers,
+      }),
+    saveTerrainsEntity: (terrains: Terrain[]) =>
+      queueSave(`terrains`, `/api/terrains`, {
+        terrains,
+      }),
+    saveCurrentTerrainEntity: (currentTerrainId: number | null) =>
+      queueSave(`current-terrain`, `/api/current-terrain`, {
+        currentTerrainId,
       }),
     saveCurrentLuneEntity: (currentLune: number) =>
       queueSave(`current-lune`, `/api/current-lune`, {

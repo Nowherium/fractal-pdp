@@ -15,6 +15,7 @@ function TimelinePage({
   timelineData,
   removeLune,
   updateLuneWeather,
+  toggleLuneAutoAssign,
   updateLuneToolAssignment,
   updateRation,
   toggleConstructionPlacement,
@@ -36,6 +37,7 @@ function TimelinePage({
     field: "eau" | "nrt" | "med" | "mat",
     rawValue: string | number,
   ) => void;
+  toggleLuneAutoAssign: (luneIndex: number, checked: boolean) => void;
   updateLuneToolAssignment: (
     luneIndex: number,
     specialite: "eau" | "nrt" | "med" | "mat" | "art",
@@ -44,7 +46,14 @@ function TimelinePage({
   updateRation: (
     luneIndex: number,
     persoId: number,
-    field: "tache" | "eau" | "nrt" | "med" | "drogue" | "constructionId",
+    field:
+      | "tache"
+      | "eau"
+      | "nrt"
+      | "med"
+      | "dehors"
+      | "drogue"
+      | "constructionId",
     value: string | boolean,
   ) => void;
   toggleConstructionPlacement: (
@@ -81,7 +90,11 @@ function TimelinePage({
         <strong>ville + perso</strong> est suffisant. La
         <strong> météo</strong> de chaque lune définit{" "}
         <strong>4 coefficients</strong> distincts pour `nrt`, `eau`, `med` et
-        `mat`, chacun entre <strong>0</strong> et <strong>1</strong>.
+        `mat`, chacun entre <strong>0</strong> et <strong>1</strong>. Le toggle
+        <strong> affectation auto</strong> choisit la meilleure production pour
+        chaque perso tant qu’il reste actif. La case <strong>Dehors</strong>
+        neutralise les bonus <strong>ville + terrain</strong> pour le perso sur
+        la lune concernée.
       </InfoText>
       <div id='timeline'>
         {timelineData.map((segment, luneIndex) => (
@@ -97,6 +110,7 @@ function TimelinePage({
             onShowAbsentPersosChange={setShowAbsentPersos}
             removeLune={removeLune}
             updateLuneWeather={updateLuneWeather}
+            toggleLuneAutoAssign={toggleLuneAutoAssign}
             updateLuneToolAssignment={updateLuneToolAssignment}
             updateRation={updateRation}
             toggleConstructionPlacement={toggleConstructionPlacement}

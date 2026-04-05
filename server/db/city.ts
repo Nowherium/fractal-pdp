@@ -15,6 +15,50 @@ type CityMultiplierInput = {
   mat?: unknown;
 } & Record<string, unknown>;
 
+type TerrainInput = {
+  id?: unknown;
+  name?: unknown;
+  eau?: unknown;
+  nrt?: unknown;
+  med?: unknown;
+  mat?: unknown;
+} & Record<string, unknown>;
+
+const normalizeTerrainPayload = (terrains: unknown): TerrainInput[] =>
+  (Array.isArray(terrains) ? terrains : []).map((terrain, index) => {
+    const current =
+      terrain && typeof terrain === "object"
+        ? (terrain as TerrainInput)
+        : ({} as TerrainInput);
+    const id = Number(current.id);
+
+    return {
+      id: Number.isFinite(id) ? id : index + 1,
+      name:
+        String(current.name ?? `Terrain ${index + 1}`).trim() ||
+        `Terrain ${index + 1}`,
+      eau: normalizeMultiplier(current.eau, defaultCityMultipliers.eau),
+      nrt: normalizeMultiplier(current.nrt, defaultCityMultipliers.nrt),
+      med: normalizeMultiplier(current.med, defaultCityMultipliers.med),
+      mat: normalizeMultiplier(current.mat, defaultCityMultipliers.mat),
+    };
+  });
+
+const normalizeCurrentTerrainId = (
+  currentTerrainId: unknown,
+): number | null => {
+  if (
+    currentTerrainId === null ||
+    currentTerrainId === undefined ||
+    currentTerrainId === ""
+  ) {
+    return null;
+  }
+
+  const numericValue = Number(currentTerrainId);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
 const updateStocks = async (stocks: Record<string, unknown>) => {
   const payload = buildStocksPayload(stocks);
 
@@ -68,6 +112,34 @@ const updateCityMultipliers = async (
   );
 };
 
+const updateTerrains = async (terrains: unknown = []) => {
+  const payload = normalizeTerrainPayload(terrains);
+
+  await pool.query(
+    `INSERT INTO cities (id, name, terrains)
+     VALUES ($1, $2, $3::jsonb)
+     ON CONFLICT (id)
+     DO UPDATE SET
+       name = EXCLUDED.name,
+       terrains = EXCLUDED.terrains`,
+    [defaultCity.id, defaultCity.name, JSON.stringify(payload)],
+  );
+};
+
+const updateCurrentTerrainId = async (currentTerrainId: unknown) => {
+  const payload = normalizeCurrentTerrainId(currentTerrainId);
+
+  await pool.query(
+    `INSERT INTO cities (id, name, current_terrain_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (id)
+     DO UPDATE SET
+       name = EXCLUDED.name,
+       current_terrain_id = EXCLUDED.current_terrain_id`,
+    [defaultCity.id, defaultCity.name, payload],
+  );
+};
+
 const updateCurrentLune = async (currentLune: string | number) => {
   const payload = normalizeCurrentLuneValue(currentLune, defaultCurrentLune);
 
@@ -99,6 +171,8 @@ const updateConstructions = async (constructions = []) => {
 export {
   updateStock,
   updateCityMultipliers,
+  updateTerrains,
+  updateCurrentTerrainId,
   updateCurrentLune,
   updateConstructions,
 };

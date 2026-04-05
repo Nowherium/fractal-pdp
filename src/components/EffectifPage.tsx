@@ -9,8 +9,8 @@ import type { Perso, PersoResource, Resource } from "../types";
 import { confirmAction } from "../utils/confirmAction";
 import { normalizeStockQuantity } from "../utils/stateUtils";
 import {
-  getPersoCapacityValue,
-  getPersoCombatValue,
+  getPersoRawCapacityValue,
+  getPersoRawCombatValue,
   getPersoWeightLimit,
   getPersoWeightValue,
   isPersoCadavre,
@@ -40,6 +40,13 @@ const capacityFields = [
   { key: "med", label: "💊 Med" },
   { key: "mat", label: "🧱 Mat" },
   { key: "art", label: "🎭 Art" },
+] as const;
+
+const carriedResourceFields = [
+  { key: "nrt", label: "🍗 Nrt" },
+  { key: "eau", label: "💧 Eau" },
+  { key: "med", label: "💊 Med" },
+  { key: "mat", label: "🧱 Mat" },
 ] as const;
 
 function EffectifPage({
@@ -99,6 +106,29 @@ function EffectifPage({
       Number(entry.quantity ?? 0),
     ]),
   );
+  const presentPersoIds = new Set(
+    persos
+      .filter((perso) => perso.present !== false && !isPersoCadavre(perso))
+      .map((perso) => Number(perso.id)),
+  );
+  const carriedTotals = new Map(
+    carriedResourceFields.map(({ key }) => [
+      key,
+      normalizeStockQuantity(
+        persoResources.reduce((total, entry) => {
+          if (!presentPersoIds.has(Number(entry.perso_id))) {
+            return total;
+          }
+
+          const resourceCode = resourceCodeById.get(Number(entry.resource_id));
+
+          return resourceCode === key
+            ? total + Number(entry.quantity ?? 0)
+            : total;
+        }, 0),
+      ),
+    ]),
+  );
 
   return (
     <Panel>
@@ -112,10 +142,11 @@ function EffectifPage({
         />
       </div>
       <InfoText>
-        Indiquez la capacité originelle. Depuis cette vue, vous pouvez aussi
-        ajuster rapidement les stocks portés de <strong>`eau`</strong>,
-        <strong>`nrt`</strong> et <strong>`med`</strong> directement dans le
-        tableau.
+        Indiquez la capacité originelle. Les colonnes affichent ici les
+        <strong> caractéristiques brutes</strong> des persos. Depuis cette vue,
+        vous pouvez aussi ajuster rapidement les stocks portés de
+        <strong>`eau`</strong>, <strong>`nrt`</strong> et <strong>`med`</strong>
+        directement dans le tableau.
       </InfoText>
       <table>
         <thead>
@@ -169,7 +200,7 @@ function EffectifPage({
                     <td key={field.key} className={highlightCellClassName}>
                       <div className='flex min-w-[72px] flex-col gap-1'>
                         <span className='font-semibold'>
-                          {formatCombat(getPersoCapacityValue(p, field.key))}
+                          {formatCombat(getPersoRawCapacityValue(p, field.key))}
                         </span>
                         {canQuickEdit && showStocks ? (
                           <label className='flex items-center gap-1 text-[0.72rem] text-[#9ea7b3]'>
@@ -203,7 +234,7 @@ function EffectifPage({
                 })}
                 <td className={highlightCellClassName}>{p.cmd}</td>
                 <td className={highlightCellClassName}>
-                  {formatCombat(getPersoCombatValue(p))}
+                  {formatCombat(getPersoRawCombatValue(p))}
                 </td>
                 <td
                   className={`${highlightCellClassName} ${isPersoOverweight(p) ? "font-bold text-accent-red" : ""}`}
@@ -251,6 +282,26 @@ function EffectifPage({
           })}
         </tbody>
       </table>
+      <div className='mt-4 rounded-lg border border-[#2a2a2a] bg-[#151515] p-3'>
+        <div className='mb-2 text-sm font-semibold text-[#d7e3f4]'>
+          Porté par les présents
+        </div>
+        <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-4'>
+          {carriedResourceFields.map((field) => (
+            <div
+              key={field.key}
+              className='rounded-md border border-[#2f2f2f] bg-[#101010] px-3 py-2'
+            >
+              <div className='text-[0.72rem] uppercase tracking-[0.08em] text-[#9ea7b3]'>
+                {field.label}
+              </div>
+              <div className='text-lg font-semibold text-[#f5f7fa]'>
+                {carriedTotals.get(field.key) ?? 0}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
       <Button className='mt-3' variant='success' onClick={addPerso}>
         + Recruter un membre
       </Button>

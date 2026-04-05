@@ -25,11 +25,39 @@ import { computeIncrement, formatDisplayValue } from "../timelineHelpers";
 
 import { getOrCreatePersoCaps } from "./state";
 
-const productionTaskKeys = ["eau", "nrt", "med", "mat"] as const;
+const productionTaskKeys = ["nrt", "eau", "med", "mat"] as const;
 type ProductionTaskKey = (typeof productionTaskKeys)[number];
 
 const isProductionTask = (task: string): task is ProductionTaskKey =>
   productionTaskKeys.includes(task as ProductionTaskKey);
+
+const getAutoAssignedTask = (
+  productionCaps: Pick<PersoCaps, ProductionTaskKey>,
+  preferredTask: string,
+): ProductionTaskKey => {
+  const preferredProductionTask = isProductionTask(preferredTask)
+    ? preferredTask
+    : null;
+
+  return productionTaskKeys.reduce<ProductionTaskKey>((bestTask, task) => {
+    const bestValue = Number(productionCaps[bestTask] ?? 0);
+    const taskValue = Number(productionCaps[task] ?? 0);
+
+    if (taskValue > bestValue) {
+      return task;
+    }
+
+    if (taskValue < bestValue) {
+      return bestTask;
+    }
+
+    if (preferredProductionTask === task) {
+      return task;
+    }
+
+    return bestTask;
+  }, preferredProductionTask ?? productionTaskKeys[0]);
+};
 
 const buildAvailableDrugsMap = (
   remainingStocks: Record<string, number> = {},
@@ -156,6 +184,7 @@ export const simulatePersoForLune = ({
     eau: Boolean(storedRation.eau),
     nrt: Boolean(storedRation.nrt),
     med: Boolean(storedRation.med),
+    dehors: Boolean(storedRation.dehors),
   };
 
   const baseCapsAtStart: PersoCaps = {
@@ -198,22 +227,30 @@ export const simulatePersoForLune = ({
       effectiveCap: number;
     }
   >;
+  const effectiveProductionMultipliers = ration.dehors
+    ? {
+        eau: 1,
+        nrt: 1,
+        med: 1,
+        mat: 1,
+      }
+    : productionMultipliers;
   let cDebut: PersoCaps = {
     eau:
       capStateAtStart.eau.effectiveCap *
-      productionMultipliers.eau *
+      effectiveProductionMultipliers.eau *
       weatherCoefficients.eau,
     nrt:
       capStateAtStart.nrt.effectiveCap *
-      productionMultipliers.nrt *
+      effectiveProductionMultipliers.nrt *
       weatherCoefficients.nrt,
     med:
       capStateAtStart.med.effectiveCap *
-      productionMultipliers.med *
+      effectiveProductionMultipliers.med *
       weatherCoefficients.med,
     mat:
       capStateAtStart.mat.effectiveCap *
-      productionMultipliers.mat *
+      effectiveProductionMultipliers.mat *
       weatherCoefficients.mat,
     art: capStateAtStart.art.effectiveCap,
   };
@@ -225,7 +262,8 @@ export const simulatePersoForLune = ({
   let drugClassName = "";
   let temporaryPvBonus = 0;
   const production = { eau: 0, nrt: 0, med: 0, mat: 0 };
-  const consumption = { eau: 0, nrt: 0, med: 0 };
+  const consumption = { eau: 0, nrt: 0, med: 0, mat: 0 };
+  const cityConsumption = { eau: 0, nrt: 0, med: 0, mat: 0 };
   let constructionAssignment = null;
 
   if (isAbsent) {
@@ -257,6 +295,7 @@ export const simulatePersoForLune = ({
       },
       production,
       consumption,
+      cityConsumption,
       constructionAssignment,
     };
   }
@@ -308,6 +347,22 @@ export const simulatePersoForLune = ({
     }
   }
 
+  const hasManualTask =
+    typeof storedRation.tache === "string" && storedRation.tache.trim() !== "";
+
+  if (lune.autoAssign && !hasManualTask && !isAbsent && !mortAuDebut) {
+    ration.tache = getAutoAssignedTask(
+      {
+        nrt: cDebut.nrt,
+        eau: cDebut.eau,
+        med: cDebut.med,
+        mat: cDebut.mat,
+      },
+      storedRation.tache,
+    );
+    ration.constructionId = null;
+  }
+
   if (!mortAuDebut) {
     if (isProductionTask(ration.tache)) {
       production[ration.tache] += cDebut[ration.tache];
@@ -325,19 +380,21 @@ export const simulatePersoForLune = ({
       };
     }
 
-    const consumeRationResource = (resourceCode: "eau" | "nrt" | "med") => {
+    const consumeRationResource = (
+      resourceCode: "eau" | "nrt" | "med",
+    ): "perso" | "ville" | "none" => {
       if (!ration[resourceCode]) {
-        return false;
+        return "none";
       }
 
       if (!availableResourceCodes.has(resourceCode)) {
-        return true;
+        return "perso";
       }
 
       const persoQuantity = Number(persoDrugStocks[resourceCode] ?? 0);
       if (persoQuantity >= 1) {
         persoDrugStocks[resourceCode] = Math.max(0, persoQuantity - 1);
-        return true;
+        return "perso";
       }
 
       const cityQuantity = Number(
@@ -348,24 +405,37 @@ export const simulatePersoForLune = ({
           0,
           cityQuantity - 1,
         );
-        return true;
+        return "ville";
       }
 
-      return false;
+      return "none";
     };
 
-    ration.eau = consumeRationResource("eau");
-    ration.nrt = consumeRationResource("nrt");
-    ration.med = consumeRationResource("med");
+    const eauSource = consumeRationResource("eau");
+    const nrtSource = consumeRationResource("nrt");
+    const medSource = consumeRationResource("med");
+
+    ration.eau = eauSource !== "none";
+    ration.nrt = nrtSource !== "none";
+    ration.med = medSource !== "none";
 
     if (ration.eau) {
       consumption.eau += 1;
+      if (eauSource === "ville") {
+        cityConsumption.eau += 1;
+      }
     }
     if (ration.nrt) {
       consumption.nrt += 1;
+      if (nrtSource === "ville") {
+        cityConsumption.nrt += 1;
+      }
     }
     if (ration.med) {
       consumption.med += 1;
+      if (medSource === "ville") {
+        cityConsumption.med += 1;
+      }
     }
 
     const hasFullRation = ration.eau && ration.nrt && ration.med;
@@ -406,6 +476,7 @@ export const simulatePersoForLune = ({
     },
     production,
     consumption,
+    cityConsumption,
     constructionAssignment,
   };
 };

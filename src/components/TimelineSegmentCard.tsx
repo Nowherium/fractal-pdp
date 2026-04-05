@@ -6,9 +6,11 @@ import TimelineSegmentHeader from "./TimelineSegmentHeader";
 import TimelineSharedToolsSection from "./TimelineSharedToolsSection";
 import TimelineStockSummary from "./TimelineStockSummary";
 import TimelineWeatherSection from "./TimelineWeatherSection";
+import Button from "./ui/Button";
 
 import type { Outil, Resource, ToolSpecialite } from "../types";
 import { getPlacedConstructionIdsForLune } from "../utils/stateUtils";
+import { downloadTimelineExportText } from "../utils/timelineExport";
 import type { TimelineSegment } from "../utils/timelineTypes";
 
 type TimelineRationField =
@@ -16,6 +18,7 @@ type TimelineRationField =
   | "eau"
   | "nrt"
   | "med"
+  | "dehors"
   | "drogue"
   | "constructionId";
 
@@ -28,7 +31,7 @@ function TimelineEmptyStateRow({ message }: { message: string }) {
   return (
     <tr>
       <td
-        colSpan={9}
+        colSpan={10}
         className='py-3 text-center text-[0.85em] italic text-[#9ea7b3]'
       >
         {message}
@@ -52,6 +55,7 @@ interface TimelineSegmentCardProps {
     field: "eau" | "nrt" | "med" | "mat",
     rawValue: string | number,
   ) => void;
+  toggleLuneAutoAssign: (luneIndex: number, checked: boolean) => void;
   updateLuneToolAssignment: (
     luneIndex: number,
     specialite: ToolSpecialite,
@@ -90,6 +94,7 @@ function TimelineSegmentCard({
   onShowAbsentPersosChange,
   removeLune,
   updateLuneWeather,
+  toggleLuneAutoAssign,
   updateLuneToolAssignment,
   updateRation,
   toggleConstructionPlacement,
@@ -126,8 +131,12 @@ function TimelineSegmentCard({
         isPastLune={isPastLune}
         isLockedLune={isLockedLune}
         isCompactView={isCompactView}
+        autoAssign={Boolean(segment.lune.autoAssign)}
         showAbsentPersos={showAbsentPersos}
         onCompactViewChange={handleCompactViewChange}
+        onAutoAssignChange={(checked) =>
+          toggleLuneAutoAssign(actualLuneIndex, checked)
+        }
         onShowAbsentPersosChange={onShowAbsentPersosChange}
         onRemove={() => removeLune(actualLuneIndex)}
       />
@@ -170,6 +179,7 @@ function TimelineSegmentCard({
             <tr>
               <th>Nom</th>
               <th>PV Début</th>
+              <th>Dehors</th>
               <th style={{ backgroundColor: "#113333" }}>TÂCHE</th>
               <th>Drogue (1 max)</th>
               <th>Mange</th>
@@ -205,6 +215,19 @@ function TimelineSegmentCard({
         </table>
 
         <TimelineStockSummary stats={segment.stats} />
+
+        {isCurrentLune ? (
+          <div className='mt-3 flex justify-end'>
+            <Button
+              className='mt-0'
+              size='sm'
+              variant='muted'
+              onClick={() => downloadTimelineExportText(segment, outils)}
+            >
+              Exporter
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

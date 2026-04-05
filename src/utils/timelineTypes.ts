@@ -32,15 +32,27 @@ export type TimelineRow = {
 
 export type TimelineStats = {
   classEau: string;
+  startEau?: number;
+  prodEau?: number;
+  consoEau?: number;
   stockEau: number;
   deltaEau: number;
   classNrt: string;
+  startNrt?: number;
+  prodNrt?: number;
+  consoNrt?: number;
   stockNrt: number;
   deltaNrt: number;
   classMed: string;
+  startMed?: number;
+  prodMed?: number;
+  consoMed?: number;
   stockMed: number;
   deltaMed: number;
   classMat: string;
+  startMat?: number;
+  prodMat?: number;
+  consoMat?: number;
   stockMat: number;
   deltaMat: number;
 };
@@ -144,12 +156,18 @@ export type ConsumptionTotals = {
   eau: number;
   nrt: number;
   med: number;
+  mat: number;
 };
 
 export type LuneTotals = ProductionTotals & {
   consoEau: number;
   consoNrt: number;
   consoMed: number;
+  consoMat: number;
+  cityConsoEau: number;
+  cityConsoNrt: number;
+  cityConsoMed: number;
+  cityConsoMat: number;
 };
 
 export type SimulationState = {
@@ -163,5 +181,6 @@ export type ProcessPersoResult = {
   row: TimelineRow;
   production: ProductionTotals;
   consumption: ConsumptionTotals;
+  cityConsumption: ConsumptionTotals;
   constructionAssignment: ConstructionAssignment | null;
 };

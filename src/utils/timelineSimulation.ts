@@ -160,6 +160,9 @@ export const simulateTimeline = (
     });
 
     const availableCityResourceStocks = createStockSnapshot(resourceStocks);
+    const startingCarriedResources = clonePersoDrugStocks(
+      remainingDrugStocksByPerso,
+    );
     const rows: TimelineRow[] = [];
     const constructionAssignments: ConstructionAssignment[] = [];
     const luneTotals = createEmptyLuneTotals();
@@ -202,8 +205,15 @@ export const simulateTimeline = (
       constructionProgressById,
       capCourantes,
       combatCourants,
+      luneTotals,
     });
-    const stockStats = buildStockStats(projectedStocks, startingStocks);
+    const stockStats = buildStockStats(
+      projectedStocks,
+      startingStocks,
+      luneTotals,
+      startingCarriedResources,
+      remainingDrugStocksByPerso,
+    );
 
     Object.assign(resourceStocks, projectedStocks);
 

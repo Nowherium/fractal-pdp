@@ -16,6 +16,7 @@ import {
   defaultRation,
   defaultWeatherCoefficients,
   type LuneInput,
+  normalizeLuneAutoAssign,
   normalizeLuneToolAssignments,
   normalizeOptionalGroupId,
   normalizeProductionCapacity,
@@ -133,6 +134,7 @@ export const normalizeLunes = (
           index + 1,
         ),
         constructions: [],
+        autoAssign: normalizeLuneAutoAssign(lune.autoAssign, false),
         toolAssignments: normalizeLuneToolAssignments(lune.toolAssignments),
         frozenTimeline:
           lune.frozenTimeline && typeof lune.frozenTimeline === "object"
@@ -151,6 +153,7 @@ export const createLune = (persos: Perso[] = [], luneId = 1): Lune =>
     overrides: {},
     constructionPlacements: [],
     constructions: [],
+    autoAssign: true,
     toolAssignments: {},
     frozenTimeline: null,
   });

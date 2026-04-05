@@ -11,6 +11,7 @@ import {
   normalizeBoolean,
   normalizeConstructionPlacements,
   normalizeCurrentLuneValue,
+  normalizeLuneToolAssignments,
   normalizeMultiplier,
   normalizeNonNegativeNumber,
   normalizeNumber,
@@ -35,6 +36,8 @@ type GenericInput = {
   lunes?: unknown;
   stocks?: unknown;
   cityMultipliers?: unknown;
+  terrains?: unknown;
+  currentTerrainId?: unknown;
   constructions?: unknown;
   currentLune?: unknown;
   groups?: unknown;
@@ -64,6 +67,8 @@ type GenericInput = {
   meteo?: unknown;
   constructionPlacements?: unknown;
   placedConstructionIds?: unknown;
+  toolAssignments?: unknown;
+  autoAssign?: unknown;
   rations?: unknown;
   overrides?: unknown;
   specialite?: unknown;
@@ -150,7 +155,7 @@ const getState = async () => {
   );
 
   const { rows: cityRows } = await pool.query(
-    "SELECT id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune, constructions FROM cities ORDER BY id ASC",
+    "SELECT id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune, constructions, terrains, current_terrain_id FROM cities ORDER BY id ASC",
   );
   const cities = cityRows.map((row) => ({
     id: Number(row.id),
@@ -167,6 +172,10 @@ const getState = async () => {
     activeCity?.current_lune,
     defaultCurrentLune,
   );
+  const terrains = Array.isArray(activeCity?.terrains)
+    ? activeCity.terrains
+    : [];
+  const currentTerrainId = normalizeOptionalId(activeCity?.current_terrain_id);
   let constructions = Array.isArray(activeCity?.constructions)
     ? activeCity.constructions
     : [];
@@ -349,7 +358,7 @@ const getState = async () => {
   const persos = persoRows.map(normalizePersoRow);
 
   const { rows: luneRows } = await pool.query(
-    "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions FROM lunes ORDER BY id ASC",
+    "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions, auto_assign, tool_assignments FROM lunes ORDER BY id ASC",
   );
   const { rows: rationsRows } = await pool.query(
     "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id FROM rations",
@@ -383,6 +392,8 @@ const getState = async () => {
     resources,
     cities,
     cityMultipliers,
+    terrains,
+    currentTerrainId,
     groups,
     cityResources,
     persoResources,
@@ -408,6 +419,8 @@ const insertState = async (state: GenericInput) => {
   const constructions = Array.isArray(state.constructions)
     ? state.constructions
     : null;
+  const terrains = asGenericInputArray(state.terrains);
+  const currentTerrainId = normalizeOptionalId(state.currentTerrainId);
   const currentLune = normalizeCurrentLuneValue(
     state.currentLune,
     defaultCurrentLune,
@@ -432,7 +445,11 @@ const insertState = async (state: GenericInput) => {
     })) || null;
 
   const citySettingsPayload =
-    cityMultipliers || state.currentLune !== undefined || constructions !== null
+    cityMultipliers ||
+    state.currentLune !== undefined ||
+    constructions !== null ||
+    terrains !== null ||
+    state.currentTerrainId !== undefined
       ? {
           eau: normalizeMultiplier(
             cityMultipliers?.eau,
@@ -451,6 +468,8 @@ const insertState = async (state: GenericInput) => {
             defaultCityMultipliers.mat,
           ),
           current_lune: currentLune,
+          terrains: Array.isArray(terrains) ? terrains : [],
+          current_terrain_id: currentTerrainId,
           constructions: Array.isArray(constructions) ? constructions : [],
         }
       : null;
@@ -488,6 +507,8 @@ const insertState = async (state: GenericInput) => {
       meteo_med: number;
       meteo_mat: number;
       constructions: ReturnType<typeof normalizeConstructionPlacements>;
+      auto_assign: boolean;
+      tool_assignments: ReturnType<typeof normalizeLuneToolAssignments>;
     }
   >();
   const rationsPayload: Array<{
@@ -517,6 +538,8 @@ const insertState = async (state: GenericInput) => {
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
       constructions: normalizeLuneConstructionPayload(lune, luneId),
+      auto_assign: normalizeBoolean(lune.autoAssign, false),
+      tool_assignments: normalizeLuneToolAssignments(lune.toolAssignments),
     });
 
     const rations =
@@ -744,8 +767,19 @@ const insertState = async (state: GenericInput) => {
 
     if (citySettingsPayload !== null) {
       await client.query(
-        `INSERT INTO cities (id, name, mult_eau, mult_nrt, mult_med, mult_mat, current_lune, constructions)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO cities (
+           id,
+           name,
+           mult_eau,
+           mult_nrt,
+           mult_med,
+           mult_mat,
+           current_lune,
+           terrains,
+           current_terrain_id,
+           constructions
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb)
          ON CONFLICT (id)
          DO UPDATE SET
            name = EXCLUDED.name,
@@ -754,6 +788,8 @@ const insertState = async (state: GenericInput) => {
            mult_med = EXCLUDED.mult_med,
            mult_mat = EXCLUDED.mult_mat,
            current_lune = EXCLUDED.current_lune,
+           terrains = EXCLUDED.terrains,
+           current_terrain_id = EXCLUDED.current_terrain_id,
            constructions = EXCLUDED.constructions`,
         [
           defaultCity.id,
@@ -763,6 +799,8 @@ const insertState = async (state: GenericInput) => {
           citySettingsPayload.med,
           citySettingsPayload.mat,
           citySettingsPayload.current_lune,
+          JSON.stringify(citySettingsPayload.terrains || []),
+          citySettingsPayload.current_terrain_id,
           JSON.stringify(citySettingsPayload.constructions || []),
         ],
       );
@@ -1049,15 +1087,34 @@ const insertState = async (state: GenericInput) => {
     if (lunesPayload !== null) {
       if (lunesPayload.length > 0) {
         await client.query(
-          `INSERT INTO lunes (id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions)
-           SELECT id, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions
+          `INSERT INTO lunes (
+             id,
+             meteo_eau,
+             meteo_nrt,
+             meteo_med,
+             meteo_mat,
+             constructions,
+             auto_assign,
+             tool_assignments
+           )
+           SELECT
+             id,
+             meteo_eau,
+             meteo_nrt,
+             meteo_med,
+             meteo_mat,
+             constructions,
+             auto_assign,
+             tool_assignments
            FROM json_to_recordset($1::json) AS incoming(
              id bigint,
              meteo_eau numeric,
              meteo_nrt numeric,
              meteo_med numeric,
              meteo_mat numeric,
-             constructions jsonb
+             constructions jsonb,
+             auto_assign boolean,
+             tool_assignments jsonb
            )
            ON CONFLICT (id)
            DO UPDATE SET
@@ -1065,7 +1122,9 @@ const insertState = async (state: GenericInput) => {
              meteo_nrt = EXCLUDED.meteo_nrt,
              meteo_med = EXCLUDED.meteo_med,
              meteo_mat = EXCLUDED.meteo_mat,
-             constructions = EXCLUDED.constructions`,
+             constructions = EXCLUDED.constructions,
+             auto_assign = EXCLUDED.auto_assign,
+             tool_assignments = EXCLUDED.tool_assignments`,
           [JSON.stringify(lunesPayload)],
         );
         await client.query(

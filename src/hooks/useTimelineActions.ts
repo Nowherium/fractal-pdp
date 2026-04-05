@@ -93,7 +93,14 @@ export const useTimelineActions = ({
   const updateRation = (
     luneIndex: number,
     persoId: number,
-    field: "tache" | "eau" | "nrt" | "med" | "drogue" | "constructionId",
+    field:
+      | "tache"
+      | "eau"
+      | "nrt"
+      | "med"
+      | "dehors"
+      | "drogue"
+      | "constructionId",
     value: string | boolean,
   ) => {
     if (isPastLuneIndex(luneIndex)) {
@@ -372,6 +379,21 @@ export const useTimelineActions = ({
     }
   };
 
+  const toggleLuneAutoAssign = (luneIndex: number, checked: boolean) => {
+    if (isPastLuneIndex(luneIndex)) {
+      return;
+    }
+
+    const nextLunes = lunes.map((lune, idx) =>
+      idx !== luneIndex ? lune : { ...lune, autoAssign: checked },
+    );
+
+    setLunes(nextLunes);
+    if (nextLunes[luneIndex]) {
+      saveLuneEntity(nextLunes[luneIndex]);
+    }
+  };
+
   const updateLuneToolAssignment = (
     luneIndex: number,
     specialite: ToolSpecialite,
@@ -484,6 +506,7 @@ export const useTimelineActions = ({
     removeConstruction,
     toggleConstructionPlacement,
     updateLuneWeather,
+    toggleLuneAutoAssign,
     updateLuneToolAssignment,
     toggleOverrideMenu,
     setOverride,

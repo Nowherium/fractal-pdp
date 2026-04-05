@@ -14,6 +14,7 @@ type LuneInput = {
   constructionPlacements?: unknown;
   placedConstructionIds?: unknown;
   toolAssignments?: unknown;
+  autoAssign?: unknown;
   rations?: unknown;
   overrides?: unknown;
   frozenTimeline?: unknown;
@@ -68,6 +69,7 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
       meteo_med: number;
       meteo_mat: number;
       constructions: unknown;
+      auto_assign: boolean;
       tool_assignments: Record<string, number | null>;
     }
   >();
@@ -99,6 +101,7 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
       meteo_med: meteo.med,
       meteo_mat: meteo.mat,
       constructions: normalizeLuneConstructionPayload(lune, luneId),
+      auto_assign: normalizeBoolean(lune.autoAssign, false),
       tool_assignments: normalizeLuneToolAssignments(lune.toolAssignments),
     });
 
@@ -164,7 +167,7 @@ const getExistingPersoIds = async (
 
 const getLuneById = async (client: PoolClient, luneId: number) => {
   const { rows: luneRows } = await client.query(
-    "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions, tool_assignments FROM lunes WHERE id = $1 LIMIT 1",
+    "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions, auto_assign, tool_assignments FROM lunes WHERE id = $1 LIMIT 1",
     [luneId],
   );
 
@@ -229,9 +232,10 @@ const upsertLune = async (lune: LuneInput) => {
          meteo_med,
          meteo_mat,
          constructions,
+         auto_assign,
          tool_assignments
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id)
        DO UPDATE SET
          meteo_eau = EXCLUDED.meteo_eau,
@@ -239,6 +243,7 @@ const upsertLune = async (lune: LuneInput) => {
          meteo_med = EXCLUDED.meteo_med,
          meteo_mat = EXCLUDED.meteo_mat,
          constructions = EXCLUDED.constructions,
+         auto_assign = EXCLUDED.auto_assign,
          tool_assignments = EXCLUDED.tool_assignments`,
       [
         luneId,
@@ -247,6 +252,7 @@ const upsertLune = async (lune: LuneInput) => {
         meteo.med,
         meteo.mat,
         JSON.stringify(lunesPayload[0]?.constructions || []),
+        Boolean(lunesPayload[0]?.auto_assign),
         JSON.stringify(lunesPayload[0]?.tool_assignments || {}),
       ],
     );
