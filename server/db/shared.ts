@@ -52,6 +52,8 @@ type DbRow = {
   nrt?: unknown;
   med?: unknown;
   mat?: unknown;
+  dehors?: unknown;
+  produit?: unknown;
   tache?: unknown;
   drogue?: unknown;
   construction_id?: unknown;
@@ -92,6 +94,8 @@ type LuneRationPayload = {
   eau: boolean;
   nrt: boolean;
   med: boolean;
+  dehors: boolean;
+  produit: boolean;
   tache: string;
   drogue: string | null;
   constructionId: string | null;
@@ -203,6 +207,8 @@ const defaultRation = () => ({
   eau: true,
   nrt: true,
   med: true,
+  dehors: false,
+  produit: false,
   tache: "",
   drogue: null,
   constructionId: null,
@@ -630,6 +636,8 @@ const buildLunes = (
       eau: normalizeBoolean(row.eau, true),
       nrt: normalizeBoolean(row.nrt, true),
       med: normalizeBoolean(row.med, true),
+      dehors: normalizeBoolean(row.dehors, false),
+      produit: normalizeBoolean(row.produit, false),
       tache: String(row.tache ?? ""),
       drogue: row.drogue ? String(row.drogue) : null,
       constructionId: row.construction_id ? String(row.construction_id) : null,

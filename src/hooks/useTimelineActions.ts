@@ -99,6 +99,7 @@ export const useTimelineActions = ({
       | "nrt"
       | "med"
       | "dehors"
+      | "produit"
       | "drogue"
       | "constructionId",
     value: string | boolean,

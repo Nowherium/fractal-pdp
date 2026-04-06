@@ -133,6 +133,7 @@ export const defaultRation = (): Ration => ({
   nrt: true,
   med: true,
   dehors: false,
+  produit: false,
   tache: "",
   drogue: null,
   constructionId: null,

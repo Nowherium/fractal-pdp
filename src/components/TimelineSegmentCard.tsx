@@ -19,6 +19,7 @@ type TimelineRationField =
   | "nrt"
   | "med"
   | "dehors"
+  | "produit"
   | "drogue"
   | "constructionId";
 
@@ -31,7 +32,7 @@ function TimelineEmptyStateRow({ message }: { message: string }) {
   return (
     <tr>
       <td
-        colSpan={10}
+        colSpan={11}
         className='py-3 text-center text-[0.85em] italic text-[#9ea7b3]'
       >
         {message}
@@ -180,6 +181,7 @@ function TimelineSegmentCard({
               <th>Nom</th>
               <th>PV Début</th>
               <th>Dehors</th>
+              <th>A produit</th>
               <th style={{ backgroundColor: "#113333" }}>TÂCHE</th>
               <th>Drogue (1 max)</th>
               <th>Mange</th>
@@ -214,7 +216,7 @@ function TimelineSegmentCard({
           </tbody>
         </table>
 
-        <TimelineStockSummary stats={segment.stats} />
+        <TimelineStockSummary stats={segment.stats} rows={segment.rows} />
 
         {isCurrentLune ? (
           <div className='mt-3 flex justify-end'>

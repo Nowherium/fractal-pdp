@@ -131,20 +131,20 @@ test("builds a lune export memo with one line per perso and a resource recap", (
   assert.match(text, /Lune 3/i);
   assert.match(
     text,
-    /\*\*Pablo\*\*\s*:\s*\*\*EAU\*\*, dehors, non drogué, \*\*Rationnement\*\*: médicaments, avec Pompe \(x2\)/i,
+    /\*\*Pablo\*\* :\n\s+- Prod \*\*EAU\*\*, en plaine sans drogue, avec Pompe \(x2\)\n\s+- \*\*Rationnement\*\* : médicaments/i,
   );
   assert.match(
     text,
-    /\*\*Nina\*\*\s*:\s*\*\*construire \(Filtre\)\*\*, dedans, drogué .*CNB, \*\*Rationnement\*\*: médicaments, sans outil partagé/i,
+    /\*\*Nina\*\* :\n\s+- construire \*\*Filtre\*\*, en com' drogué .*CNB, sans outil partagé\n\s+- \*\*Rationnement\*\* : médicaments/i,
   );
   assert.match(text, /Léo\s*:\s*absent pour cette lune/i);
   assert.match(text, /Récap ressources/i);
   assert.match(
     text,
-    /EAU : départ 5 \| production estimée 2 \| consommation estimée 1 \| stock final 6/i,
+    /EAU : Stock début 5 \| Prod estimée 2 \| Conso estimée 1 \| Stock final 6/i,
   );
   assert.match(
     text,
-    /MAT : départ 3 \| production estimée 2 \| consommation estimée 1 \| stock final 4/i,
+    /MAT : Stock début 3 \| Prod estimée 2 \| Conso estimée 1 \| Stock final 4/i,
   );
 });

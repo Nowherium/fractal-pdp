@@ -57,13 +57,74 @@ test("renders a per-resource summary with start, production, consumption and end
     }),
   );
 
-  assert.match(markup, /Départ/i);
+  assert.match(markup, /Stock/i);
   assert.match(markup, /Prod/i);
   assert.match(markup, /Conso/i);
   assert.match(markup, /Fin/i);
   assert.match(markup, /\+2\.5/);
   assert.match(markup, /-3\.0/);
   assert.match(markup, /1\.25|1\.3/);
+});
+
+test("shows the remaining production in the stock summary once a perso is marked as already produced", () => {
+  const markup = renderToStaticMarkup(
+    createElement(TimelineStockSummary, {
+      stats: {
+        startEau: 5,
+        prodEau: 3,
+        consoEau: 1,
+        stockEau: 7,
+        deltaEau: 2,
+        classEau: "safe",
+        startNrt: 0,
+        prodNrt: 0,
+        consoNrt: 0,
+        stockNrt: 0,
+        deltaNrt: 0,
+        classNrt: "safe",
+        startMed: 0,
+        prodMed: 0,
+        consoMed: 0,
+        stockMed: 0,
+        deltaMed: 0,
+        classMed: "safe",
+        startMat: 0,
+        prodMat: 0,
+        consoMat: 0,
+        stockMat: 0,
+        deltaMat: 0,
+        classMat: "safe",
+      },
+      rows: [
+        {
+          persoId: 1,
+          nom: "Producteur",
+          ration: {
+            eau: false,
+            nrt: false,
+            med: false,
+            dehors: false,
+            produit: true,
+            tache: "eau",
+            drogue: null,
+            constructionId: null,
+          },
+          mortAuDebut: false,
+          isAbsent: false,
+          cDebut: { eau: 2, nrt: 0, med: 0, mat: 0, art: 0 },
+          pvDebut: 5,
+          pvFin: 5,
+          pvDisplayDebut: 5,
+          pvDisplayFin: 5,
+          availableDrugs: {},
+        },
+      ],
+    }),
+  );
+
+  assert.match(markup, /EAU[\s\S]*Stock[\s\S]*7\.0/i);
+  assert.match(markup, /EAU[\s\S]*Prod[\s\S]*\+3\.0 \(produit : 2\.0\)/i);
+  assert.match(markup, /EAU[\s\S]*Fin[\s\S]*7\.0[\s\S]*\(0\.0\)/i);
 });
 
 test("ignores absent persos in timeline calculations", () => {

@@ -176,8 +176,19 @@ const ensureDefaultGameState = async (): Promise<void> => {
 
     await pool.query("INSERT INTO lunes (id) VALUES ($1)", [defaultLuneId]);
     await pool.query(
-      "INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-      [defaultLuneId, defaultPerso.id, true, true, true, "", null, null],
+      "INSERT INTO rations (lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+      [
+        defaultLuneId,
+        defaultPerso.id,
+        true,
+        true,
+        true,
+        false,
+        false,
+        "",
+        null,
+        null,
+      ],
     );
   }
 

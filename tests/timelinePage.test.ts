@@ -247,14 +247,16 @@ test("keeps task selection editable even when affectation auto is enabled", () =
   );
 });
 
-test("renders a Dehors column with one checkbox per visible perso", () => {
+test("renders Dehors and A produit columns with one checkbox per visible perso", () => {
   const markup = renderToStaticMarkup(
     createElement(TimelinePage, timelinePageProps),
   );
 
-  assert.match(markup, /PV Début[\s\S]*Dehors[\s\S]*TÂCHE/);
+  assert.match(markup, /PV Début[\s\S]*Dehors[\s\S]*A produit[\s\S]*TÂCHE/);
   assert.match(markup, /aria-label="Dehors pour Présent"/);
+  assert.match(markup, /aria-label="A produit pour Présent"/);
   assert.doesNotMatch(markup, /aria-label="Dehors pour Absent"/);
+  assert.doesNotMatch(markup, /aria-label="A produit pour Absent"/);
 });
 
 test("keeps Repos / Autre as an explicit manual option under affectation auto", () => {

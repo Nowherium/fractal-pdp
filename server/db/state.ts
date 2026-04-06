@@ -104,6 +104,8 @@ type LuneRationInput = {
   eau?: unknown;
   nrt?: unknown;
   med?: unknown;
+  dehors?: unknown;
+  produit?: unknown;
   tache?: unknown;
   drogue?: unknown;
   constructionId?: unknown;
@@ -361,7 +363,7 @@ const getState = async () => {
     "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions, auto_assign, tool_assignments FROM lunes ORDER BY id ASC",
   );
   const { rows: rationsRows } = await pool.query(
-    "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id FROM rations",
+    "SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id FROM rations",
   );
   const { rows: overridesRows } = await pool.query(
     "SELECT lune_id, perso_id, data FROM overrides",
@@ -517,6 +519,8 @@ const insertState = async (state: GenericInput) => {
     eau: boolean;
     nrt: boolean;
     med: boolean;
+    dehors: boolean;
+    produit: boolean;
     tache: string;
     drogue: string | null;
     construction_id: string | null;
@@ -555,6 +559,8 @@ const insertState = async (state: GenericInput) => {
         eau: normalizeBoolean(ration?.eau, true),
         nrt: normalizeBoolean(ration?.nrt, true),
         med: normalizeBoolean(ration?.med, true),
+        dehors: normalizeBoolean(ration?.dehors, false),
+        produit: normalizeBoolean(ration?.produit, false),
         tache: String(ration?.tache ?? ""),
         drogue: ration?.drogue ? String(ration.drogue) : null,
         construction_id: ration?.constructionId
@@ -1137,14 +1143,16 @@ const insertState = async (state: GenericInput) => {
 
       if (rationsPayload.length > 0) {
         await client.query(
-          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id)
-           SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id
+          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id)
+           SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id
            FROM json_to_recordset($1::json) AS incoming(
              lune_id bigint,
              perso_id integer,
              eau boolean,
              nrt boolean,
              med boolean,
+             dehors boolean,
+             produit boolean,
              tache text,
              drogue text,
              construction_id text
@@ -1154,6 +1162,8 @@ const insertState = async (state: GenericInput) => {
              eau = EXCLUDED.eau,
              nrt = EXCLUDED.nrt,
              med = EXCLUDED.med,
+             dehors = EXCLUDED.dehors,
+             produit = EXCLUDED.produit,
              tache = EXCLUDED.tache,
              drogue = EXCLUDED.drogue,
              construction_id = EXCLUDED.construction_id`,

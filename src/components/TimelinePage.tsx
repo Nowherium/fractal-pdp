@@ -52,6 +52,7 @@ function TimelinePage({
       | "nrt"
       | "med"
       | "dehors"
+      | "produit"
       | "drogue"
       | "constructionId",
     value: string | boolean,
@@ -94,7 +95,8 @@ function TimelinePage({
         <strong> affectation auto</strong> choisit la meilleure production pour
         chaque perso tant qu’il reste actif. La case <strong>Dehors</strong>
         neutralise les bonus <strong>ville + terrain</strong> pour le perso sur
-        la lune concernée.
+        la lune concernée, et la case <strong>A produit</strong> permet de
+        suivre ce qu’il reste à faire sans passer le tour.
       </InfoText>
       <div id='timeline'>
         {timelineData.map((segment, luneIndex) => (

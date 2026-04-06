@@ -1,8 +1,14 @@
 import type { TimelineSegment } from "../utils/timelineTypes";
 
+const productionTaskKeys = ["nrt", "eau", "med", "mat"] as const;
+type ProductionTaskKey = (typeof productionTaskKeys)[number];
+
+const roundAmount = (value: number) => Number(value.toFixed(2));
+
 const stockFields = [
   {
     label: "NRT",
+    resourceKey: "nrt",
     startKey: "startNrt",
     prodKey: "prodNrt",
     consoKey: "consoNrt",
@@ -12,6 +18,7 @@ const stockFields = [
   },
   {
     label: "EAU",
+    resourceKey: "eau",
     startKey: "startEau",
     prodKey: "prodEau",
     consoKey: "consoEau",
@@ -21,6 +28,7 @@ const stockFields = [
   },
   {
     label: "MED",
+    resourceKey: "med",
     startKey: "startMed",
     prodKey: "prodMed",
     consoKey: "consoMed",
@@ -30,6 +38,7 @@ const stockFields = [
   },
   {
     label: "MAT",
+    resourceKey: "mat",
     startKey: "startMat",
     prodKey: "prodMat",
     consoKey: "consoMat",
@@ -58,15 +67,53 @@ const getFlowClassName = (value: number, positiveClassName: string) => {
   return "text-gray-400";
 };
 
-function TimelineStockSummary({ stats }: { stats: TimelineSegment["stats"] }) {
+function TimelineStockSummary({
+  stats,
+  rows = [],
+}: {
+  stats: TimelineSegment["stats"];
+  rows?: TimelineSegment["rows"];
+}) {
+  const completedProductionByResource = rows.reduce<
+    Record<ProductionTaskKey, number>
+  >(
+    (acc, row) => {
+      const task = String(row.ration.tache ?? "")
+        .trim()
+        .toLowerCase();
+
+      if (
+        row.isAbsent ||
+        row.mortAuDebut ||
+        !row.ration.produit ||
+        !productionTaskKeys.includes(task as ProductionTaskKey)
+      ) {
+        return acc;
+      }
+
+      const resourceKey = task as ProductionTaskKey;
+      acc[resourceKey] += Number(row.cDebut[resourceKey] ?? 0);
+      return acc;
+    },
+    { nrt: 0, eau: 0, med: 0, mat: 0 },
+  );
+
   return (
     <div className='mb-2.5 mt-[15px] grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[10px] rounded-[5px] border border-border-main bg-[#0a0a0a] p-2.5'>
       {stockFields.map((field) => {
-        const startValue = Number(stats[field.startKey] ?? 0);
-        const prodValue = Number(stats[field.prodKey] ?? 0);
+        const completedProductionValue = Math.min(
+          Number(stats[field.prodKey] ?? 0),
+          Number(completedProductionByResource[field.resourceKey] ?? 0),
+        );
+        const startValue = roundAmount(
+          Number(stats[field.startKey] ?? 0) + completedProductionValue,
+        );
+        const prodValue = roundAmount(Number(stats[field.prodKey] ?? 0));
         const consoValue = Number(stats[field.consoKey] ?? 0);
         const endValue = Number(stats[field.valueKey] ?? 0);
-        const deltaValue = stats[field.deltaKey];
+        const deltaValue = roundAmount(
+          endValue - startValue + completedProductionValue,
+        );
 
         return (
           <div
@@ -79,7 +126,7 @@ function TimelineStockSummary({ stats }: { stats: TimelineSegment["stats"] }) {
 
             <div className='space-y-1'>
               <div className='flex items-center justify-between gap-2'>
-                <span className='text-[#9ea7b3]'>Départ</span>
+                <span className='text-[#9ea7b3]'>Stock</span>
                 <span className='font-medium text-white'>
                   {formatAmount(startValue)}
                 </span>
@@ -89,7 +136,8 @@ function TimelineStockSummary({ stats }: { stats: TimelineSegment["stats"] }) {
                 <span
                   className={`font-semibold ${getFlowClassName(prodValue, "text-green-400")}`}
                 >
-                  {formatSignedAmount(prodValue)}
+                  {formatSignedAmount(prodValue)} (produit :{" "}
+                  {formatAmount(completedProductionValue)})
                 </span>
               </div>
               <div className='flex items-center justify-between gap-2'>

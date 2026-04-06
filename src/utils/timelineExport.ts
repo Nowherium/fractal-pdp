@@ -12,11 +12,11 @@ const productionTasks: ResourceStatKey[] = ["eau", "nrt", "med", "mat"];
 
 const formatFrenchList = (items: string[]): string => {
   if (items.length === 0) {
-    return "aucun";
+    return "non";
   }
 
   if (items.length === 1) {
-    return items[0] ?? "aucun";
+    return items[0] ?? "non";
   }
 
   if (items.length === 2) {
@@ -31,40 +31,40 @@ const resourceSummaries = [
     code: "nrt",
     label: "NRT",
     getValues: (segment: TimelineSegment) => ({
-      start: Number(segment.stats.startNrt ?? 0),
-      prod: Number(segment.stats.prodNrt ?? 0),
-      conso: Number(segment.stats.consoNrt ?? 0),
-      stock: Number(segment.stats.stockNrt ?? 0),
+      start: Number(segment.stats.startNrt ?? 0).toFixed(1),
+      prod: Number(segment.stats.prodNrt ?? 0).toFixed(1),
+      conso: Number(segment.stats.consoNrt ?? 0).toFixed(1),
+      stock: Number(segment.stats.stockNrt ?? 0).toFixed(1),
     }),
   },
   {
     code: "eau",
     label: "EAU",
     getValues: (segment: TimelineSegment) => ({
-      start: Number(segment.stats.startEau ?? 0),
-      prod: Number(segment.stats.prodEau ?? 0),
-      conso: Number(segment.stats.consoEau ?? 0),
-      stock: Number(segment.stats.stockEau ?? 0),
+      start: Number(segment.stats.startEau ?? 0).toFixed(1),
+      prod: Number(segment.stats.prodEau ?? 0).toFixed(1),
+      conso: Number(segment.stats.consoEau ?? 0).toFixed(1),
+      stock: Number(segment.stats.stockEau ?? 0).toFixed(1),
     }),
   },
   {
     code: "med",
     label: "MED",
     getValues: (segment: TimelineSegment) => ({
-      start: Number(segment.stats.startMed ?? 0),
-      prod: Number(segment.stats.prodMed ?? 0),
-      conso: Number(segment.stats.consoMed ?? 0),
-      stock: Number(segment.stats.stockMed ?? 0),
+      start: Number(segment.stats.startMed ?? 0).toFixed(1),
+      prod: Number(segment.stats.prodMed ?? 0).toFixed(1),
+      conso: Number(segment.stats.consoMed ?? 0).toFixed(1),
+      stock: Number(segment.stats.stockMed ?? 0).toFixed(1),
     }),
   },
   {
     code: "mat",
     label: "MAT",
     getValues: (segment: TimelineSegment) => ({
-      start: Number(segment.stats.startMat ?? 0),
-      prod: Number(segment.stats.prodMat ?? 0),
-      conso: Number(segment.stats.consoMat ?? 0),
-      stock: Number(segment.stats.stockMat ?? 0),
+      start: Number(segment.stats.startMat ?? 0).toFixed(1),
+      prod: Number(segment.stats.prodMat ?? 0).toFixed(1),
+      conso: Number(segment.stats.consoMat ?? 0).toFixed(1),
+      stock: Number(segment.stats.stockMat ?? 0).toFixed(1),
     }),
   },
 ] as const;
@@ -84,19 +84,19 @@ const getTaskSummary = (row: TimelineRow, segment: TimelineSegment): string => {
       .toLowerCase()
   ) {
     case "eau":
-      return "EAU";
+      return "Prod **EAU**";
     case "nrt":
-      return "NOURRITURE";
+      return "Prod **NOURRITURE**";
     case "med":
-      return "MÉDICAMENTS";
+      return "Prod **MÉDICAMENTS**";
     case "mat":
-      return "MATÉRIAUX";
+      return "Prod **MATÉRIAUX**";
     case "construire": {
       const constructionName = (segment.lune.constructions ?? []).find(
         (construction) => construction.id === row.ration.constructionId,
       )?.name;
       return constructionName
-        ? `construire (${constructionName})`
+        ? `construire **${constructionName}**`
         : "construire";
     }
     default:
@@ -161,13 +161,13 @@ const buildPersoLine = (
       !row.ration.med ? "médicaments" : null,
     ].filter((value): value is string => Boolean(value)),
   );
-  const positionSummary = row.ration.dehors ? "dehors" : "dedans";
+  const positionSummary = row.ration.dehors ? "en plaine" : `en com'`;
   const drugSummary = row.ration.drogue
-    ? `drogué ${getDrugLabel(row.ration.drogue)}`
-    : "non drogué";
+    ? `drogué ${getDrugLabel(row.ration.drogue)},`
+    : `sans drogue,`;
   const toolSummary = getToolSummary(row, segment, outils);
 
-  return `- **${row.nom}** : **${taskSummary}**, ${positionSummary}, ${drugSummary}, **Rationnement**: ${rationnement}, ${toolSummary}`;
+  return `- **${row.nom}** :\n  - ${taskSummary}, ${positionSummary} ${drugSummary} ${toolSummary}\n  - **Rationnement** : ${rationnement}`;
 };
 
 export const buildTimelineExportText = (
@@ -175,14 +175,14 @@ export const buildTimelineExportText = (
   outils: Outil[] = [],
 ): string => {
   const lines = [
-    `Lune ${Number(segment.lune.id)} — aide-mémoire`,
+    `Lune ${Number(segment.lune.id)} — Plan de production`,
     "",
     ...segment.rows.map((row) => buildPersoLine(row, segment, outils)),
     "",
     "Récap ressources",
     ...resourceSummaries.map(({ label, getValues }) => {
       const values = getValues(segment);
-      return `- ${label} : départ ${formatDrugQuantity(values.start)} | production estimée ${formatDrugQuantity(values.prod)} | consommation estimée ${formatDrugQuantity(values.conso)} | stock final ${formatDrugQuantity(values.stock)}`;
+      return `- ${label} : Stock début ${formatDrugQuantity(values.start)} | Prod estimée ${formatDrugQuantity(values.prod)} | Conso estimée ${formatDrugQuantity(values.conso)} | Stock final ${formatDrugQuantity(values.stock)}`;
     }),
   ];
 

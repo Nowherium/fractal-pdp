@@ -161,6 +161,7 @@ export interface Ration {
   nrt: boolean;
   med: boolean;
   dehors?: boolean;
+  produit?: boolean;
   tache: string;
   drogue: string | null;
   constructionId?: string | null;

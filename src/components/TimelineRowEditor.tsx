@@ -103,6 +103,7 @@ function TimelineRowEditor({
       | "nrt"
       | "med"
       | "dehors"
+      | "produit"
       | "drogue"
       | "constructionId",
     value: string | boolean,
@@ -122,6 +123,9 @@ function TimelineRowEditor({
     typeof row.ration.tache === "string" && row.ration.tache.trim() !== ""
       ? row.ration.tache
       : "autre";
+  const isProductionTask = ["nrt", "eau", "med", "mat"].includes(
+    taskSelectValue,
+  );
   const constructionOptions = (segment.lune.constructions ?? []).filter(
     (construction) => {
       const isPlacedThisLune = placedConstructionIds.includes(construction.id);
@@ -160,6 +164,30 @@ function TimelineRowEditor({
             }
           />
         </td>
+        <td className='text-center'>
+          <input
+            type='checkbox'
+            className={`h-[18px] w-[18px] accent-green-500 ${isRowLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+            aria-label={`A produit pour ${row.nom}`}
+            title={
+              isProductionTask
+                ? "Indique que la production de ce perso a déjà été faite"
+                : "Disponible uniquement pour une tâche de production"
+            }
+            checked={
+              !row.isAbsent && !row.mortAuDebut && Boolean(row.ration.produit)
+            }
+            disabled={isRowLocked}
+            onChange={(event) =>
+              updateRation(
+                actualLuneIndex,
+                row.persoId,
+                "produit",
+                event.target.checked,
+              )
+            }
+          />
+        </td>
         <td className='bg-[#112222]'>
           <select
             className='w-full'
@@ -175,10 +203,10 @@ function TimelineRowEditor({
             }
           >
             <option value='autre'>Repos / Autre</option>
-            <option value='nrt'>🍗 Nrt ({row.cDebut.nrt.toFixed(2)})</option>
-            <option value='eau'>💧 Eau ({row.cDebut.eau.toFixed(2)})</option>
-            <option value='med'>💊 Med ({row.cDebut.med.toFixed(2)})</option>
-            <option value='mat'>🧱 Mat ({row.cDebut.mat.toFixed(2)})</option>
+            <option value='nrt'>🍗 Nrt ({row.cDebut.nrt.toFixed(1)})</option>
+            <option value='eau'>💧 Eau ({row.cDebut.eau.toFixed(1)})</option>
+            <option value='med'>💊 Med ({row.cDebut.med.toFixed(1)})</option>
+            <option value='mat'>🧱 Mat ({row.cDebut.mat.toFixed(1)})</option>
             <option value='construire'>🛠️ Construire</option>
           </select>
           {isAutoAssignEnabled && !row.isAbsent && !row.mortAuDebut ? (

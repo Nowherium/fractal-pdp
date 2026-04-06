@@ -23,6 +23,8 @@ type RationInput = {
   eau?: unknown;
   nrt?: unknown;
   med?: unknown;
+  dehors?: unknown;
+  produit?: unknown;
   tache?: unknown;
   drogue?: unknown;
   constructionId?: unknown;
@@ -79,6 +81,8 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
     eau: boolean;
     nrt: boolean;
     med: boolean;
+    dehors: boolean;
+    produit: boolean;
     tache: string;
     drogue: string | null;
     construction_id: string | null;
@@ -115,6 +119,8 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
         eau: normalizeBoolean(ration?.eau, true),
         nrt: normalizeBoolean(ration?.nrt, true),
         med: normalizeBoolean(ration?.med, true),
+        dehors: normalizeBoolean(ration?.dehors, false),
+        produit: normalizeBoolean(ration?.produit, false),
         tache: String(ration?.tache ?? ""),
         drogue: ration?.drogue ? String(ration.drogue) : null,
         construction_id: ration?.constructionId
@@ -176,7 +182,7 @@ const getLuneById = async (client: PoolClient, luneId: number) => {
   }
 
   const { rows: rationRows } = await client.query(
-    "SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id FROM rations WHERE lune_id = $1",
+    "SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id FROM rations WHERE lune_id = $1",
     [luneId],
   );
   const { rows: overrideRows } = await client.query(
@@ -260,14 +266,16 @@ const upsertLune = async (lune: LuneInput) => {
     await client.query("DELETE FROM rations WHERE lune_id = $1", [luneId]);
     if (filteredRationsPayload.length > 0) {
       await client.query(
-        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id)
-         SELECT lune_id, perso_id, eau, nrt, med, tache, drogue, construction_id
+        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id)
+         SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id
          FROM json_to_recordset($1::json) AS incoming(
            lune_id bigint,
            perso_id integer,
            eau boolean,
            nrt boolean,
            med boolean,
+           dehors boolean,
+           produit boolean,
            tache text,
            drogue text,
            construction_id text

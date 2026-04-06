@@ -130,6 +130,8 @@ CREATE TABLE IF NOT EXISTS rations (
   eau boolean NOT NULL,
   nrt boolean NOT NULL,
   med boolean NOT NULL,
+  dehors boolean NOT NULL DEFAULT false,
+  produit boolean NOT NULL DEFAULT false,
   tache text NOT NULL,
   drogue text,
   construction_id text,
@@ -201,6 +203,21 @@ WHERE tool_assignments IS NULL;
 ALTER TABLE lunes
   ALTER COLUMN tool_assignments SET DEFAULT '{}'::jsonb,
   ALTER COLUMN tool_assignments SET NOT NULL;
+
+ALTER TABLE rations
+  ADD COLUMN IF NOT EXISTS dehors boolean,
+  ADD COLUMN IF NOT EXISTS produit boolean;
+
+UPDATE rations
+SET dehors = COALESCE(dehors, false),
+    produit = COALESCE(produit, false)
+WHERE dehors IS NULL OR produit IS NULL;
+
+ALTER TABLE rations
+  ALTER COLUMN dehors SET DEFAULT false,
+  ALTER COLUMN dehors SET NOT NULL,
+  ALTER COLUMN produit SET DEFAULT false,
+  ALTER COLUMN produit SET NOT NULL;
 
 DO $$
 BEGIN

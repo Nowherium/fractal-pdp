@@ -185,6 +185,7 @@ export const simulatePersoForLune = ({
     nrt: Boolean(storedRation.nrt),
     med: Boolean(storedRation.med),
     dehors: Boolean(storedRation.dehors),
+    produit: Boolean(storedRation.produit),
   };
 
   const baseCapsAtStart: PersoCaps = {
@@ -214,7 +215,7 @@ export const simulatePersoForLune = ({
           {
             rawCap,
             appliedToolMultiplier,
-            effectiveCap: rawCap * appliedToolMultiplier,
+            effectiveCap: Number((rawCap * appliedToolMultiplier).toFixed(1)),
           },
         ];
       },
