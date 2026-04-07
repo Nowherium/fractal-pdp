@@ -22,7 +22,7 @@ const persos = [
     capMedEffectif: 4.4,
     capMat: 0.1,
     capMatEffectif: 3.1,
-    capart: 0.2,
+    capArt: 0.2,
     capArtEffectif: 2.2,
     combat: 1.1,
     combatEffectif: 7.1,
@@ -41,7 +41,7 @@ const persos = [
     capMedEffectif: 3.2,
     capMat: 0.1,
     capMatEffectif: 2.1,
-    capart: 0.1,
+    capArt: 0.1,
     capArtEffectif: 1.1,
     combat: 0.2,
     combatEffectif: 5.2,
@@ -75,9 +75,9 @@ test("shows raw group totals in the groups list", () => {
 
   assert.match(markup, /Alpha/);
   assert.match(markup, /1\.55/);
-  assert.match(markup, /1\.30/);
+  assert.match(markup, /12\.30/);
   assert.doesNotMatch(markup, /14\.55/);
-  assert.doesNotMatch(markup, /12\.30/);
+  assert.doesNotMatch(markup, /1\.30/);
 });
 
 test("shows raw perso stats in the group detail page", () => {
@@ -92,8 +92,8 @@ test("shows raw perso stats in the group detail page", () => {
 
   assert.match(markup, /1\.33/);
   assert.match(markup, /0\.22/);
-  assert.match(markup, /1\.10/);
+  assert.match(markup, /7\.10/);
   assert.doesNotMatch(markup, /9\.33/);
   assert.doesNotMatch(markup, /5\.22/);
-  assert.doesNotMatch(markup, /7\.10/);
+  assert.doesNotMatch(markup, /1\.10/);
 });

@@ -142,7 +142,7 @@ export const useDerivedPersoState = ({
           Number(perso.capMat ?? 0) * Number(multiplierBySpecialite.mat ?? 1),
         );
         const nextCapArtEffectif = normalizeProductionCapacity(
-          Number(perso.capart ?? 0) * Number(multiplierBySpecialite.art ?? 1),
+          Number(perso.capArt ?? 0) * Number(multiplierBySpecialite.art ?? 1),
         );
         const nextPoidsTotal =
           sumItemWeights(carriedWeapons) +

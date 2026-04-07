@@ -60,7 +60,7 @@ type GenericInput = {
   capNrt?: unknown;
   capMed?: unknown;
   capMat?: unknown;
-  capart?: unknown;
+  capArt?: unknown;
   cmd?: unknown;
   combat?: unknown;
   groupId?: unknown;
@@ -270,12 +270,12 @@ const getState = async () => {
       p.capNrt,
       p.capMed,
       p.capMat,
-      p.capart,
+      p.capArt,
       p.capEau * COALESCE(tb.mult_eau, 1) AS capeau_effectif,
       p.capNrt * COALESCE(tb.mult_nrt, 1) AS capnrt_effectif,
       p.capMed AS capmed_effectif,
       p.capMat * COALESCE(tb.mult_mat, 1) AS capmat_effectif,
-      p.capart * COALESCE(tb.mult_art, 1) AS capart_effectif,
+      p.capArt * COALESCE(tb.mult_art, 1) AS capart_effectif,
       COALESCE(pw.total_poids, 0) AS poids_total,
       p.cmd,
       p.combat,
@@ -491,7 +491,7 @@ const insertState = async (state: GenericInput) => {
       capnrt: normalizeNumber(p.capNrt),
       capmed: normalizeNumber(p.capMed),
       capmat: normalizeNumber(p.capMat),
-      capart: normalizeNumber(p.capart),
+      capart: normalizeNumber(p.capArt),
       cmd: normalizeNumber(p.cmd),
       combat: normalizeNumber(p.combat),
       group_id: normalizeOptionalId(p.groupId),
@@ -939,7 +939,7 @@ const insertState = async (state: GenericInput) => {
     if (persosPayload !== null) {
       if (persosPayload.length > 0) {
         await client.query(
-          `INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id)
+          `INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capArt, cmd, combat, group_id)
            SELECT id, nom, present, pvmax, pv, poidsmax, capeau, capnrt, capmed, capmat, capart, cmd, combat, group_id
            FROM json_to_recordset($1::json) AS incoming(
              id integer,
@@ -968,7 +968,7 @@ const insertState = async (state: GenericInput) => {
              capNrt = EXCLUDED.capNrt,
              capMed = EXCLUDED.capMed,
              capMat = EXCLUDED.capMat,
-             capart = EXCLUDED.capart,
+             capArt = EXCLUDED.capArt,
              cmd = EXCLUDED.cmd,
              combat = EXCLUDED.combat,
              group_id = EXCLUDED.group_id`,

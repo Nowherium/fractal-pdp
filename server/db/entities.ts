@@ -34,7 +34,7 @@ type EntityInput = {
   capNrt?: unknown;
   capMed?: unknown;
   capMat?: unknown;
-  capart?: unknown;
+  capArt?: unknown;
   cmd?: unknown;
   combat?: unknown;
   groupId?: unknown;
@@ -230,7 +230,7 @@ const upsertPerso = async (perso: EntityInput | null | undefined) => {
       capnrt: normalizeNumber(mergedPerso.capNrt),
       capmed: normalizeNumber(mergedPerso.capMed),
       capmat: normalizeNumber(mergedPerso.capMat),
-      capart: normalizeNumber(mergedPerso.capart),
+      capart: normalizeNumber(mergedPerso.capArt),
       cmd: normalizeNumber(mergedPerso.cmd),
       combat: normalizeNumber(mergedPerso.combat),
       group_id: normalizeOptionalId(mergedPerso.groupId),
@@ -238,7 +238,7 @@ const upsertPerso = async (perso: EntityInput | null | undefined) => {
     };
     await ensureGroupExists(client, payload.group_id);
     await client.query(
-      `INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id, esclave)
+      `INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capArt, cmd, combat, group_id, esclave)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (id)
        DO UPDATE SET
@@ -251,7 +251,7 @@ const upsertPerso = async (perso: EntityInput | null | undefined) => {
          capNrt = EXCLUDED.capNrt,
          capMed = EXCLUDED.capMed,
          capMat = EXCLUDED.capMat,
-         capart = EXCLUDED.capart,
+         capArt = EXCLUDED.capArt,
          cmd = EXCLUDED.cmd,
          combat = EXCLUDED.combat,
          group_id = EXCLUDED.group_id,
@@ -302,7 +302,7 @@ const replacePersoResources = async (
       .map((entry) => ({
         perso_id: persoId,
         resource_id: Number(entry.resource_id),
-        quantity: normalizeNonNegativeNumber(entry.quantity),
+        quantity: normalizeNonNegativeNumber(entry.quantity).toFixed(1),
       }))
       .filter(
         (entry) =>

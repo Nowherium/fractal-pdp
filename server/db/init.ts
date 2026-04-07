@@ -155,7 +155,7 @@ const ensureDefaultGameState = async (): Promise<void> => {
     }
 
     await pool.query(
-      "INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capart, cmd, combat, group_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
+      "INSERT INTO persos (id, nom, present, pvmax, pv, poidsmax, capEau, capNrt, capMed, capMat, capArt, cmd, combat, group_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
       [
         defaultPerso.id,
         defaultPerso.nom,
@@ -167,7 +167,7 @@ const ensureDefaultGameState = async (): Promise<void> => {
         defaultPerso.capNrt,
         defaultPerso.capMed,
         defaultPerso.capMat,
-        defaultPerso.capart,
+        defaultPerso.capArt,
         defaultPerso.cmd,
         defaultPerso.combat,
         defaultPerso.groupId,

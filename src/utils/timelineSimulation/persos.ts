@@ -194,6 +194,8 @@ export const simulatePersoForLune = ({
     med: Number(capCourantes[perso.id]?.med ?? 0),
     mat: Number(capCourantes[perso.id]?.mat ?? 0),
     art: Number(capCourantes[perso.id]?.art ?? 0),
+    cmd: Number(capCourantes[perso.id]?.cmd ?? 0),
+    combat: Number(capCourantes[perso.id]?.combat ?? 0),
   };
   const currentCaps = getOrCreatePersoCaps(
     capCourantes,
@@ -207,7 +209,11 @@ export const simulatePersoForLune = ({
         const rawCap = Number(baseCapsAtStart[specialite] ?? 0);
         const appliedToolMultiplier = Math.max(
           1,
-          Number(selectedToolMultipliers[specialite] ?? 1),
+          Number(
+            specialite !== "cmd" && specialite !== "combat"
+              ? (selectedToolMultipliers[specialite] ?? 1)
+              : 1,
+          ),
         );
 
         return [

@@ -17,7 +17,7 @@ import {
   isPersoOverweight,
 } from "../utils/groupUtils";
 
-const formatCombat = (value: number | string | null | undefined) => {
+const formatCap = (value: number | string | null | undefined) => {
   const numericValue = Number(value ?? 0);
   return Number.isInteger(numericValue)
     ? numericValue
@@ -40,6 +40,8 @@ const capacityFields = [
   { key: "med", label: "💊 Med" },
   { key: "mat", label: "🧱 Mat" },
   { key: "art", label: "🎭 Art" },
+  { key: "cmd", label: "📢 Cmd" },
+  { key: "combat", label: "⚔️ Combat" },
 ] as const;
 
 const carriedResourceFields = [
@@ -160,12 +162,15 @@ function EffectifPage({
                 <span className={headerHintClassName}>
                   {quickEditResourceCodes.has(field.key) && showStocks
                     ? "Cap. + stock"
-                    : "Capacité"}
+                    : "Base"}
                 </span>
               </th>
             ))}
-            <th className={highlightCellClassName}>CMD</th>
-            <th className={highlightCellClassName}>Combat</th>
+            <th className={highlightCellClassName}>
+              Combat
+              <br />
+              <span className={headerHintClassName}>Avec arme</span>
+            </th>
             <th className={highlightCellClassName}>Poids</th>
             <th className={highlightCellClassName}>Présent</th>
             <th>Action</th>
@@ -200,7 +205,7 @@ function EffectifPage({
                     <td key={field.key} className={highlightCellClassName}>
                       <div className='flex min-w-[72px] flex-col gap-1'>
                         <span className='font-semibold'>
-                          {formatCombat(getPersoRawCapacityValue(p, field.key))}
+                          {formatCap(getPersoRawCapacityValue(p, field.key))}
                         </span>
                         {canQuickEdit && showStocks ? (
                           <label className='flex items-center gap-1 text-[0.72rem] text-[#9ea7b3]'>
@@ -232,15 +237,14 @@ function EffectifPage({
                     </td>
                   );
                 })}
-                <td className={highlightCellClassName}>{p.cmd}</td>
                 <td className={highlightCellClassName}>
-                  {formatCombat(getPersoRawCombatValue(p))}
+                  {formatCap(getPersoRawCombatValue(p))}
                 </td>
                 <td
                   className={`${highlightCellClassName} ${isPersoOverweight(p) ? "font-bold text-accent-red" : ""}`}
                 >
-                  {formatCombat(getPersoWeightValue(p))} /{" "}
-                  {formatCombat(getPersoWeightLimit(p))}
+                  {formatCap(getPersoWeightValue(p))} /{" "}
+                  {formatCap(getPersoWeightLimit(p))}
                 </td>
                 <td className={highlightCellClassName}>
                   <input

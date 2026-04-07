@@ -9,7 +9,7 @@ export const defaultPersoValues = {
   capNrt: 1,
   capMed: 0,
   capMat: 1,
-  capart: 0,
+  capArt: 0,
   capEauEffectif: 1,
   capNrtEffectif: 1,
   capMedEffectif: 0,

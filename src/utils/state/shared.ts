@@ -211,7 +211,7 @@ export const normalizePersoFieldValue = (
     field === "capNrt" ||
     field === "capMed" ||
     field === "capMat" ||
-    field === "capart"
+    field === "capArt"
   ) {
     return normalizeProductionCapacity(numericValue);
   }

@@ -49,7 +49,7 @@ export const getPersoRawCombatValue = (
 ): number =>
   isPersoCadavre(perso)
     ? 0
-    : Number(perso?.combat ?? perso?.combatEffectif ?? 0);
+    : Number(perso?.combatEffectif ?? perso?.combat ?? 0);
 
 export const getPersoWeightValue = (
   perso: Partial<Perso> | null | undefined,
@@ -81,7 +81,7 @@ export const getPersoCapacityValue = (
     case "mat":
       return Number(perso?.capMatEffectif ?? perso?.capMat ?? 0);
     case "art":
-      return Number(perso?.capArtEffectif ?? perso?.capart ?? 0);
+      return Number(perso?.capArtEffectif ?? perso?.capArt ?? 0);
     default:
       return 0;
   }
@@ -105,7 +105,11 @@ export const getPersoRawCapacityValue = (
     case "mat":
       return Number(perso?.capMat ?? perso?.capMatEffectif ?? 0);
     case "art":
-      return Number(perso?.capart ?? perso?.capArtEffectif ?? 0);
+      return Number(perso?.capArt ?? perso?.capArtEffectif ?? 0);
+    case "cmd":
+      return Number(perso?.cmd ?? 0);
+    case "combat":
+      return Number(perso?.combat ?? perso?.combatEffectif ?? 0);
     default:
       return 0;
   }

@@ -37,7 +37,7 @@ const persoFields: Array<{
   { key: "capEau", label: "Capacité Eau", type: "number" },
   { key: "capMed", label: "Capacité Med", type: "number" },
   { key: "capMat", label: "Capacité Mat", type: "number" },
-  { key: "capart", label: "Capacité Art", type: "number" },
+  { key: "capArt", label: "Capacité Art", type: "number" },
   { key: "cmd", label: "CMD", type: "number", step: "0.1" },
   { key: "combat", label: "Combat", type: "number", step: "0.1" },
 ];
@@ -162,11 +162,13 @@ function PersoPage({
     persoSacs.find((entry) => entry.perso_id === perso.id && entry.equipe)
       ?.sac_id ?? null;
   const equippedBag = sacs.find((sac) => sac.id === equippedBagId) ?? null;
+  const totalWeight = Number(perso.poidsTotal ?? 0);
   const baseWeightLimit = Number(perso.poidsMax ?? 20);
   const effectiveWeightLimit = Number(
     perso.poidsMaxEffectif ?? baseWeightLimit,
   );
-  const isOverweight = Number(perso.poidsTotal ?? 0) > effectiveWeightLimit;
+  const deltaWeightLimit = effectiveWeightLimit - totalWeight;
+  const isOverweight = Number(totalWeight ?? 0) > effectiveWeightLimit;
 
   const toggleWeapon = (weaponId: number, checked: boolean) => {
     const nextCarriedWeaponIds = toggleIdInList(
@@ -368,7 +370,9 @@ function PersoPage({
 
         <Field label='Poids max'>
           <div className={`text-[#9ea7b3]`} aria-readonly='true'>
-            {baseWeightLimit} Kg
+            {totalWeight} / {effectiveWeightLimit} (
+            {deltaWeightLimit.toFixed(2)}{" "}
+            {deltaWeightLimit >= 0 ? `libre` : `en trop`})
           </div>
         </Field>
 

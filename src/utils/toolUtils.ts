@@ -1,4 +1,4 @@
-import type { Outil, PersoCapacityKey, ToolSpecialite } from "../types";
+import type { Outil, ToolSpecialite } from "../types";
 
 export const toolSpecialiteOrder: ToolSpecialite[] = [
   "eau",
@@ -41,7 +41,7 @@ export const getBestToolForSpecialite = (
 ): Outil | null => getToolsForSpecialite(outils, specialite)[0] ?? null;
 
 export const createDefaultToolMultipliers = (): Record<
-  PersoCapacityKey,
+  ToolSpecialite,
   number
 > => ({
   eau: 1,

@@ -57,7 +57,7 @@ const persistAdvancedPersos = ({
       Number(previousPerso.capNrt ?? 0) !== Number(perso.capNrt ?? 0) ||
       Number(previousPerso.capMed ?? 0) !== Number(perso.capMed ?? 0) ||
       Number(previousPerso.capMat ?? 0) !== Number(perso.capMat ?? 0) ||
-      Number(previousPerso.capart ?? 0) !== Number(perso.capart ?? 0)
+      Number(previousPerso.capArt ?? 0) !== Number(perso.capArt ?? 0)
     ) {
       savePersoEntity(perso);
     }

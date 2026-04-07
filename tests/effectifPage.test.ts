@@ -17,7 +17,7 @@ const effectifPageProps = {
       capNrt: 1,
       capMed: 0,
       capMat: 0,
-      capart: 0,
+      capArt: 0,
       cmd: 1,
       combat: 1,
       present: true,
@@ -84,7 +84,7 @@ test("shows the carried resource totals for present persos only", () => {
           capNrt: 1,
           capMed: 1,
           capMat: 1,
-          capart: 0,
+          capArt: 0,
           cmd: 0,
           combat: 1,
           present: false,
@@ -98,7 +98,7 @@ test("shows the carried resource totals for present persos only", () => {
           capNrt: 1,
           capMed: 1,
           capMat: 1,
-          capart: 0,
+          capArt: 0,
           cmd: 0,
           combat: 1,
           present: true,
@@ -146,10 +146,10 @@ test("shows raw perso stats in the effectif table rather than effectif values", 
 
   assert.match(markup, /1\.33/);
   assert.match(markup, /0\.22/);
+  assert.match(markup, /7\.11/);
   assert.match(markup, /1\.11/);
   assert.doesNotMatch(markup, /9\.33/);
   assert.doesNotMatch(markup, /5\.22/);
-  assert.doesNotMatch(markup, /7\.11/);
 });
 
 test("marks a zero-pv personnage as a cadavre while keeping edit actions visible", () => {

@@ -35,7 +35,7 @@ export const normalizePersos = (persos: Array<Partial<Perso>> = []): Perso[] =>
     const capNrt = normalizeProductionCapacity(perso.capNrt ?? 0);
     const capMed = normalizeProductionCapacity(perso.capMed ?? 0);
     const capMat = normalizeProductionCapacity(perso.capMat ?? 0);
-    const capart = normalizeProductionCapacity(perso.capart ?? 0);
+    const capArt = normalizeProductionCapacity(perso.capArt ?? 0);
     const combat = Number(perso.combat ?? 0);
     const poidsMaxValue = Number(perso.poidsMax ?? 20);
     const poidsMax = Number.isFinite(poidsMaxValue)
@@ -54,7 +54,7 @@ export const normalizePersos = (persos: Array<Partial<Perso>> = []): Perso[] =>
       capNrt,
       capMed,
       capMat,
-      capart,
+      capArt,
       capEauEffectif: normalizeProductionCapacity(
         perso.capEauEffectif ?? capEau,
       ),
@@ -68,7 +68,7 @@ export const normalizePersos = (persos: Array<Partial<Perso>> = []): Perso[] =>
         perso.capMatEffectif ?? capMat,
       ),
       capArtEffectif: normalizeProductionCapacity(
-        perso.capArtEffectif ?? capart,
+        perso.capArtEffectif ?? capArt,
       ),
       poidsTotal: Number(perso.poidsTotal ?? 0),
       cmd: Number(perso.cmd ?? 0),

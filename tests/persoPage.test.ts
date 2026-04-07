@@ -16,7 +16,7 @@ const persoPageProps = {
     capNrt: 1,
     capMed: 0,
     capMat: 0,
-    capart: 0,
+    capArt: 0,
     cmd: 1,
     combat: 1,
     poidsMax: 20,

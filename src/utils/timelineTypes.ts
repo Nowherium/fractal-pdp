@@ -114,6 +114,8 @@ export type PersoCaps = {
   med: number;
   mat: number;
   art: number;
+  cmd?: number;
+  combat?: number;
 };
 
 export type PersoDrugStocks = Record<number, Record<string, number>>;

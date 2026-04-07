@@ -24,8 +24,8 @@ export type PersistOptions = {
 };
 
 export type ResourceStatKey = "eau" | "nrt" | "med" | "mat";
-export type PersoCapacityKey = ResourceStatKey | "art";
-export type ToolSpecialite = PersoCapacityKey;
+export type PersoCapacityKey = ResourceStatKey | "art" | "cmd" | "combat";
+export type ToolSpecialite = ResourceStatKey | "art";
 
 export interface CityMultipliers {
   eau: number;
@@ -65,7 +65,7 @@ export interface Perso {
   capNrt?: number;
   capMed?: number;
   capMat?: number;
-  capart?: number;
+  capArt?: number;
   capEauEffectif?: number;
   capNrtEffectif?: number;
   capMedEffectif?: number;

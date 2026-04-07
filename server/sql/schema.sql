@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS persos (
   capNrt numeric NOT NULL,
   capMed numeric NOT NULL,
   capMat numeric NOT NULL,
-  capart numeric NOT NULL DEFAULT 0,
+  capArt numeric NOT NULL DEFAULT 0,
   cmd numeric NOT NULL DEFAULT 0,
   combat numeric NOT NULL DEFAULT 0,
   group_id integer,

@@ -43,7 +43,7 @@ const persoCapStateMappings = [
   ["nrt", "capNrt", "capNrtEffectif"],
   ["med", "capMed", "capMedEffectif"],
   ["mat", "capMat", "capMatEffectif"],
-  ["art", "capart", "capArtEffectif"],
+  ["art", "capArt", "capArtEffectif"],
 ] as const;
 
 export const roundStateValue = (value: number): number =>
@@ -102,7 +102,7 @@ export const buildDrugStocksByPerso = (
 
 export const getInitialPersoCapValue = (
   perso: Perso,
-  baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capart",
+  baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capArt",
 ): number => roundStateValue(Math.max(0, Number(perso[baseField] ?? 0) || 0));
 
 export const buildBestToolsBySpecialite = (
@@ -213,7 +213,7 @@ export const buildTimelineStateSnapshot = ({
         nrt: getInitialPersoCapValue(perso, "capNrt"),
         med: getInitialPersoCapValue(perso, "capMed"),
         mat: getInitialPersoCapValue(perso, "capMat"),
-        art: getInitialPersoCapValue(perso, "capart"),
+        art: getInitialPersoCapValue(perso, "capArt"),
       });
 
       return [
@@ -249,7 +249,7 @@ export const buildTimelineStateSnapshot = ({
 
 const resolveBaseCapFromEffective = (
   _perso: Perso,
-  _baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capart",
+  _baseField: "capEau" | "capNrt" | "capMed" | "capMat" | "capArt",
   _effectifField:
     | "capEauEffectif"
     | "capNrtEffectif"
@@ -383,7 +383,7 @@ export const initializePersoSimulationState = (
       nrt: getInitialPersoCapValue(perso, "capNrt"),
       med: getInitialPersoCapValue(perso, "capMed"),
       mat: getInitialPersoCapValue(perso, "capMat"),
-      art: getInitialPersoCapValue(perso, "capart"),
+      art: getInitialPersoCapValue(perso, "capArt"),
     };
     combatCourants[perso.id] = Number(perso.combat ?? 0);
     remainingDrugStocksByPerso[perso.id] =
