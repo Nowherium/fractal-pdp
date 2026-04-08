@@ -8,7 +8,7 @@ import TimelineStockSummary from "./TimelineStockSummary";
 import TimelineWeatherSection from "./TimelineWeatherSection";
 import Button from "./ui/Button";
 
-import type { Outil, Resource, ToolSpecialite } from "../types";
+import type { Action, Outil, Resource, ToolSpecialite } from "../types";
 import { getPlacedConstructionIdsForLune } from "../utils/stateUtils";
 import { downloadTimelineExportText } from "../utils/timelineExport";
 import type { TimelineSegment } from "../utils/timelineTypes";
@@ -21,7 +21,8 @@ type TimelineRationField =
   | "dehors"
   | "produit"
   | "drogue"
-  | "constructionId";
+  | "constructionId"
+  | "actionId";
 
 const getTimelineEmptyStateMessage = (rowCount: number) =>
   rowCount === 0
@@ -82,6 +83,7 @@ interface TimelineSegmentCardProps {
     rawValue: string | number | boolean | null,
   ) => void;
   clearOverrides: (luneIndex: number, persoId: number) => void;
+  actions: Action[];
 }
 
 function TimelineSegmentCard({
@@ -103,6 +105,7 @@ function TimelineSegmentCard({
   openOverrides,
   setOverride,
   clearOverrides,
+  actions,
 }: TimelineSegmentCardProps) {
   const actualLuneIndex = segment.actualIndex ?? luneIndex;
   const isPastLune = Number(segment.lune.id) < Number(currentLune);
@@ -206,6 +209,7 @@ function TimelineSegmentCard({
                   updateRation={updateRation}
                   setOverride={setOverride}
                   clearOverrides={clearOverrides}
+                  actions={actions}
                 />
               ))
             ) : (

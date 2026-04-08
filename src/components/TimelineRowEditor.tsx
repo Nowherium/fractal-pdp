@@ -5,6 +5,7 @@ import Button from "./ui/Button";
 
 import { DRUG_EFFECTS, formatDrugQuantity } from "../utils/drugEffects";
 import type { TimelineRow, TimelineSegment } from "../utils/timelineTypes";
+import type { Action } from "../types";
 
 const isTimelineRowLocked = (row: TimelineRow, isPastLune: boolean) =>
   row.mortAuDebut || row.isAbsent || isPastLune;
@@ -86,6 +87,7 @@ function TimelineRowEditor({
   updateRation,
   setOverride,
   clearOverrides,
+  actions,
 }: {
   segment: TimelineSegment;
   row: TimelineRow;
@@ -105,7 +107,8 @@ function TimelineRowEditor({
       | "dehors"
       | "produit"
       | "drogue"
-      | "constructionId",
+      | "constructionId"
+      | "actionId",
     value: string | boolean,
   ) => void;
   setOverride: (
@@ -115,6 +118,7 @@ function TimelineRowEditor({
     rawValue: string | number | boolean | null,
   ) => void;
   clearOverrides: (luneIndex: number, persoId: number) => void;
+  actions: Action[];
 }) {
   const isRowLocked = isTimelineRowLocked(row, isPastLune);
   const isAutoAssignEnabled = Boolean(segment.lune.autoAssign);
@@ -208,6 +212,7 @@ function TimelineRowEditor({
             <option value='med'>💊 Med ({row.cDebut.med.toFixed(1)})</option>
             <option value='mat'>🧱 Mat ({row.cDebut.mat.toFixed(1)})</option>
             <option value='construire'>🛠️ Construire</option>
+            <option value='fabriquer'>🛠️ Fabriquer</option>
           </select>
           {isAutoAssignEnabled && !row.isAbsent && !row.mortAuDebut ? (
             <div className='mt-1 text-[0.72rem] font-medium text-accent-cyan'>
@@ -240,6 +245,30 @@ function TimelineRowEditor({
                   <option key={construction.id} value={construction.id}>
                     {construction.name} •{" "}
                     {isPlacedThisLune ? "posé" : "à poser d'abord"}
+                  </option>
+                );
+              })}
+            </select>
+          ) : null}
+          {row.ration.tache === "fabriquer" ? (
+            <select
+              className='mt-[0.35rem] w-full'
+              value={row.ration.actionId ? Number(row.ration.actionId) : ""}
+              disabled={isRowLocked}
+              onChange={(event) =>
+                updateRation(
+                  actualLuneIndex,
+                  row.persoId,
+                  "actionId",
+                  event.target.value,
+                )
+              }
+            >
+              <option value=''>Choisir quoi faire</option>
+              {actions.map((action) => {
+                return (
+                  <option key={action.id} value={action.id}>
+                    {action.name}
                   </option>
                 );
               })}

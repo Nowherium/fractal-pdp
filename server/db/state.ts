@@ -28,6 +28,7 @@ import {
   normalizeWeatherCoefficients,
   normalizeWeaponQuantity,
   pool,
+  normalizeActionRow,
 } from "./shared";
 
 type GenericInput = {
@@ -93,6 +94,10 @@ type GenericInput = {
   att?: unknown;
   degats?: unknown;
   fiabilite?: unknown;
+  actions?: unknown;
+  min_capacite?: unknown;
+  resource_cost?: unknown;
+  target_type?: unknown;
 } & Record<string, unknown>;
 type CityMultiplierInput = {
   eau?: unknown;
@@ -109,6 +114,7 @@ type LuneRationInput = {
   tache?: unknown;
   drogue?: unknown;
   constructionId?: unknown;
+  actionId?: unknown;
 };
 
 const asGenericInputArray = (value: unknown): GenericInput[] | null =>
@@ -242,6 +248,11 @@ const getState = async () => {
   );
   const outils = outilRows.map(normalizeOutilRow);
 
+  const { rows: actionRows } = await pool.query(
+    "SELECT id, name, specialite, min_capacite, resource_cost, resource_id, target_type, sac_id, arme_id, outil_id FROM actions ORDER BY id ASC",
+  );
+  const actions = actionRows.map(normalizeActionRow);
+
   const { rows: persoOutilRows } = await pool.query(
     "SELECT perso_id, outil_id FROM perso_outils ORDER BY perso_id, outil_id ASC",
   );
@@ -363,7 +374,7 @@ const getState = async () => {
     "SELECT id, meteo, meteo_eau, meteo_nrt, meteo_med, meteo_mat, constructions, auto_assign, tool_assignments FROM lunes ORDER BY id ASC",
   );
   const { rows: rationsRows } = await pool.query(
-    "SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id FROM rations",
+    "SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id, action_id FROM rations",
   );
   const { rows: overridesRows } = await pool.query(
     "SELECT lune_id, perso_id, data FROM overrides",
@@ -402,6 +413,7 @@ const getState = async () => {
     armes,
     persoArmes,
     outils,
+    actions,
     persoOutils,
     sacs,
     persoSacs,
@@ -434,6 +446,7 @@ const insertState = async (state: GenericInput) => {
   const persoOutils = asGenericInputArray(state.persoOutils);
   const sacs = asGenericInputArray(state.sacs);
   const persoSacs = asGenericInputArray(state.persoSacs);
+  const actions = asGenericInputArray(state.actions);
   const persoResources = asGenericInputArray(state.persoResources);
 
   const resourcesPayload =
@@ -524,6 +537,7 @@ const insertState = async (state: GenericInput) => {
     tache: string;
     drogue: string | null;
     construction_id: string | null;
+    action_id: number | null;
   }> = [];
   const overridesPayload: Array<{
     lune_id: number;
@@ -566,6 +580,7 @@ const insertState = async (state: GenericInput) => {
         construction_id: ration?.constructionId
           ? String(ration.constructionId)
           : null,
+        action_id: ration?.actionId ? Number(ration.actionId) : 1,
       });
     }
 
@@ -619,6 +634,22 @@ const insertState = async (state: GenericInput) => {
     })) || null;
   const outilIds =
     outilsPayload?.map((outil) => outil.id).filter(Number.isFinite) || [];
+
+  const actionsPayload =
+    actions?.map((action: GenericInput) => ({
+      id: Number(action.id),
+      name: action.name || "Action sans nom",
+      specialite: normalizeNumber(action.specialite || 1),
+      min_capacite: normalizeNumber(action.min_capacite),
+      resource_cost: normalizeNumber(action.resource_cost),
+      resource_id: normalizeNumber(action.resource_id),
+      target_type: String(action.target_type ?? "arme"),
+      sac_id: normalizeNumber(action.sac_id ?? 0),
+      arme_id: normalizeNumber(action.arme_id ?? 1),
+      outil_id: normalizeNumber(action.outil_id ?? 0),
+    })) || null;
+  const actionIds =
+    actionsPayload?.map((action) => action.id).filter(Number.isFinite) || [];
 
   const sacsPayload =
     sacs?.map((sac: GenericInput) => ({
@@ -901,6 +932,48 @@ const insertState = async (state: GenericInput) => {
       }
     }
 
+    if (actionsPayload !== null) {
+      if (actionsPayload.length > 0) {
+        await client.query(
+          `INSERT INTO actions (id, name, specialite, min_capacite, resource_cost, resource_id, target_type, sac_id, arme_id, outil_id)
+           SELECT id, name, specialite, min_capacite, resource_cost, resource_id, target_type, sac_id, arme_id, outil_id
+           FROM json_to_recordset($1::json) AS incoming(
+             id integer,
+             name text,
+             specialite text,
+             min_capacite numeric,
+             resource_cost numeric,
+             resource_id integer,
+             target_type text,
+             sac_id integer,
+             arme_id integer,
+             outil_id integer
+           )
+           ON CONFLICT (id)
+           DO UPDATE SET
+             name = EXCLUDED.name,
+             specialite = EXCLUDED.specialite,
+             min_capacite = EXCLUDED.min_capacite,
+             resource_cost = EXCLUDED.resource_cost,
+             resource_id = EXCLUDED.resource_id,
+             target_type = EXCLUDED.target_type,
+             sac_id = EXCLUDED.sac_id,
+             arme_id = EXCLUDED.arme_id,
+             outil_id = EXCLUDED.outil_id`,
+          [JSON.stringify(actionsPayload)],
+        );
+      }
+
+      if (actionIds.length > 0) {
+        await client.query(
+          "DELETE FROM actions WHERE NOT (id = ANY($1::int[]))",
+          [actionIds],
+        );
+      } else {
+        await client.query("DELETE FROM actions");
+      }
+    }
+
     if (sacsPayload !== null) {
       if (sacsPayload.length > 0) {
         await client.query(
@@ -1143,8 +1216,8 @@ const insertState = async (state: GenericInput) => {
 
       if (rationsPayload.length > 0) {
         await client.query(
-          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id)
-           SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id
+          `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id, action_id)
+           SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id, action_id
            FROM json_to_recordset($1::json) AS incoming(
              lune_id bigint,
              perso_id integer,
@@ -1155,7 +1228,8 @@ const insertState = async (state: GenericInput) => {
              produit boolean,
              tache text,
              drogue text,
-             construction_id text
+             construction_id text,
+             action_id integer
            )
            ON CONFLICT (lune_id, perso_id)
            DO UPDATE SET
@@ -1166,7 +1240,9 @@ const insertState = async (state: GenericInput) => {
              produit = EXCLUDED.produit,
              tache = EXCLUDED.tache,
              drogue = EXCLUDED.drogue,
-             construction_id = EXCLUDED.construction_id`,
+             construction_id = EXCLUDED.construction_id,
+             action_id = EXCLUDED.action_id`,
+
           [JSON.stringify(rationsPayload)],
         );
         await client.query(

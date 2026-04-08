@@ -23,6 +23,7 @@ const defaultRation = () => ({
   tache: "eau",
   drogue: null,
   constructionId: null,
+  actionId: null,
 });
 
 test("renders a per-resource summary with start, production, consumption and ending stock", () => {
@@ -140,6 +141,7 @@ test("ignores absent persos in timeline calculations", () => {
       overrides: {},
       constructionPlacements: [],
       constructions: [],
+      actions: [],
       rations: {
         1: { eau: true, nrt: false, med: false, tache: "eau", drogue: null },
         2: { eau: true, nrt: false, med: false, tache: "eau", drogue: null },
@@ -183,7 +185,14 @@ test("exposes start, production, consumption and ending stock for the lune summa
         constructionPlacements: [],
         constructions: [],
         rations: {
-          1: { eau: true, nrt: false, med: false, tache: "eau", drogue: null },
+          1: {
+            eau: true,
+            nrt: false,
+            med: false,
+            tache: "eau",
+            drogue: null,
+            actionId: null,
+          },
         },
       },
     ],
@@ -606,6 +615,7 @@ test("restarts future simulation from the real current-lune state", () => {
       overrides: {},
       constructionPlacements: [],
       constructions: [],
+      actions: [],
       rations: {
         1: { eau: true, nrt: false, med: false, tache: "eau", drogue: null },
       },

@@ -105,15 +105,12 @@ function TimelineStockSummary({
           Number(stats[field.prodKey] ?? 0),
           Number(completedProductionByResource[field.resourceKey] ?? 0),
         );
-        const startValue = roundAmount(
-          Number(stats[field.startKey] ?? 0) + completedProductionValue,
-        );
+        const startValue = roundAmount(Number(stats[field.startKey] ?? 0));
+        const currentValue = roundAmount(startValue + completedProductionValue);
         const prodValue = roundAmount(Number(stats[field.prodKey] ?? 0));
         const consoValue = Number(stats[field.consoKey] ?? 0);
         const endValue = Number(stats[field.valueKey] ?? 0);
-        const deltaValue = roundAmount(
-          endValue - startValue + completedProductionValue,
-        );
+        const deltaValue = Number(stats[field.deltaKey] ?? 0);
 
         return (
           <div
@@ -138,6 +135,12 @@ function TimelineStockSummary({
                 >
                   {formatSignedAmount(prodValue)} (produit :{" "}
                   {formatAmount(completedProductionValue)})
+                </span>
+              </div>
+              <div className='flex items-center justify-between gap-2'>
+                <span className='text-[#9ea7b3]'>Stock courant</span>
+                <span className='font-medium text-white'>
+                  {formatAmount(currentValue)}
                 </span>
               </div>
               <div className='flex items-center justify-between gap-2'>

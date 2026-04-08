@@ -28,6 +28,8 @@ import {
   deleteArme,
   upsertOutil,
   deleteOutil,
+  upsertAction,
+  deleteAction,
   upsertSac,
   deleteSac,
   defaultStocks,
@@ -360,6 +362,19 @@ registerIdDeleteRoute({
   path: "/api/outils/:id",
   errorMessage: "Impossible de supprimer l'outil",
   action: deleteOutil,
+});
+
+registerIdWriteRoute({
+  path: "/api/actions/:id",
+  errorMessage: "Impossible de sauvegarder l'action",
+  action: (actionId, body) =>
+    upsertAction({ ...getBodyPayload(body, "action", {}), id: actionId }),
+});
+
+registerIdDeleteRoute({
+  path: "/api/actions/:id",
+  errorMessage: "Impossible de supprimer l'action",
+  action: deleteAction,
 });
 
 registerIdWriteRoute({

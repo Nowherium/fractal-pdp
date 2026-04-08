@@ -26,6 +26,7 @@ export type RawState = {
   armes?: unknown;
   persoArmes?: unknown;
   outils?: unknown;
+  actions?: unknown;
   persoOutils?: unknown;
   sacs?: unknown;
   persoSacs?: unknown;

@@ -22,6 +22,7 @@ import type {
   Sac,
   Stocks,
   Terrain,
+  Action,
 } from "../types";
 import {
   exportStateData,
@@ -46,6 +47,7 @@ interface UseAppDataManagementParams {
   cityMultipliers: CityMultipliers;
   terrains: Terrain[];
   currentTerrainId: number | null;
+  actions: Action[];
   groups: Group[];
   armes: Arme[];
   persoArmes: PersoArme[];
@@ -81,6 +83,7 @@ export const useAppDataManagement = ({
   cityMultipliers,
   terrains,
   currentTerrainId,
+  actions,
   groups,
   armes,
   persoArmes,
@@ -168,6 +171,7 @@ export const useAppDataManagement = ({
       cityMultipliers,
       terrains,
       currentTerrainId,
+      actions,
       groups,
       armes,
       persoArmes,
@@ -198,6 +202,7 @@ export const useAppDataManagement = ({
     terrains,
     currentTerrainId,
     outils,
+    actions,
   ]);
 
   const importData = useCallback(

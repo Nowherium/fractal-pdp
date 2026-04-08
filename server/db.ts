@@ -26,6 +26,8 @@ export {
   deleteArme,
   upsertOutil,
   deleteOutil,
+  upsertAction,
+  deleteAction,
   upsertSac,
   deleteSac,
 } from "./db/entities";

@@ -110,6 +110,9 @@ export const buildState = (rawState: unknown = {}) => {
   const rawPersoOutils = Array.isArray(source.persoOutils)
     ? source.persoOutils
     : [];
+
+  const rawActions = Array.isArray(source.actions) ? source.actions : [];
+
   const rawSacs = Array.isArray(source.sacs) ? source.sacs : [];
   const rawPersoSacs = Array.isArray(source.persoSacs) ? source.persoSacs : [];
   const rawStocks =
@@ -173,5 +176,6 @@ export const buildState = (rawState: unknown = {}) => {
     persoOutils: normalizePersoOutils(rawPersoOutils),
     sacs: normalizeSacs(rawSacs),
     persoSacs: normalizePersoSacs(rawPersoSacs),
+    actions: rawActions,
   };
 };

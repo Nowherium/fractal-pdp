@@ -28,6 +28,7 @@ type RationInput = {
   tache?: unknown;
   drogue?: unknown;
   constructionId?: unknown;
+  actionId?: unknown;
 };
 
 const asRationRecord = (value: unknown): Record<string, RationInput> =>
@@ -86,6 +87,7 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
     tache: string;
     drogue: string | null;
     construction_id: string | null;
+    action_id: number | null;
   }> = [];
   const overridesPayload: Array<{
     lune_id: number;
@@ -126,6 +128,7 @@ const buildLunesWritePayload = (lunes: LuneInput[] = []) => {
         construction_id: ration?.constructionId
           ? String(ration.constructionId)
           : null,
+        action_id: ration?.actionId ? Number(ration.actionId) : null,
       });
     }
 
@@ -266,8 +269,8 @@ const upsertLune = async (lune: LuneInput) => {
     await client.query("DELETE FROM rations WHERE lune_id = $1", [luneId]);
     if (filteredRationsPayload.length > 0) {
       await client.query(
-        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id)
-         SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id
+        `INSERT INTO rations (lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id, action_id)
+         SELECT lune_id, perso_id, eau, nrt, med, dehors, produit, tache, drogue, construction_id, action_id
          FROM json_to_recordset($1::json) AS incoming(
            lune_id bigint,
            perso_id integer,
@@ -278,7 +281,8 @@ const upsertLune = async (lune: LuneInput) => {
            produit boolean,
            tache text,
            drogue text,
-           construction_id text
+           construction_id text,
+           action_id integer
          )`,
         [JSON.stringify(filteredRationsPayload)],
       );

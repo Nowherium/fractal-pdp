@@ -10,6 +10,7 @@ import type {
   PersoSac,
   Ration,
   Sac,
+  Action,
 } from "../../types";
 import { normalizeToolSpecialite } from "../toolUtils";
 import {
@@ -134,6 +135,7 @@ export const normalizeLunes = (
           index + 1,
         ),
         constructions: [],
+        actions: [],
         autoAssign: normalizeLuneAutoAssign(lune.autoAssign, false),
         toolAssignments: normalizeLuneToolAssignments(lune.toolAssignments),
         frozenTimeline:
@@ -156,6 +158,7 @@ export const createLune = (persos: Perso[] = [], luneId = 1): Lune =>
     autoAssign: true,
     toolAssignments: {},
     frozenTimeline: null,
+    actions: [],
   });
 
 export const normalizeArmes = (armes: Array<Partial<Arme>> = []): Arme[] =>
@@ -184,6 +187,22 @@ export const normalizeOutils = (outils: Array<Partial<Outil>> = []): Outil[] =>
     pvmax: Math.max(0, Number(outil.pvmax ?? 0) || 0),
     poids: Math.max(0, Number(outil.poids ?? 0) || 0),
     quantity: Math.max(0, Math.floor(Number(outil.quantity ?? 1) || 0)),
+  }));
+
+export const normalizeActions = (
+  actions: Array<Partial<Action>> = [],
+): Action[] =>
+  actions.map((action) => ({
+    id: Number(action.id),
+    name: action.name || "Action sans nom",
+    specialite: action.specialite || "arme",
+    min_capacite: Math.max(0, Number(action.min_capacite ?? 0) || 0),
+    resource_cost: Math.max(0, Number(action.resource_cost ?? 0) || 0),
+    resource_id: Math.max(0, Number(action.resource_id ?? 0) || 0),
+    target_type: "arme",
+    sac_id: Math.max(0, Math.floor(Number(action.sac_id ?? 1) || 0)),
+    arme_id: Math.max(0, Number(action.arme_id ?? 0) || 0),
+    outil_id: Math.max(0, Number(action.outil_id ?? 0) || 0),
   }));
 
 export const normalizePersoArmes = (

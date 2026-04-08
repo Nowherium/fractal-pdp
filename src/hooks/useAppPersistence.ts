@@ -19,6 +19,7 @@ import type {
   PersoSac,
   Resource,
   Sac,
+  Action,
 } from "../types";
 import { loadState } from "../utils/api";
 import { useDebouncedApiSave } from "../utils/useDebouncedApiSave";
@@ -155,6 +156,15 @@ export const useAppEntitySaves = ({
       queueSave(
         `outil-${outilId}`,
         `/api/outils/${outilId}`,
+        undefined,
+        "DELETE",
+      ),
+    saveActionsEntity: (action: Action) =>
+      queueSave(`action-${action.id}`, `/api/actions/${action.id}`, { action }),
+    deleteActionsEntity: (actionId: number) =>
+      queueSave(
+        `action-${actionId}`,
+        `/api/actions/${actionId}`,
         undefined,
         "DELETE",
       ),

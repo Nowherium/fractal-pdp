@@ -28,6 +28,7 @@ import { useTimelineActions } from "./hooks/useTimelineActions";
 import { useEnsureTimelineLunes } from "./hooks/useEnsureTimelineLunes";
 import { combineCityAndTerrainMultipliers } from "./utils/terrainUtils";
 import type { PageTab } from "./types";
+import { useActionsActions } from "./hooks/useActionsActions";
 
 function App() {
   const {
@@ -57,6 +58,8 @@ function App() {
     setPersoArmes,
     outils,
     setOutils,
+    actions,
+    setActions,
     persoOutils,
     setPersoOutils,
     sacs,
@@ -112,6 +115,8 @@ function App() {
     savePersoArmesEntity,
     saveOutilEntity,
     deleteOutilEntity,
+    saveActionsEntity,
+    deleteActionsEntity,
     savePersoOutilsEntity,
     saveSacEntity,
     deleteSacEntity,
@@ -189,6 +194,13 @@ function App() {
     saveCurrentTerrainEntity,
   });
 
+  const { addAction, updateAction, removeAction } = useActionsActions({
+    actions,
+    setActions,
+    saveActionsEntity,
+    deleteActionsEntity,
+  });
+
   const {
     openPersoPage,
     closePersoPage,
@@ -239,6 +251,7 @@ function App() {
   } = useTimelineActions({
     persos,
     constructions,
+    actions,
     lunes,
     currentLune,
     setConstructions,
@@ -335,6 +348,7 @@ function App() {
     cityMultipliers,
     terrains,
     currentTerrainId,
+    actions,
     groups,
     armes,
     persoArmes,
@@ -523,6 +537,7 @@ function App() {
     { key: "sacs", label: "8. Sacs" },
     { key: "resources", label: "9. Ressources" },
     { key: "terrains", label: "10. Terrains" },
+    { key: "actions", label: "11. Actions" },
   ];
 
   return (
@@ -671,6 +686,7 @@ function App() {
           setOverride,
           clearOverrides,
           addLune: handleAddLune,
+          actions,
         }}
         weaponsProps={{
           armes,
@@ -695,6 +711,16 @@ function App() {
           addTerrain,
           updateTerrain,
           removeTerrain,
+        }}
+        actionsProps={{
+          actions,
+          armes,
+          sacs,
+          outils,
+          resources,
+          addAction,
+          updateAction,
+          removeAction,
         }}
       />
     </>

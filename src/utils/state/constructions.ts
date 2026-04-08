@@ -293,6 +293,7 @@ export const syncLuneConstructionPlacements = <
     constructionPlacements?: LunePlacement[];
     placedConstructionIds?: Array<string | number>;
     constructions?: unknown[];
+    actions?: unknown[];
   },
 >(
   lune: T,

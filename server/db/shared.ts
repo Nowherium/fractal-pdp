@@ -68,6 +68,11 @@ type DbRow = {
   meteo_nrt?: unknown;
   meteo_med?: unknown;
   meteo_mat?: unknown;
+  min_capacite?: unknown;
+  resource_cost?: unknown;
+  resource_id?: unknown;
+  target_type?: unknown;
+  action_id?: unknown;
 } & Record<string, unknown>;
 
 type GenericInput = {
@@ -99,6 +104,7 @@ type LuneRationPayload = {
   tache: string;
   drogue: string | null;
   constructionId: string | null;
+  actionId: number | null;
 };
 
 const stockFields = [
@@ -212,6 +218,7 @@ const defaultRation = () => ({
   tache: "",
   drogue: null,
   constructionId: null,
+  actionId: null,
 });
 
 const normalizeNumber = (value: unknown): number => {
@@ -547,6 +554,19 @@ const normalizeOutilRow = (row: DbRow) => ({
   quantity: normalizeWeaponQuantity(row.quantity),
 });
 
+const normalizeActionRow = (row: DbRow) => ({
+  id: Number(row.id),
+  name: row.name,
+  specialite: normalizeToolSpecialite(row.specialite),
+  min_capacite: normalizeNonNegativeNumber(row.min_capacite),
+  resource_cost: normalizeNonNegativeNumber(row.resource_cost),
+  resource_id: normalizeOptionalId(row.resource_id),
+  target_type: row.target_type ? String(row.target_type) : "arme",
+  sac_id: normalizeNonNegativeNumber(row.sac_id),
+  arme_id: normalizeNonNegativeNumber(row.arme_id),
+  outil_id: normalizeNonNegativeNumber(row.outil_id),
+});
+
 const normalizePersoArmeRow = (row: DbRow) => ({
   perso_id: Number(row.perso_id),
   arme_id: Number(row.arme_id),
@@ -641,6 +661,7 @@ const buildLunes = (
       tache: String(row.tache ?? ""),
       drogue: row.drogue ? String(row.drogue) : null,
       constructionId: row.construction_id ? String(row.construction_id) : null,
+      actionId: row.action_id ? Number(row.action_id) : null,
     };
   });
 
@@ -937,6 +958,7 @@ export {
   normalizePersoRow,
   normalizeArmeRow,
   normalizeOutilRow,
+  normalizeActionRow,
   normalizePersoArmeRow,
   normalizePersoOutilRow,
   normalizeSacRow,

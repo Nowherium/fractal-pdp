@@ -13,6 +13,7 @@ import TimelinePage from "./TimelinePage";
 import WeaponsPage from "./WeaponsPage";
 import ToolsPage from "./ToolsPage";
 import BagsPage from "./BagsPage";
+import ActionsPage from "./ActionsPage";
 
 import type { AppPage, Group, Perso } from "../types";
 
@@ -118,12 +119,14 @@ type TimelineDomainProps = Pick<
   | "setOverride"
   | "clearOverrides"
   | "addLune"
+  | "actions"
 >;
 
 type WeaponsDomainProps = ComponentProps<typeof WeaponsPage>;
 type ToolsDomainProps = ComponentProps<typeof ToolsPage>;
 type BagsDomainProps = ComponentProps<typeof BagsPage>;
 type TerrainsDomainProps = ComponentProps<typeof TerrainsPage>;
+type ActionsDomainProps = ComponentProps<typeof ActionsPage>;
 
 interface AppPageContentProps {
   page: AppPage;
@@ -138,6 +141,7 @@ interface AppPageContentProps {
   toolsProps: ToolsDomainProps;
   bagsProps: BagsDomainProps;
   terrainsProps: TerrainsDomainProps;
+  actionsProps: ActionsDomainProps;
 }
 
 function AppPageContent({
@@ -153,6 +157,7 @@ function AppPageContent({
   toolsProps,
   bagsProps,
   terrainsProps,
+  actionsProps,
 }: AppPageContentProps) {
   switch (page) {
     case "reserve":
@@ -202,6 +207,8 @@ function AppPageContent({
       return <ToolsPage {...toolsProps} />;
     case "sacs":
       return <BagsPage {...bagsProps} />;
+    case "actions":
+      return <ActionsPage {...actionsProps} />;
     default:
       return null;
   }

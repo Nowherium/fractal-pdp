@@ -20,6 +20,7 @@ test("setOverride clamps numeric timeline overrides to non-negative values", () 
 
   const actions = useTimelineActions({
     persos: [{ id: 1, nom: "Alya" }],
+    actions: [],
     constructions: [],
     lunes: lunesState.get(),
     currentLune: 1,
@@ -53,6 +54,7 @@ test("addLune enables auto assignment by default for the next lune", () => {
 
   const actions = useTimelineActions({
     persos: [{ id: 1, nom: "Alya" }],
+    actions: [],
     constructions: [],
     lunes: lunesState.get(),
     currentLune: 1,

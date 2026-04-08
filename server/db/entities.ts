@@ -9,6 +9,7 @@ import {
   normalizeNumber,
   normalizeOptionalId,
   normalizeOutilRow,
+  normalizeActionRow,
   normalizePersoRow,
   normalizeResourceCode,
   normalizeResourceName,
@@ -753,6 +754,79 @@ const deleteOutil = async (outilId: number) => {
   await pool.query("DELETE FROM outils WHERE id = $1", [outilId]);
 };
 
+const upsertAction = async (action: EntityInput | null | undefined) => {
+  const id = Number(action?.id);
+  if (!Number.isFinite(id)) {
+    throw new Error("Identifiant d'action invalide.");
+  }
+
+  await withTransaction(async (client) => {
+    const { rows: existingRows } = await client.query(
+      "SELECT * FROM actions WHERE id = $1 LIMIT 1",
+      [id],
+    );
+    const mergedAction = {
+      ...(existingRows[0] ? normalizeActionRow(existingRows[0]) : {}),
+      ...(action || {}),
+      id,
+    };
+
+    const payload = {
+      id,
+      name: mergedAction.name || "Action sans nom",
+      specialite: normalizeToolSpecialite(mergedAction.specialite),
+      min_capacite: normalizeNonNegativeNumber(mergedAction.min_capacite ?? 1),
+      resource_cost: normalizeNonNegativeNumber(mergedAction.resource_cost),
+      resource_id: normalizeOptionalId(mergedAction.resource_id),
+      target_type: mergedAction.target_type || "arme",
+      sac_id:
+        mergedAction.target_type === "sac"
+          ? normalizeOptionalId(mergedAction.sac_id)
+          : null,
+      outil_id:
+        mergedAction.target_type === "outil"
+          ? normalizeOptionalId(mergedAction.outil_id)
+          : null,
+      arme_id:
+        mergedAction.target_type === "arme"
+          ? normalizeOptionalId(mergedAction.arme_id)
+          : null,
+    };
+
+    await client.query(
+      `INSERT INTO actions (id, name, specialite, min_capacite, resource_cost, resource_id, target_type, sac_id, outil_id, arme_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (id)
+       DO UPDATE SET
+         name = EXCLUDED.name,
+         specialite = EXCLUDED.specialite,
+         min_capacite = EXCLUDED.min_capacite,
+         resource_cost = EXCLUDED.resource_cost,
+         resource_id = EXCLUDED.resource_id,
+         target_type = EXCLUDED.target_type,
+         sac_id = EXCLUDED.sac_id,
+         outil_id = EXCLUDED.outil_id,
+         arme_id = EXCLUDED.arme_id`,
+      [
+        payload.id,
+        payload.name,
+        payload.specialite,
+        payload.min_capacite,
+        payload.resource_cost,
+        payload.resource_id,
+        payload.target_type,
+        payload.sac_id,
+        payload.outil_id,
+        payload.arme_id,
+      ],
+    );
+  });
+};
+
+const deleteAction = async (actionId: number) => {
+  await pool.query("DELETE FROM actions WHERE id = $1", [actionId]);
+};
+
 const upsertSac = async (sac: EntityInput | null | undefined) => {
   const id = Number(sac?.id);
   if (!Number.isFinite(id)) {
@@ -833,6 +907,8 @@ export {
   deleteArme,
   upsertOutil,
   deleteOutil,
+  upsertAction,
+  deleteAction,
   upsertSac,
   deleteSac,
 };

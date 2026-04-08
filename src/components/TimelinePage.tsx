@@ -4,7 +4,7 @@ import TimelineSegmentCard from "./TimelineSegmentCard";
 import Button from "./ui/Button";
 import InfoText from "./ui/InfoText";
 
-import type { LuneConstruction, Outil, Resource } from "../types";
+import type { Action, LuneConstruction, Outil, Resource } from "../types";
 import type { TimelineSegment } from "../utils/timelineTypes";
 
 function TimelinePage({
@@ -25,6 +25,7 @@ function TimelinePage({
   clearOverrides,
   addLune,
   defaultShowAbsentPersos = false,
+  actions,
 }: {
   currentLune: number;
   resources: Resource[];
@@ -54,7 +55,8 @@ function TimelinePage({
       | "dehors"
       | "produit"
       | "drogue"
-      | "constructionId",
+      | "constructionId"
+      | "actionId",
     value: string | boolean,
   ) => void;
   toggleConstructionPlacement: (
@@ -73,6 +75,7 @@ function TimelinePage({
   clearOverrides: (luneIndex: number, persoId: number) => void;
   addLune: () => void;
   defaultShowAbsentPersos?: boolean;
+  actions: Action[];
 }) {
   const [showAbsentPersos, setShowAbsentPersos] = useState(
     defaultShowAbsentPersos,
@@ -120,6 +123,7 @@ function TimelinePage({
             openOverrides={openOverrides}
             setOverride={setOverride}
             clearOverrides={clearOverrides}
+            actions={actions}
           />
         ))}
       </div>

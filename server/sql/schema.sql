@@ -145,6 +145,19 @@ CREATE TABLE IF NOT EXISTS overrides (
   PRIMARY KEY (lune_id, perso_id)
 );
 
+CREATE TABLE IF NOT EXISTS actions (
+  id integer PRIMARY KEY,
+  name text NOT NULL,
+  specialite text NOT NULL DEFAULT 'art',
+  min_capacite numeric NOT NULL DEFAULT 3,
+  resource_cost numeric NOT NULL DEFAULT 2,
+  resource_id integer REFERENCES resources(id) ON DELETE SET NULL,
+  target_type text NOT NULL DEFAULT 'arme',
+  sac_id integer REFERENCES sacs(id) ON DELETE SET NULL,
+  outil_id integer REFERENCES outils(id) ON DELETE SET NULL,
+  arme_id integer REFERENCES armes(id) ON DELETE SET NULL
+);
+
 -- Compatibility migrations for already-initialized databases.
 -- `CREATE TABLE IF NOT EXISTS` does not add new columns to existing tables,
 -- so recent additions still need explicit idempotent ALTERs here.
@@ -218,6 +231,9 @@ ALTER TABLE rations
   ALTER COLUMN dehors SET NOT NULL,
   ALTER COLUMN produit SET DEFAULT false,
   ALTER COLUMN produit SET NOT NULL;
+
+  ALTER TABLE rations
+  ADD COLUMN IF NOT EXISTS action_id INTEGER REFERENCES actions(id) ON DELETE SET NULL;
 
 DO $$
 BEGIN

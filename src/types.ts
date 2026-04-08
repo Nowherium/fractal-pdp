@@ -11,7 +11,8 @@ export type AppPage =
   | "outils"
   | "sacs"
   | "resources"
-  | "terrains";
+  | "terrains"
+  | "actions";
 
 export interface AppRouteState {
   page: AppPage;
@@ -165,6 +166,7 @@ export interface Ration {
   tache: string;
   drogue: string | null;
   constructionId?: string | null;
+  actionId?: number | null;
 }
 
 export type ConstructionStatus = "todo" | "in-progress" | "done";
@@ -235,4 +237,18 @@ export interface Lune {
   autoAssign?: boolean;
   toolAssignments?: TimelineToolAssignments;
   frozenTimeline?: FrozenTimelineData | null;
+}
+
+export interface Action {
+  id: number;
+  name: string;
+  specialite: string;
+  min_capacite?: number;
+  resource_cost?: number;
+  resource_id?: number;
+  target_type?: string;
+  sac_id?: number;
+  arme_id?: number;
+  outil_id?: number;
+  [key: string]: unknown;
 }

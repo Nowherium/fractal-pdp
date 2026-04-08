@@ -19,6 +19,7 @@ const timelinePageProps = {
     { id: 5, name: "Pinceau", specialite: "art", bonus: 1.1 },
   ] satisfies Outil[],
   constructions: [],
+  actions: [],
   timelineData: [
     {
       actualIndex: 0,
@@ -29,6 +30,7 @@ const timelinePageProps = {
         overrides: {},
         constructionPlacements: [],
         constructions: [],
+        actions: [],
       },
       rows: [
         {

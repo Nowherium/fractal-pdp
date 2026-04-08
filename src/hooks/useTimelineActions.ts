@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type {
+  Action,
   Lune,
   LuneConstruction,
   Perso,
@@ -31,6 +32,7 @@ const sanitizeConstructions = (
 interface UseTimelineActionsParams {
   persos: Perso[];
   constructions: LuneConstruction[];
+  actions: Action[];
   lunes: Lune[];
   currentLune: number;
   setConstructions: Dispatch<SetStateAction<LuneConstruction[]>>;
@@ -44,6 +46,7 @@ interface UseTimelineActionsParams {
 export const useTimelineActions = ({
   persos,
   constructions,
+  actions,
   lunes,
   currentLune,
   setConstructions,
@@ -101,7 +104,8 @@ export const useTimelineActions = ({
       | "dehors"
       | "produit"
       | "drogue"
-      | "constructionId",
+      | "constructionId"
+      | "actionId",
     value: string | boolean,
   ) => {
     if (isPastLuneIndex(luneIndex)) {
@@ -131,12 +135,20 @@ export const useTimelineActions = ({
         nextRation.constructionId = null;
       }
 
+      if (field === "tache" && value !== "fabriquer") {
+        nextRation.actionId = null;
+      }
+
       if (
         field === "tache" &&
         value === "construire" &&
         !nextRation.constructionId
       ) {
         nextRation.constructionId = constructions?.[0]?.id ?? null;
+      }
+
+      if (field === "tache" && value === "fabriquer" && !nextRation.actionId) {
+        nextRation.actionId = actions?.[0]?.id ?? null;
       }
 
       return {
