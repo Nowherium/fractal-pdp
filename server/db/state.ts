@@ -580,7 +580,7 @@ const insertState = async (state: GenericInput) => {
         construction_id: ration?.constructionId
           ? String(ration.constructionId)
           : null,
-        action_id: ration?.actionId ? Number(ration.actionId) : 1,
+        action_id: ration?.actionId ? Number(ration.actionId) : null,
       });
     }
 
@@ -636,18 +636,28 @@ const insertState = async (state: GenericInput) => {
     outilsPayload?.map((outil) => outil.id).filter(Number.isFinite) || [];
 
   const actionsPayload =
-    actions?.map((action: GenericInput) => ({
-      id: Number(action.id),
-      name: action.name || "Action sans nom",
-      specialite: normalizeNumber(action.specialite || 1),
-      min_capacite: normalizeNumber(action.min_capacite),
-      resource_cost: normalizeNumber(action.resource_cost),
-      resource_id: normalizeNumber(action.resource_id),
-      target_type: String(action.target_type ?? "arme"),
-      sac_id: normalizeNumber(action.sac_id ?? 0),
-      arme_id: normalizeNumber(action.arme_id ?? 1),
-      outil_id: normalizeNumber(action.outil_id ?? 0),
-    })) || null;
+    actions?.map((action: GenericInput) => {
+      const targetType =
+        action.target_type === "sac" || action.target_type === "outil"
+          ? action.target_type
+          : "arme";
+
+      return {
+        id: Number(action.id),
+        name: action.name || "Action sans nom",
+        specialite: normalizeToolSpecialite(action.specialite),
+        min_capacite: normalizeNumber(action.min_capacite),
+        resource_cost: normalizeNumber(action.resource_cost),
+        resource_id: normalizeNumber(action.resource_id),
+        target_type: targetType,
+        sac_id:
+          targetType === "sac" ? normalizeOptionalId(action.sac_id) : null,
+        arme_id:
+          targetType === "arme" ? normalizeOptionalId(action.arme_id) : null,
+        outil_id:
+          targetType === "outil" ? normalizeOptionalId(action.outil_id) : null,
+      };
+    }) || null;
   const actionIds =
     actionsPayload?.map((action) => action.id).filter(Number.isFinite) || [];
 

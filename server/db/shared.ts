@@ -314,7 +314,7 @@ const normalizeToolSpecialite = (value: unknown): string => {
 const normalizeOptionalId = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const normalized = Number(value);
-  return Number.isFinite(normalized) ? normalized : null;
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
 };
 
 const normalizeLuneToolAssignments = (value: unknown) => {

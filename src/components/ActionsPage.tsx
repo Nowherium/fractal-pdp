@@ -1,25 +1,72 @@
 import type {
   Action,
   Arme,
-  Sac,
   Outil,
-  ToolSpecialite,
   Resource,
+  Sac,
+  ToolSpecialite,
 } from "../types";
 import { confirmAction } from "../utils/confirmAction";
 import Button from "./ui/Button";
 import Panel from "./ui/Panel";
 import InfoText from "./ui/InfoText";
 import type { ActionEditableField } from "../utils/actionsUtils";
-import { formControlClassName, toFormInputValue } from "../utils/formUtils";
+import { formControlClassName } from "../utils/formUtils";
 import { toolSpecialiteLabels, toolSpecialiteOrder } from "../utils/toolUtils";
-import { useState, useEffect } from "react";
 
 const specialites: Array<{ value: ToolSpecialite; label: string }> =
   toolSpecialiteOrder.map((value) => ({
     value,
     label: toolSpecialiteLabels[value],
   }));
+
+type ActionTargetType = "arme" | "outil" | "sac";
+
+const normalizeActionTargetType = (
+  value: Action["target_type"],
+): ActionTargetType => (value === "sac" || value === "outil" ? value : "arme");
+
+const getTargetField = (targetType: ActionTargetType): ActionEditableField => {
+  if (targetType === "sac") return "sac_id";
+  if (targetType === "outil") return "outil_id";
+  return "arme_id";
+};
+
+const getTargetOptions = (
+  targetType: ActionTargetType,
+  armes: Arme[],
+  sacs: Sac[],
+  outils: Outil[],
+): Array<Arme | Sac | Outil> => {
+  if (targetType === "sac") return sacs;
+  if (targetType === "outil") return outils;
+  return armes;
+};
+
+const getTargetId = (action: Action, targetType: ActionTargetType): number => {
+  if (targetType === "sac") return Math.max(0, Number(action.sac_id ?? 0) || 0);
+  if (targetType === "outil") {
+    return Math.max(0, Number(action.outil_id ?? 0) || 0);
+  }
+  return Math.max(0, Number(action.arme_id ?? 0) || 0);
+};
+
+const resolveTargetId = (
+  action: Action,
+  targetType: ActionTargetType,
+  armes: Arme[],
+  sacs: Sac[],
+  outils: Outil[],
+): number => {
+  const targetOptions = getTargetOptions(targetType, armes, sacs, outils);
+  const currentTargetId = getTargetId(action, targetType);
+
+  if (targetOptions.some((option) => Number(option.id) === currentTargetId)) {
+    return currentTargetId;
+  }
+
+  return Number(targetOptions[0]?.id ?? 0);
+};
 
 function ActionsPage({
   actions,
@@ -40,30 +87,11 @@ function ActionsPage({
   updateAction: (
     index: number,
     field: ActionEditableField,
-    rawValue: string | number,
+    rawValue: string | number | null,
     options?: { persist?: boolean },
   ) => void;
   removeAction: (index: number) => void;
 }) {
-  const [localTargetType, setLocalTargetType] = useState<
-    "arme" | "outil" | "sac"
-  >("arme");
-  const [targetId, setTargetId] = useState<number>(1);
-
-  useEffect(() => {
-    if (localTargetType === "arme" && armes.length > 0) {
-      setTargetId(armes[0]?.id ?? 1);
-    }
-
-    if (localTargetType === "outil" && outils.length > 0) {
-      setTargetId(outils[0]?.id ?? 1);
-    }
-
-    if (localTargetType === "sac" && sacs.length > 0) {
-      setTargetId(sacs[0]?.id ?? 1);
-    }
-  }, [localTargetType, armes, sacs, outils]);
-
   return (
     <Panel>
       <h2>6. Administration des actions</h2>
@@ -80,160 +108,169 @@ function ActionsPage({
               <th>Spécialité</th>
               <th>Capacité min.</th>
               <th>Coût</th>
-              <th>ID ressource</th>
+              <th>Besoin</th>
               <th>Type</th>
               <th>Quoi ?</th>
             </tr>
           </thead>
           <tbody>
-            {actions.map((action, index) => (
-              <tr key={index}>
-                <td>
-                  <input
-                    type='text'
-                    value={action.name}
-                    onChange={(event) =>
-                      updateAction(index, "name", event.target.value)
-                    }
-                  />
-                </td>
-                <td>
-                  <select
-                    className={formControlClassName}
-                    value={action.specialite ?? "art"}
-                    onChange={(event) =>
-                      updateAction(index, "specialite", event.target.value)
-                    }
-                  >
-                    {specialites.map((specialite) => (
-                      <option key={specialite.value} value={specialite.value}>
-                        {specialite.label}
+            {actions.map((action, index) => {
+              const targetType = normalizeActionTargetType(action.target_type);
+              const targetField = getTargetField(targetType);
+              const targetOptions = getTargetOptions(
+                targetType,
+                armes,
+                sacs,
+                outils,
+              );
+              const currentTargetId = getTargetId(action, targetType);
+              const selectedTargetId = targetOptions.some(
+                (option) => Number(option.id) === currentTargetId,
+              )
+                ? currentTargetId
+                : (targetOptions[0]?.id ?? "");
+
+              return (
+                <tr key={action.id || index}>
+                  <td>
+                    <input
+                      type='text'
+                      value={action.name}
+                      onChange={(event) =>
+                        updateAction(index, "name", event.target.value)
+                      }
+                    />
+                  </td>
+                  <td>
+                    <select
+                      className={formControlClassName}
+                      value={action.specialite || "art"}
+                      onChange={(event) =>
+                        updateAction(index, "specialite", event.target.value)
+                      }
+                    >
+                      {specialites.map((specialite) => (
+                        <option key={specialite.value} value={specialite.value}>
+                          {specialite.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      type='number'
+                      className={formControlClassName}
+                      min='0'
+                      value={action.min_capacite}
+                      onChange={(event) =>
+                        updateAction(index, "min_capacite", event.target.value)
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type='number'
+                      className={formControlClassName}
+                      min='0'
+                      value={action.resource_cost}
+                      onChange={(event) =>
+                        updateAction(
+                          index,
+                          "resource_cost",
+                          event.target.value
+                            ? Number(event.target.value)
+                            : null,
+                        )
+                      }
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={action.resource_id ?? ""}
+                      onChange={(event) =>
+                        updateAction(
+                          index,
+                          "resource_id",
+                          Number(event.target.value),
+                        )
+                      }
+                    >
+                      {resources.map((resource) => (
+                        <option key={resource.id} value={resource.id}>
+                          {resource.name || resource.code.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      value={targetType}
+                      onChange={(event) => {
+                        const nextTargetType = normalizeActionTargetType(
+                          event.target.value,
+                        );
+                        const nextTargetField = getTargetField(nextTargetType);
+                        const nextTargetId = resolveTargetId(
+                          action,
+                          nextTargetType,
+                          armes,
+                          sacs,
+                          outils,
+                        );
+
+                        updateAction(index, "target_type", nextTargetType, {
+                          persist: false,
+                        });
+                        updateAction(index, nextTargetField, nextTargetId);
+                      }}
+                    >
+                      <option value='arme'>Arme</option>
+                      <option value='sac'>Sac</option>
+                      <option value='outil'>Outil</option>
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      value={selectedTargetId}
+                      onChange={(event) =>
+                        updateAction(
+                          index,
+                          targetField,
+                          event.target.value ? Number(event.target.value) : 0,
+                        )
+                      }
+                      disabled={targetOptions.length === 0}
+                    >
+                      <option value=''>
+                        {targetOptions.length === 0
+                          ? "Aucun élément disponible"
+                          : "Choisir…"}
                       </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input
-                    type='number'
-                    className={`${formControlClassName}`}
-                    min='0'
-                    value={action.min_capacite}
-                    onChange={(event) =>
-                      updateAction(index, "min_capacite", event.target.value)
-                    }
-                  />
-                </td>
-                <td>
-                  <input
-                    type='number'
-                    className={`${formControlClassName}`}
-                    min='0'
-                    value={action.resource_cost}
-                    onChange={(event) =>
-                      updateAction(index, "resource_cost", event.target.value)
-                    }
-                  />
-                </td>
-                <td>
-                  <select
-                    value={action.resource_id}
-                    onChange={(event) =>
-                      updateAction(
-                        index,
-                        "resource_id",
-                        Number(event.target.value),
-                      )
-                    }
-                  >
-                    {resources.map((resource) => (
-                      <option key={resource.id} value={resource.id}>
-                        {resource.name || resource.code.toUpperCase()}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <select
-                    value={toFormInputValue(localTargetType, "arme")}
-                    onChange={(event) => {
-                      const newValue = event.target.value as
-                        | "arme"
-                        | "outil"
-                        | "sac";
-                      setLocalTargetType(newValue);
-                      console.log("Selected target type:", newValue);
-                      updateAction(
-                        index,
-                        (localTargetType + "_id") as ActionEditableField,
-                        targetId,
-                      );
-                      updateAction(index, "target_type", event.target.value);
-                    }}
-                  >
-                    <option value='arme'>Arme</option>
-                    <option value='sac'>Sac</option>
-                    <option value='outil'>Outil</option>
-                  </select>
-                </td>
-                <td className={localTargetType === "arme" ? "" : "hidden"}>
-                  <select
-                    value={targetId}
-                    onChange={(event) => {
-                      updateAction(index, "arme_id", event.target.value);
-                    }}
-                  >
-                    {armes.map((arme) => (
-                      <option key={arme.id} value={arme.id}>
-                        {arme.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className={localTargetType === "sac" ? "" : "hidden"}>
-                  <select
-                    value={targetId}
-                    onChange={(event) =>
-                      updateAction(index, "sac_id", event.target.value)
-                    }
-                  >
-                    {sacs.map((sac) => (
-                      <option key={sac.id} value={sac.id}>
-                        {sac.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className={localTargetType === "outil" ? "" : "hidden"}>
-                  <select
-                    value={targetId}
-                    onChange={(event) => {
-                      updateAction(index, "outil_id", event.target.value);
-                    }}
-                  >
-                    {outils.map((outil) => (
-                      <option key={outil.id} value={outil.id}>
-                        {outil.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <Button
-                    className='mt-0'
-                    size='sm'
-                    variant='danger'
-                    onClick={() =>
-                      confirmAction(
-                        `Supprimer l'action ${action.name || "sélectionné"} ?`,
-                        () => removeAction(index),
-                      )
-                    }
-                  >
-                    Supprimer
-                  </Button>
-                </td>
-              </tr>
-            ))}
+                      {targetOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <Button
+                      className='mt-0'
+                      size='sm'
+                      variant='danger'
+                      onClick={() =>
+                        confirmAction(
+                          `Supprimer l'action ${action.name || "sélectionné"} ?`,
+                          () => removeAction(index),
+                        )
+                      }
+                    >
+                      Supprimer
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

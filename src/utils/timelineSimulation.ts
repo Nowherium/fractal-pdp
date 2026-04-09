@@ -1,4 +1,6 @@
 import type {
+  Action,
+  Arme,
   ConstructionProgressById,
   Lune,
   LuneConstruction,
@@ -7,6 +9,7 @@ import type {
   PersoResource,
   Ration,
   Resource,
+  Sac,
 } from "../types";
 import type {
   CityMultipliersInput,
@@ -66,10 +69,29 @@ export const simulateTimeline = (
   currentLune = 1,
   constructionProgress: ConstructionProgressById = {},
   outils: Outil[] = [],
+  actions: Action[] = [],
+  armes: Arme[] = [],
+  sacs: Sac[] = [],
 ): TimelineSegment[] => {
   const timeline: TimelineSegment[] = [];
   const productionMultipliers = normalizeProductionMultipliers(cityMultipliers);
   const availableResourceCodes = buildAvailableResourceCodes(resources);
+  const resourceCodesById = new Map<number, string>(
+    resources.map((resource) => [
+      Number(resource.id),
+      String(resource.code ?? "")
+        .trim()
+        .toLowerCase(),
+    ]),
+  );
+  const actionsById = new Map<number, Action>(
+    actions.map((action) => [Number(action.id), action]),
+  );
+  const craftableTargetIds = {
+    arme: new Set(armes.map((arme) => Number(arme.id))),
+    outil: new Set(outils.map((outil) => Number(outil.id))),
+    sac: new Set(sacs.map((sac) => Number(sac.id))),
+  };
   const baseDrugStocksByPerso = buildDrugStocksByPerso(
     resources,
     persoResources,
@@ -183,6 +205,9 @@ export const simulateTimeline = (
         availableCityResourceStocks,
         availableResourceCodes,
         selectedToolMultipliers,
+        actionsById,
+        resourceCodesById,
+        craftableTargetIds,
       });
 
       rows.push(persoResult.row);
@@ -195,6 +220,20 @@ export const simulateTimeline = (
 
     const startingStocks = createStockSnapshot(resourceStocks);
     const projectedStocks = projectStocksForLune(resourceStocks, luneTotals);
+
+    Object.entries(availableCityResourceStocks).forEach(([code, quantity]) => {
+      if (code === "eau" || code === "nrt" || code === "med") {
+        return;
+      }
+
+      if (code === "mat") {
+        projectedStocks[code] = Number(quantity ?? 0) + luneTotals.mat;
+        return;
+      }
+
+      projectedStocks[code] = Number(quantity ?? 0);
+    });
+
     const constructionStates = processConstructionProgress({
       constructionsForLune: constructionsForLune.map((construction) => ({
         ...construction,

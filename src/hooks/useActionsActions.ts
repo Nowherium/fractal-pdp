@@ -30,14 +30,9 @@ export const useActionsActions = ({
   const updateAction = (
     index: number,
     field: ActionEditableField,
-    rawValue: string | number,
+    rawValue: string | number | null,
     { persist = true }: PersistOptions = {},
   ) => {
-    const currentAction = actions[index];
-    if (!currentAction) {
-      return;
-    }
-
     const nextValue =
       field === "name" || field === "target_type" || field === "specialite"
         ? String(rawValue ?? "")
@@ -45,21 +40,30 @@ export const useActionsActions = ({
             const numericValue = Number(rawValue);
             return Number.isFinite(numericValue)
               ? Math.max(0, numericValue)
-              : 1;
+              : 0;
           })();
 
-    const nextAction = {
-      ...currentAction,
-      [field]: nextValue,
-    };
-    const nextActions = actions.map((action, currentIndex) =>
-      currentIndex !== index ? action : nextAction,
-    );
+    setActions((previous) => {
+      const currentAction = previous[index];
+      if (!currentAction) {
+        return previous;
+      }
 
-    setActions(nextActions);
-    if (persist) {
-      saveActionsEntity(nextAction);
-    }
+      const nextAction = {
+        ...currentAction,
+        [field]: nextValue,
+      };
+
+      if (persist) {
+        queueMicrotask(() => {
+          saveActionsEntity(nextAction);
+        });
+      }
+
+      return previous.map((action, currentIndex) =>
+        currentIndex !== index ? action : nextAction,
+      );
+    });
   };
 
   const removeAction = (index: number) => {

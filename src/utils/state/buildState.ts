@@ -13,6 +13,7 @@ import {
 } from "./constructions";
 import {
   createLune,
+  normalizeActions,
   normalizeArmes,
   normalizeGroups,
   normalizeLunes,
@@ -176,6 +177,6 @@ export const buildState = (rawState: unknown = {}) => {
     persoOutils: normalizePersoOutils(rawPersoOutils),
     sacs: normalizeSacs(rawSacs),
     persoSacs: normalizePersoSacs(rawPersoSacs),
-    actions: rawActions,
+    actions: normalizeActions(rawActions),
   };
 };

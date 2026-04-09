@@ -77,6 +77,9 @@ export const normalizePresenceValue = (
 export const createStockSnapshot = (
   stocks: Record<string, number> = {},
 ): StockSnapshot => ({
+  ...Object.fromEntries(
+    Object.entries(stocks).map(([code, value]) => [code, Number(value ?? 0)]),
+  ),
   eau: Number(stocks["eau"] ?? 0),
   nrt: Number(stocks["nrt"] ?? 0),
   med: Number(stocks["med"] ?? 0),
