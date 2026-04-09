@@ -1361,6 +1361,195 @@ test("applies the passed turn results back to persos, carried resources and stoc
   assert.equal(advanced.persoResources.length, 0);
 });
 
+test("applies a fabriquer action by consuming resources and increasing the crafted inventory on pass turn", () => {
+  const resources = [{ id: 1, code: "mat", name: "Mat" }];
+  const actions = [
+    {
+      id: 1,
+      name: "Fabriquer une lance",
+      specialite: "mat",
+      min_capacite: 2,
+      resource_cost: 2,
+      resource_id: 1,
+      target_type: "arme",
+      arme_id: 0,
+      outil_id: 0,
+      sac_id: 0,
+    },
+  ];
+  const armes = [{ id: 9, name: "Lance", quantity: 1 }];
+  const persos = [
+    {
+      id: 1,
+      nom: "Forgeron",
+      present: true,
+      pv: 5,
+      pvmax: 5,
+      capEau: 0,
+      capEauEffectif: 0,
+      capNrt: 0,
+      capNrtEffectif: 0,
+      capMed: 0,
+      capMedEffectif: 0,
+      capMat: 3,
+      capMatEffectif: 3,
+      capArt: 0,
+      capArtEffectif: 0,
+      combat: 0,
+    },
+  ];
+
+  const [segment] = simulateTimeline(
+    persos,
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "fabriquer",
+            drogue: null,
+            actionId: 1,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 3 },
+    defaultRation,
+    [],
+    resources,
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+    {},
+    [],
+    actions,
+    armes,
+    [],
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.stats.consoMat, 2);
+  assert.equal(segment.stats.stockMat, 1);
+  assert.equal(segment.rows[0]?.craftedAction?.success, true);
+
+  const advanced = applyTimelineSegmentToState(
+    persos,
+    { eau: 0, nrt: 0, med: 0, mat: 3 },
+    segment,
+    [],
+    resources,
+    actions,
+    armes,
+    [],
+    [],
+  );
+
+  assert.equal(advanced.stocks["mat"], 1);
+  assert.equal(advanced.persos[0]?.capMat, 3.1);
+  assert.equal(advanced.armes[0]?.quantity, 2);
+});
+
+test("does not craft anything when the action requirements are not met", () => {
+  const resources = [{ id: 1, code: "mat", name: "Mat" }];
+  const actions = [
+    {
+      id: 1,
+      name: "Fabriquer une lance",
+      specialite: "mat",
+      min_capacite: 4,
+      resource_cost: 2,
+      resource_id: 1,
+      target_type: "arme",
+      arme_id: 9,
+      outil_id: 0,
+      sac_id: 0,
+    },
+  ];
+  const armes = [{ id: 9, name: "Lance", quantity: 1 }];
+  const persos = [
+    {
+      id: 1,
+      nom: "Apprenti",
+      present: true,
+      pv: 5,
+      pvmax: 5,
+      capEau: 0,
+      capEauEffectif: 0,
+      capNrt: 0,
+      capNrtEffectif: 0,
+      capMed: 0,
+      capMedEffectif: 0,
+      capMat: 2,
+      capMatEffectif: 2,
+      capArt: 0,
+      capArtEffectif: 0,
+      combat: 0,
+    },
+  ];
+
+  const [segment] = simulateTimeline(
+    persos,
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "fabriquer",
+            drogue: null,
+            actionId: 1,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 3 },
+    defaultRation,
+    [],
+    resources,
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+    {},
+    [],
+    actions,
+    armes,
+    [],
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.stats.consoMat, 0);
+  assert.equal(segment.stats.stockMat, 3);
+  assert.equal(segment.rows[0]?.craftedAction?.success, false);
+
+  const advanced = applyTimelineSegmentToState(
+    persos,
+    { eau: 0, nrt: 0, med: 0, mat: 3 },
+    segment,
+    [],
+    resources,
+    actions,
+    armes,
+    [],
+    [],
+  );
+
+  assert.equal(advanced.persos[0]?.capMat, 2);
+  assert.equal(advanced.armes[0]?.quantity, 1);
+});
+
 test("applies the full capacity gain even when a shared tool bonus is active", () => {
   const persos = [
     {

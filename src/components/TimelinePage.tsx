@@ -57,7 +57,7 @@ function TimelinePage({
       | "drogue"
       | "constructionId"
       | "actionId",
-    value: string | boolean,
+    value: number | string | boolean,
   ) => void;
   toggleConstructionPlacement: (
     luneIndex: number,

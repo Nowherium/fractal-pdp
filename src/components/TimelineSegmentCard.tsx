@@ -67,7 +67,7 @@ interface TimelineSegmentCardProps {
     luneIndex: number,
     persoId: number,
     field: TimelineRationField,
-    value: string | boolean,
+    value: string | boolean | number,
   ) => void;
   toggleConstructionPlacement: (
     luneIndex: number,
@@ -125,6 +125,8 @@ function TimelineSegmentCard({
     setIsSharedToolsOpen(!checked);
   };
 
+  const availableOutils = outils.filter((outil) => Number(outil.quantity) > 0);
+
   return (
     <div
       key={segment.lune.id}
@@ -157,7 +159,7 @@ function TimelineSegmentCard({
         />
 
         <TimelineSharedToolsSection
-          outils={outils}
+          outils={availableOutils}
           toolAssignments={toolAssignments}
           open={isSharedToolsOpen}
           isPastLune={isPastLune}

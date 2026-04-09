@@ -106,7 +106,7 @@ export const useTimelineActions = ({
       | "drogue"
       | "constructionId"
       | "actionId",
-    value: string | boolean,
+    value: string | boolean | number,
   ) => {
     if (isPastLuneIndex(luneIndex)) {
       return;
@@ -128,7 +128,11 @@ export const useTimelineActions = ({
                 ? value === "" || value === null || value === undefined
                   ? null
                   : String(value)
-                : Boolean(value),
+                : field === "actionId"
+                  ? value === "" || value === null || value === undefined
+                    ? null
+                    : Number(value)
+                  : Boolean(value),
       };
 
       if (field === "tache" && value !== "construire") {

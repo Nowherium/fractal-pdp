@@ -23,7 +23,7 @@ export const createDefaultAction = (actions: Action[] = []): Action => {
   return {
     id: nextId,
     name: `Action ${nextId}`,
-    specialite: "",
+    specialite: "art",
     min_capacite: 0,
     resource_cost: 0,
     resource_id: 1,

@@ -4,6 +4,7 @@ import type {
   Lune,
   Outil,
   Perso,
+  ToolSpecialite,
   PersoArme,
   PersoOutil,
   PersoResource,
@@ -195,12 +196,18 @@ export const normalizeActions = (
   actions.map((action) => ({
     id: Number(action.id),
     name: action.name || "Action sans nom",
-    specialite: action.specialite || "arme",
+    specialite:
+      action.specialite === null || action.specialite === undefined
+        ? "art"
+        : normalizeToolSpecialite(action.specialite as ToolSpecialite),
     min_capacite: Math.max(0, Number(action.min_capacite ?? 0) || 0),
     resource_cost: Math.max(0, Number(action.resource_cost ?? 0) || 0),
     resource_id: Math.max(0, Number(action.resource_id ?? 0) || 0),
-    target_type: "arme",
-    sac_id: Math.max(0, Math.floor(Number(action.sac_id ?? 1) || 0)),
+    target_type:
+      action.target_type === "sac" || action.target_type === "outil"
+        ? action.target_type
+        : "arme",
+    sac_id: Math.max(0, Math.floor(Number(action.sac_id ?? 0) || 0)),
     arme_id: Math.max(0, Number(action.arme_id ?? 0) || 0),
     outil_id: Math.max(0, Number(action.outil_id ?? 0) || 0),
   }));

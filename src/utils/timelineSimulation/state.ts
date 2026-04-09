@@ -1,9 +1,12 @@
 import type {
+  Action,
+  Arme,
   Lune,
   Outil,
   Perso,
   PersoResource,
   Resource,
+  Sac,
   Stocks,
   ToolSpecialite,
 } from "../../types";
@@ -448,13 +451,27 @@ export const applyTimelineSegmentToState = (
   segment?: TimelineSegment | null,
   persoResources: PersoResource[] = [],
   resources: Resource[] = [],
-): { persos: Perso[]; stocks: Stocks; persoResources: PersoResource[] } => {
+  _actions: Action[] = [],
+  armes: Arme[] = [],
+  outils: Outil[] = [],
+  sacs: Sac[] = [],
+): {
+  persos: Perso[];
+  stocks: Stocks;
+  persoResources: PersoResource[];
+  armes: Arme[];
+  outils: Outil[];
+  sacs: Sac[];
+} => {
   const endingState = segment?.endingState;
   if (!endingState) {
     return {
       persos: [...persos],
       stocks: { ...stocks },
       persoResources: [...persoResources],
+      armes: [...armes],
+      outils: [...outils],
+      sacs: [...sacs],
     };
   }
 
@@ -510,6 +527,53 @@ export const applyTimelineSegmentToState = (
     return quantity > 0 ? [{ ...entry, quantity }] : [];
   });
 
+  const craftedCounts = (segment?.rows ?? []).reduce(
+    (acc, row) => {
+      const craftedAction = row.craftedAction;
+      if (
+        !craftedAction?.success ||
+        !craftedAction.targetType ||
+        !craftedAction.targetId
+      ) {
+        return acc;
+      }
+
+      const targetType = craftedAction.targetType;
+      const targetId = Number(craftedAction.targetId);
+      if (!Number.isFinite(targetId) || targetId <= 0) {
+        return acc;
+      }
+
+      acc[targetType][targetId] = (acc[targetType][targetId] ?? 0) + 1;
+      return acc;
+    },
+    {
+      arme: {} as Record<number, number>,
+      outil: {} as Record<number, number>,
+      sac: {} as Record<number, number>,
+    },
+  );
+
+  const applyCraftedQuantities = <
+    TItem extends { id: number; quantity?: number },
+  >(
+    items: TItem[] = [],
+    countsById: Record<number, number>,
+  ): TItem[] =>
+    items.map((item) => {
+      const craftedCount = countsById[Number(item.id)] ?? 0;
+      if (craftedCount <= 0) {
+        return item;
+      }
+
+      return {
+        ...item,
+        quantity:
+          Math.max(0, Math.floor(Number(item.quantity ?? 0) || 0)) +
+          craftedCount,
+      };
+    });
+
   return {
     persos: nextPersos,
     stocks: {
@@ -517,5 +581,8 @@ export const applyTimelineSegmentToState = (
       ...endingState.stocks,
     },
     persoResources: nextPersoResources,
+    armes: applyCraftedQuantities(armes, craftedCounts.arme),
+    outils: applyCraftedQuantities(outils, craftedCounts.outil),
+    sacs: applyCraftedQuantities(sacs, craftedCounts.sac),
   };
 };

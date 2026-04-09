@@ -109,7 +109,7 @@ function TimelineRowEditor({
       | "drogue"
       | "constructionId"
       | "actionId",
-    value: string | boolean,
+    value: number | string | boolean,
   ) => void;
   setOverride: (
     luneIndex: number,
@@ -260,7 +260,7 @@ function TimelineRowEditor({
                   actualLuneIndex,
                   row.persoId,
                   "actionId",
-                  event.target.value,
+                  event.target.value ? Number(event.target.value) : false,
                 )
               }
             >

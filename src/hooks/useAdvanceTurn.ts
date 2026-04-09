@@ -4,13 +4,27 @@ import {
   applyTimelineSegmentToState,
   buildFrozenTimelineSnapshot,
 } from "../utils/timelineSimulation";
-import type { Lune, Perso, PersoResource, Resource, Stocks } from "../types";
+import type {
+  Action,
+  Arme,
+  Lune,
+  Outil,
+  Perso,
+  PersoResource,
+  Resource,
+  Sac,
+  Stocks,
+} from "../types";
 import type { TimelineSegment } from "../utils/timelineTypes";
 
 interface UseAdvanceTurnParams {
   hasNoPersos: boolean;
   currentTimelineSegment: TimelineSegment | null;
   persos: Perso[];
+  actions: Action[];
+  armes: Arme[];
+  outils: Outil[];
+  sacs: Sac[];
   stocks: Stocks;
   persoResources: PersoResource[];
   resources: Resource[];
@@ -19,11 +33,17 @@ interface UseAdvanceTurnParams {
   addLune: () => void;
   setLunes: Dispatch<SetStateAction<Lune[]>>;
   setPersos: Dispatch<SetStateAction<Perso[]>>;
+  setArmes: Dispatch<SetStateAction<Arme[]>>;
+  setOutils: Dispatch<SetStateAction<Outil[]>>;
+  setSacs: Dispatch<SetStateAction<Sac[]>>;
   setPersoResources: Dispatch<SetStateAction<PersoResource[]>>;
   setStocks: Dispatch<SetStateAction<Stocks>>;
   setVisiblePastLunes: Dispatch<SetStateAction<number>>;
   setCurrentLune: Dispatch<SetStateAction<number>>;
   savePersoEntity: (perso: Perso) => void;
+  saveArmeEntity: (arme: Arme) => void;
+  saveOutilEntity: (outil: Outil) => void;
+  saveSacEntity: (sac: Sac) => void;
   savePersoResourcesEntity: (
     persoId: number,
     nextPersoResources: PersoResource[],
@@ -112,10 +132,34 @@ const persistAdvancedStocks = ({
   });
 };
 
+const persistAdvancedInventory = <TItem extends { id: number }>({
+  previousItems,
+  nextItems,
+  saveEntity,
+}: {
+  previousItems: TItem[];
+  nextItems: TItem[];
+  saveEntity: (item: TItem) => void;
+}) => {
+  nextItems.forEach((item) => {
+    const previousItem = previousItems.find(
+      (candidate) => Number(candidate.id) === Number(item.id),
+    );
+
+    if (previousItem && JSON.stringify(previousItem) !== JSON.stringify(item)) {
+      saveEntity(item);
+    }
+  });
+};
+
 export const useAdvanceTurn = ({
   hasNoPersos,
   currentTimelineSegment,
   persos,
+  actions,
+  armes,
+  outils,
+  sacs,
   stocks,
   persoResources,
   resources,
@@ -124,11 +168,17 @@ export const useAdvanceTurn = ({
   addLune,
   setLunes,
   setPersos,
+  setArmes,
+  setOutils,
+  setSacs,
   setPersoResources,
   setStocks,
   setVisiblePastLunes,
   setCurrentLune,
   savePersoEntity,
+  saveArmeEntity,
+  saveOutilEntity,
+  saveSacEntity,
   savePersoResourcesEntity,
   saveStockEntity,
   saveLuneEntity,
@@ -166,6 +216,10 @@ export const useAdvanceTurn = ({
         currentTimelineSegment,
         persoResources,
         resources,
+        actions,
+        armes,
+        outils,
+        sacs,
       );
 
       setPersos(advancedState.persos);
@@ -180,6 +234,27 @@ export const useAdvanceTurn = ({
         previousPersoResources: persoResources,
         nextPersoResources: advancedState.persoResources,
         savePersoResourcesEntity,
+      });
+
+      setArmes(advancedState.armes);
+      persistAdvancedInventory({
+        previousItems: armes,
+        nextItems: advancedState.armes,
+        saveEntity: saveArmeEntity,
+      });
+
+      setOutils(advancedState.outils);
+      persistAdvancedInventory({
+        previousItems: outils,
+        nextItems: advancedState.outils,
+        saveEntity: saveOutilEntity,
+      });
+
+      setSacs(advancedState.sacs);
+      persistAdvancedInventory({
+        previousItems: sacs,
+        nextItems: advancedState.sacs,
+        saveEntity: saveSacEntity,
       });
 
       setStocks(advancedState.stocks);
@@ -205,23 +280,33 @@ export const useAdvanceTurn = ({
     saveCurrentLuneEntity(nextCurrentLune);
     showToast(`Passage à la lune ${nextCurrentLune}.`);
   }, [
+    actions,
     addLune,
+    armes,
     currentLune,
     currentTimelineSegment,
     hasNoPersos,
     lunes,
+    outils,
     persos,
     persoResources,
+    sacs,
     resources,
+    saveArmeEntity,
     saveCurrentLuneEntity,
     saveLuneEntity,
+    saveOutilEntity,
     savePersoEntity,
     savePersoResourcesEntity,
+    saveSacEntity,
     saveStockEntity,
+    setArmes,
     setCurrentLune,
     setLunes,
+    setOutils,
     setPersoResources,
     setPersos,
+    setSacs,
     setStocks,
     setVisiblePastLunes,
     showToast,

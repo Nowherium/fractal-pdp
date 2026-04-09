@@ -8,6 +8,15 @@ import type {
 
 export type CityMultipliersInput = Partial<CityMultipliers>;
 
+export type CraftedActionResult = {
+  actionId: number | null;
+  success: boolean;
+  name?: string;
+  targetType?: "arme" | "outil" | "sac" | null;
+  targetId?: number | null;
+  reason?: string;
+};
+
 export type TimelineRow = {
   persoId: number;
   nom: string;
@@ -28,6 +37,7 @@ export type TimelineRow = {
   rationSource?: Record<"eau" | "nrt" | "med", "perso" | "ville" | "none">;
   drugStatus?: string;
   drugClassName?: string;
+  craftedAction?: CraftedActionResult;
 };
 
 export type TimelineStats = {
