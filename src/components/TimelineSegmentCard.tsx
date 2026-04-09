@@ -125,7 +125,9 @@ function TimelineSegmentCard({
     setIsSharedToolsOpen(!checked);
   };
 
-  const availableOutils = outils.filter((outil) => Number(outil.quantity) > 0);
+  const availableOutils = outils.filter(
+    (outil) => Number(outil.quantity ?? 1) > 0,
+  );
 
   return (
     <div

@@ -11,6 +11,7 @@ export type CityMultipliersInput = Partial<CityMultipliers>;
 export type CraftedActionResult = {
   actionId: number | null;
   success: boolean;
+  quantity?: number;
   name?: string;
   targetType?: "arme" | "outil" | "sac" | null;
   targetId?: number | null;

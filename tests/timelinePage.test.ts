@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import TimelineOverrideEditor from "../src/components/TimelineOverrideEditor";
 import TimelinePage from "../src/components/TimelinePage";
-import type { Outil } from "../src/types";
+import type { Action, Outil } from "../src/types";
 
 const timelinePageProps = {
   currentLune: 1,
@@ -356,6 +356,55 @@ test("preselects the highest-bonus shared tool by default", () => {
     markup,
     /<option[^>]*value="6"[^>]*selected=""[^>]*>Seau \(x1\.10\)<\/option>/,
   );
+});
+
+test("shows the fabrication skill and planned quantity for the selected action", () => {
+  const actions = [
+    {
+      id: 42,
+      name: "Pioche de campagne",
+      specialite: "mat",
+      min_capacite: 3,
+      resource_cost: 2,
+      resource_id: 1,
+      target_type: "outil",
+      outil_id: 7,
+    },
+  ] satisfies Action[];
+
+  const markup = renderToStaticMarkup(
+    createElement(TimelinePage, {
+      ...timelinePageProps,
+      actions,
+      timelineData: [
+        {
+          ...timelinePageProps.timelineData[0]!,
+          rows: [
+            {
+              ...timelinePageProps.timelineData[0]!.rows[0]!,
+              cDebut: { eau: 1, nrt: 1, med: 0, mat: 9.05, art: 0 },
+              ration: {
+                ...timelinePageProps.timelineData[0]!.rows[0]!.ration,
+                tache: "fabriquer",
+                actionId: 42,
+              },
+              craftedAction: {
+                actionId: 42,
+                success: true,
+                quantity: 3,
+                name: "Pioche de campagne",
+                targetType: "outil",
+                targetId: 7,
+              },
+            },
+          ],
+        },
+      ],
+    }),
+  );
+
+  assert.match(markup, /Fabriquer \(Mat 9\.1\)/);
+  assert.match(markup, /Quantité : 3 × Pioche de campagne/);
 });
 
 test("renders an Exporter button at the bottom-right of the current lune only", () => {

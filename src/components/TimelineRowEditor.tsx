@@ -16,6 +16,49 @@ const drugStatusClassNames = {
   safe: "text-accent-green",
 } as const;
 
+const fabricationSpecialiteLabels = {
+  eau: "Eau",
+  nrt: "Nrt",
+  med: "Med",
+  mat: "Mat",
+  art: "Art",
+} as const;
+
+const fabricationFailureLabels = {
+  "action-invalide": "action invalide",
+  "cible-invalide": "cible invalide",
+  "capacite-insuffisante": "capacité insuffisante",
+  "ressource-insuffisante": "ressources insuffisantes",
+} as const;
+
+const normalizeFabricationSpecialite = (
+  value: unknown,
+): keyof typeof fabricationSpecialiteLabels => {
+  const normalized = String(value ?? "").toLowerCase();
+
+  return normalized in fabricationSpecialiteLabels
+    ? (normalized as keyof typeof fabricationSpecialiteLabels)
+    : "art";
+};
+
+const estimateCraftedQuantity = (row: TimelineRow, action?: Action): number => {
+  if (!action) {
+    return 0;
+  }
+
+  if (Number(row.craftedAction?.actionId ?? 0) === Number(action.id ?? 0)) {
+    return Math.max(0, Number(row.craftedAction?.quantity ?? 0));
+  }
+
+  const specialite = normalizeFabricationSpecialite(action.specialite);
+  const effectiveCapacity = Number(
+    row.cDebut[specialite] ?? row.cDebut.art ?? 0,
+  );
+  const requiredCapacity = Math.max(1, Number(action.min_capacite ?? 0) || 0);
+
+  return Math.max(0, Math.floor(effectiveCapacity / requiredCapacity));
+};
+
 function TimelineRationCheckbox({
   checked,
   disabled,
@@ -137,6 +180,24 @@ function TimelineRowEditor({
       return isPlacedThisLune || row.ration.constructionId === construction.id;
     },
   );
+  const selectedAction =
+    actions.find(
+      (action) => Number(action.id ?? 0) === Number(row.ration.actionId ?? 0),
+    ) ?? actions[0];
+  const fabricationSpecialite = normalizeFabricationSpecialite(
+    selectedAction?.specialite,
+  );
+  const fabricationCapacity = Number(
+    row.cDebut[fabricationSpecialite] ?? row.cDebut.art ?? 0,
+  );
+  const fabricationOptionLabel = `🛠️ Fabriquer (${fabricationSpecialiteLabels[fabricationSpecialite]} ${fabricationCapacity.toFixed(1)})`;
+  const estimatedCraftQuantity = estimateCraftedQuantity(row, selectedAction);
+  const fabricationFailureReason =
+    row.craftedAction?.success === false
+      ? fabricationFailureLabels[
+          row.craftedAction.reason as keyof typeof fabricationFailureLabels
+        ]
+      : null;
 
   return (
     <Fragment>
@@ -212,7 +273,7 @@ function TimelineRowEditor({
             <option value='med'>💊 Med ({row.cDebut.med.toFixed(1)})</option>
             <option value='mat'>🧱 Mat ({row.cDebut.mat.toFixed(1)})</option>
             <option value='construire'>🛠️ Construire</option>
-            <option value='fabriquer'>🛠️ Fabriquer</option>
+            <option value='fabriquer'>{fabricationOptionLabel}</option>
           </select>
           {isAutoAssignEnabled && !row.isAbsent && !row.mortAuDebut ? (
             <div className='mt-1 text-[0.72rem] font-medium text-accent-cyan'>
@@ -273,6 +334,20 @@ function TimelineRowEditor({
                 );
               })}
             </select>
+          ) : null}
+          {row.ration.tache === "fabriquer" && selectedAction ? (
+            <div className='mt-1 text-[0.72rem] text-[#9ea7b3]'>
+              {!fabricationFailureReason ? (
+                <div>
+                  <div>{`Quantité : ${estimatedCraftQuantity} × ${selectedAction.name}`}</div>
+                  <div>{`Compétence min ${Number(selectedAction.min_capacite ?? 0)}`}</div>
+                </div>
+              ) : (
+                <div className='text-[#ffb74d]'>
+                  {`Fabrication bloquée : ${fabricationFailureReason}`}
+                </div>
+              )}
+            </div>
           ) : null}
         </td>
         <td>

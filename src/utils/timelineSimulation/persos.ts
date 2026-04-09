@@ -397,7 +397,7 @@ export const simulatePersoForLune = ({
           nrt: cDebut.nrt * drugEffect.productionMultiplier,
           med: cDebut.med * drugEffect.productionMultiplier,
           mat: cDebut.mat * drugEffect.productionMultiplier,
-          art: cDebut.art * drugEffect.productionMultiplier,
+          art: cDebut.art,
         };
       }
 
@@ -458,8 +458,12 @@ export const simulatePersoForLune = ({
         Number(selectedAction?.min_capacite ?? 0) || 0,
       );
       const specialiteState = capStateAtStart[specialite];
-      const hasEnoughCapacity =
-        Number(specialiteState?.effectiveCap ?? 0) >= requiredCapacity;
+      const effectiveCapacity = Number(specialiteState?.effectiveCap ?? 0);
+      const capacityPerCraft = Math.max(1, requiredCapacity || 0);
+      const maxCraftCountByCapacity = Math.max(
+        0,
+        Math.floor(effectiveCapacity / capacityPerCraft),
+      );
       const resourceCost = Math.max(
         0,
         Number(selectedAction?.resource_cost ?? 0) || 0,
@@ -471,22 +475,28 @@ export const simulatePersoForLune = ({
         ? Number(persoDrugStocks[resourceCode] ?? 0) +
           Number(availableCityResourceStocks[resourceCode] ?? 0)
         : Number.POSITIVE_INFINITY;
+      const maxCraftCountByResource =
+        resourceCost > 0
+          ? Math.max(0, Math.floor(totalAvailableResource / resourceCost))
+          : Number.POSITIVE_INFINITY;
+      const hasEnoughCapacity = maxCraftCountByCapacity > 0;
       const hasEnoughResource =
-        resourceCost <= 0 ||
-        Boolean(resourceCode && totalAvailableResource >= resourceCost);
+        resourceCost <= 0 || maxCraftCountByResource > 0;
       const hasValidTarget = Boolean(
         targetType &&
         targetId &&
         craftableTargetIds[targetType].has(Number(targetId)),
       );
+      const craftCount =
+        hasValidTarget && hasEnoughCapacity && hasEnoughResource
+          ? Math.max(
+              0,
+              Math.min(maxCraftCountByCapacity, maxCraftCountByResource),
+            )
+          : 0;
 
-      if (
-        selectedAction &&
-        hasValidTarget &&
-        hasEnoughCapacity &&
-        hasEnoughResource
-      ) {
-        let remainingCost = resourceCost;
+      if (selectedAction && craftCount > 0) {
+        let remainingCost = resourceCost * craftCount;
         let cityConsumed = 0;
 
         if (resourceCode && remainingCost > 0) {
@@ -514,7 +524,7 @@ export const simulatePersoForLune = ({
           }
 
           if (isProductionTask(resourceCode)) {
-            consumption[resourceCode] += resourceCost;
+            consumption[resourceCode] += resourceCost * craftCount;
             cityConsumption[resourceCode] += cityConsumed;
           }
         }
@@ -525,6 +535,7 @@ export const simulatePersoForLune = ({
         craftedAction = {
           actionId: Number(selectedAction.id),
           success: true,
+          quantity: craftCount,
           name: String(selectedAction.name ?? ""),
           targetType,
           targetId: Number(targetId),
@@ -535,6 +546,7 @@ export const simulatePersoForLune = ({
             ? Number(selectedAction.id)
             : Number(ration.actionId),
           success: false,
+          quantity: 0,
           name: String(selectedAction?.name ?? ""),
           targetType,
           targetId,

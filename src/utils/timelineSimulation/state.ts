@@ -544,7 +544,16 @@ export const applyTimelineSegmentToState = (
         return acc;
       }
 
-      acc[targetType][targetId] = (acc[targetType][targetId] ?? 0) + 1;
+      const craftedQuantity = Math.max(
+        0,
+        Number(craftedAction.quantity ?? 1) || 0,
+      );
+      if (craftedQuantity <= 0) {
+        return acc;
+      }
+
+      acc[targetType][targetId] =
+        (acc[targetType][targetId] ?? 0) + craftedQuantity;
       return acc;
     },
     {

@@ -1456,6 +1456,101 @@ test("applies a fabriquer action by consuming resources and increasing the craft
   assert.equal(advanced.armes[0]?.quantity, 2);
 });
 
+test("crafts multiple objects when the effective capacity covers min_capacite several times", () => {
+  const resources = [{ id: 1, code: "mat", name: "Mat" }];
+  const actions = [
+    {
+      id: 1,
+      name: "Fabriquer une lance",
+      specialite: "mat",
+      min_capacite: 3,
+      resource_cost: 2,
+      resource_id: 1,
+      target_type: "arme",
+      arme_id: 9,
+      outil_id: 0,
+      sac_id: 0,
+    },
+  ];
+  const armes = [{ id: 9, name: "Lance", quantity: 1 }];
+  const persos = [
+    {
+      id: 1,
+      nom: "Forgeron expert",
+      present: true,
+      pv: 5,
+      pvmax: 5,
+      capEau: 0,
+      capEauEffectif: 0,
+      capNrt: 0,
+      capNrtEffectif: 0,
+      capMed: 0,
+      capMedEffectif: 0,
+      capMat: 9.05,
+      capMatEffectif: 9.05,
+      capArt: 0,
+      capArtEffectif: 0,
+      combat: 0,
+    },
+  ];
+
+  const [segment] = simulateTimeline(
+    persos,
+    [
+      {
+        id: 1,
+        meteo: { eau: 1, nrt: 1, med: 1, mat: 1 },
+        overrides: {},
+        constructionPlacements: [],
+        constructions: [],
+        rations: {
+          1: {
+            eau: false,
+            nrt: false,
+            med: false,
+            tache: "fabriquer",
+            drogue: null,
+            actionId: 1,
+          },
+        },
+      },
+    ],
+    { eau: 0, nrt: 0, med: 0, mat: 10 },
+    defaultRation,
+    [],
+    resources,
+    [],
+    { eau: 1, nrt: 1, med: 1, mat: 1 },
+    1,
+    {},
+    [],
+    actions,
+    armes,
+    [],
+  );
+
+  assert.ok(segment);
+  assert.equal(segment.stats.consoMat, 6);
+  assert.equal(segment.stats.stockMat, 4);
+  assert.equal(segment.rows[0]?.craftedAction?.success, true);
+  assert.equal(segment.rows[0]?.craftedAction?.quantity, 3);
+
+  const advanced = applyTimelineSegmentToState(
+    persos,
+    { eau: 0, nrt: 0, med: 0, mat: 10 },
+    segment,
+    [],
+    resources,
+    actions,
+    armes,
+    [],
+    [],
+  );
+
+  assert.equal(advanced.stocks["mat"], 4);
+  assert.equal(advanced.armes[0]?.quantity, 4);
+});
+
 test("does not craft anything when the action requirements are not met", () => {
   const resources = [{ id: 1, code: "mat", name: "Mat" }];
   const actions = [
