@@ -114,6 +114,15 @@ export const setupAuthRoutes = (app: Express) => {
     res.json({ success: true });
   });
 
+  app.delete("/api/users/:id", requireAuth, requireRole(["admin"]), async (req, res) => {
+    if (req.params.id === "1" || req.params.id === String(req.user?.id)) {
+      return res.status(403).json({ error: "Action non autorisée (impossible de supprimer cet admin)" });
+    }
+    
+    await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
+  });
+
   app.get("/api/logs", requireAuth, requireRole(["admin"]), async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 50));
