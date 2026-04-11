@@ -46,7 +46,7 @@ export const requireRole = (roles: string[]) => (req: AuthRequest, res: Response
 };
 
 export const auditLogger = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (["POST", "PUT", "DELETE"].includes(req.method)) {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
     res.on("finish", async () => {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         try {
@@ -112,5 +112,52 @@ export const setupAuthRoutes = (app: Express) => {
     const { role } = req.body;
     await pool.query("UPDATE users SET role = $1 WHERE id = $2", [role, req.params.id]);
     res.json({ success: true });
+  });
+
+  app.get("/api/logs", requireAuth, requireRole(["admin"]), async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * limit;
+    const search = req.query.search ? `%${req.query.search}%` : null;
+
+    let query = `
+      SELECT al.id, u.username, al.action_type, al.details, al.created_at 
+      FROM audit_logs al
+      LEFT JOIN users u ON al.user_id = u.id
+    `;
+    let countQuery = `
+      SELECT COUNT(*) 
+      FROM audit_logs al
+      LEFT JOIN users u ON al.user_id = u.id
+    `;
+    
+    const params: any[] = [];
+
+    if (search) {
+      const searchClause = ` WHERE u.username ILIKE $1 OR al.action_type ILIKE $1 OR al.details::text ILIKE $1 `;
+      query += searchClause;
+      countQuery += searchClause;
+      params.push(search);
+    }
+
+    query += ` ORDER BY al.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+
+    try {
+      const { rows } = await pool.query(query, [...params, limit, offset]);
+      const { rows: countRows } = await pool.query(countQuery, params);
+      const total = parseInt(countRows[0].count, 10);
+
+      res.json({
+        data: rows,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Erreur lors de la récupération des logs" });
+    }
   });
 };
