@@ -36,6 +36,13 @@ import {
   defaultPersos,
   defaultRation,
 } from "./db";
+import {
+  seedAdmin,
+  setupAuthRoutes,
+  auditLogger,
+  requireAuth,
+  requireRole,
+} from "./auth";
 
 type DbAction = () => Promise<void>;
 type DbReadAction<T> = () => Promise<T>;
@@ -54,6 +61,21 @@ app.use(express.json({ limit: "5mb" }));
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
+
+setupAuthRoutes(app);
+
+app.use("/api", requireAuth as RequestHandler);
+
+app.use("/api", ((req, res, next) => {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    const roleHandler = requireRole(["read-write", "admin"]);
+    roleHandler(req as any, res, next);
+  } else {
+    next();
+  }
+}) as RequestHandler);
+
+app.use("/api", auditLogger as RequestHandler);
 
 const ensureNumericId = (res: Response, rawId: unknown): number | null => {
   const id = Number(rawId);
@@ -403,6 +425,7 @@ app.post("/api/reset", async (_req, res) => {
 const start = async (): Promise<void> => {
   try {
     await initDb();
+    await seedAdmin();
     app.listen(PORT, () => {
       console.log(`Backend démarré sur le port ${PORT}`);
     });
