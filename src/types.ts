@@ -12,7 +12,8 @@ export type AppPage =
   | "sacs"
   | "resources"
   | "terrains"
-  | "actions";
+  | "actions"
+  | "forum";
 
 export interface AppRouteState {
   page: AppPage;
