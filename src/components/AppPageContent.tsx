@@ -14,6 +14,7 @@ import WeaponsPage from "./WeaponsPage";
 import ToolsPage from "./ToolsPage";
 import BagsPage from "./BagsPage";
 import ActionsPage from "./ActionsPage";
+import ForumPage from "./ForumPage";
 
 import type { AppPage, Group, Perso } from "../types";
 
@@ -209,6 +210,8 @@ function AppPageContent({
       return <BagsPage {...bagsProps} />;
     case "actions":
       return <ActionsPage {...actionsProps} />;
+    case "forum":
+      return <ForumPage />;
     default:
       return null;
   }
